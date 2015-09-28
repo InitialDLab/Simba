@@ -1,7 +1,7 @@
 package org.apache.spark.sql.index
 
 /**
- * Created by Dong on 9/22/15.
+ * Created by Dong Xie on 9/22/15.
  * Base trait for index and index type
  */
 trait Index

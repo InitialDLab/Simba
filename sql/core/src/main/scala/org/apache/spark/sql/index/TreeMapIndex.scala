@@ -1,6 +1,6 @@
 package org.apache.spark.sql.index
 
-import org.apache.spark.sql.Row
+import org.apache.spark.sql.catalyst.InternalRow
 
 /**
  * Created by Dong Xie on 9/22/15.
@@ -11,7 +11,7 @@ class TreeMapIndex[T] extends Index {
 }
 
 object TreeMapIndex {
-  def apply[T](data: Array[(T, Row)]) = {
+  def apply[T](data: Array[(T, InternalRow)]) = {
     val res = new TreeMapIndex[T]
     for (i <- data.indices)
       res.index.put(data(i)._1, i)
