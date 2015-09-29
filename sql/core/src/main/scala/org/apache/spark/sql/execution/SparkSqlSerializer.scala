@@ -34,6 +34,8 @@ import org.apache.spark.sql.types.Decimal
 import org.apache.spark.util.MutablePair
 import org.apache.spark.util.collection.OpenHashSet
 import org.apache.spark.{SparkConf, SparkEnv}
+import org.apache.spark.sql.spatial._
+import org.apache.spark.sql.index.{RTree, RTreeNode, RTreeEntry, TreeMapIndex, HashMapIndex}
 
 private[sql] class SparkSqlSerializer(conf: SparkConf) extends KryoSerializer(conf) {
   override def newKryo(): Kryo = {
@@ -55,6 +57,16 @@ private[sql] class SparkSqlSerializer(conf: SparkConf) extends KryoSerializer(co
                   new OpenHashSetSerializer)
     kryo.register(classOf[Decimal])
     kryo.register(classOf[JavaHashMap[_, _]])
+
+    kryo.register(classOf[Point])
+    kryo.register(classOf[MBR])
+    kryo.register(classOf[RTreeNode])
+    kryo.register(classOf[RTreeEntry])
+    kryo.register(classOf[RTree])
+    kryo.register(classOf[java.util.TreeMap[_, _]])
+    kryo.register(classOf[java.util.HashMap[_, _]])
+    kryo.register(classOf[TreeMapIndex[_]])
+    kryo.register(classOf[HashMapIndex[_]])
 
     kryo.setReferences(false)
     kryo

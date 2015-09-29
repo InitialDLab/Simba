@@ -217,6 +217,52 @@ object ExtractEquiJoinKeys extends Logging with PredicateHelper {
   }
 }
 
+object ExtractSpatialJoinKeys extends Logging with PredicateHelper {
+  type ReturnType = (Seq[Expression], Seq[Expression], Literal, JoinType, LogicalPlan, LogicalPlan)
+
+  def unapply(plan: LogicalPlan): Option[ReturnType] = {
+    plan match {
+      case Join(left, right, KNNJoin, condition) =>
+        val children = condition.get.children
+        // condition = leftKeys + rightKeys + k, thus dimension length for each table is (length - 1) / 2
+        val len = (children.length - 1) >> 1
+        var left_keys = Seq[Expression]()
+        var right_keys = Seq[Expression]()
+        for (i <- 0 to len - 1) {
+          right_keys = right_keys :+ children(i)
+          left_keys = left_keys :+ children(len + i)
+        }
+        val k = children.last.asInstanceOf[Literal]
+        Some((left_keys, right_keys, k, KNNJoin, left, right))
+      case Join(left, right, ZKNNJoin, condition) =>
+        val children = condition.get.children
+        // condition = leftKeys + rightKeys + k, thus dimension length for each table is (length - 1) / 2
+        val len = (children.length - 1) >> 1
+        var left_keys = Seq[Expression]()
+        var right_keys = Seq[Expression]()
+        for (i <- 0 to len - 1) {
+          right_keys = right_keys :+ children(i)
+          left_keys = left_keys :+ children(len + i)
+        }
+        val k = children.last.asInstanceOf[Literal]
+        Some((left_keys, right_keys, k, ZKNNJoin, left, right))
+      case Join(left, right, DistanceJoin, condition) =>
+        val children = condition.get.children
+        // condition = leftKeys + rightKeys + k, thus dimension length for each table is (length - 1) / 2
+        val len = (children.length - 1) >> 1
+        var left_keys = Seq[Expression]()
+        var right_keys = Seq[Expression]()
+        for (i <- 0 to len - 1) {
+          right_keys = right_keys :+ children(i)
+          left_keys = left_keys :+ children(len + i)
+        }
+        val r = children.last.asInstanceOf[Literal]
+        Some((left_keys, right_keys, r, DistanceJoin, left, right))
+    }
+  }
+}
+
+
 /**
  * A pattern that collects all adjacent unions and returns their children as a Seq.
  */

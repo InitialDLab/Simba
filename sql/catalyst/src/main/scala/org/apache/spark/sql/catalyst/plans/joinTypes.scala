@@ -48,3 +48,9 @@ case object RightOuter extends JoinType
 case object FullOuter extends JoinType
 
 case object LeftSemi extends JoinType
+
+case object KNNJoin extends JoinType
+
+case object ZKNNJoin extends JoinType
+
+case object DistanceJoin extends JoinType

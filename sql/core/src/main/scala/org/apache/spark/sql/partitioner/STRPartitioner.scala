@@ -86,7 +86,7 @@ class STRPartitioner(est_partition: Int,
       val grouped = entries.sortWith(_.coord(cur_dim) < _.coord(cur_dim))
                            .grouped(Math.ceil(len / dim(cur_dim)).toInt).toArray
       val flag = 1 << cur_dim
-      var ans = mutable.ListBuffer[MBR]()
+      var ans = mutable.ArrayBuffer[MBR]()
       if (cur_dim < until_dim) {
         for (i <- grouped.indices) {
           val cur_min = now_min

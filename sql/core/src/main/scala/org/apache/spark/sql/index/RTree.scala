@@ -33,7 +33,7 @@ class NNOrdering() extends Ordering[(_, Double)] {
 
 case class RTree(root: RTreeNode) extends Index {
   def range(query: MBR): Array[(MBR, Int)] = {
-    val ans = mutable.ListBuffer[(MBR, Int)]()
+    val ans = mutable.ArrayBuffer[(MBR, Int)]()
     val st = new mutable.Stack[RTreeNode]()
     if (root.m_mbr.isIntersect(query) && root.m_child.nonEmpty)
       st.push(root)
@@ -47,7 +47,7 @@ case class RTree(root: RTreeNode) extends Index {
   }
 
   def circleRange(origin: Point, r: Double): Array[(MBR, Int)] = {
-    val ans = mutable.ListBuffer[(MBR, Int)]()
+    val ans = mutable.ArrayBuffer[(MBR, Int)]()
     val st = new mutable.Stack[RTreeNode]()
     if (root.m_mbr.minDist(origin) <= r && root.m_child.nonEmpty)
       st.push(root)
@@ -61,7 +61,7 @@ case class RTree(root: RTreeNode) extends Index {
   }
 
   def circleRange(origin: MBR, r: Double): Array[(MBR, Int)] = {
-    val ans = mutable.ListBuffer[(MBR, Int)]()
+    val ans = mutable.ArrayBuffer[(MBR, Int)]()
     val st = new mutable.Stack[RTreeNode]()
     if (root.m_mbr.minDist(origin) <= r && root.m_child.nonEmpty)
       st.push(root)
@@ -75,7 +75,7 @@ case class RTree(root: RTreeNode) extends Index {
   }
 
   def circleRangeConj(queries: Array[(Point, Double)]): Array[(MBR, Int)] = {
-    val ans = mutable.ListBuffer[(MBR, Int)]()
+    val ans = mutable.ArrayBuffer[(MBR, Int)]()
     val st = new mutable.Stack[RTreeNode]()
 
     def checkMBR(mbr: MBR) : Boolean = {
@@ -97,7 +97,7 @@ case class RTree(root: RTreeNode) extends Index {
   }
 
   def kNN(query: Point, k: Int, keepSame: Boolean = false): Array[(MBR, Int)] = {
-    val ans = mutable.ListBuffer[(MBR, Int)]()
+    val ans = mutable.ArrayBuffer[(MBR, Int)]()
     val pq = new mutable.PriorityQueue[(_, Double)]()(new NNOrdering())
     var cnt = 0
     var kNN_dis = 0.0
@@ -129,7 +129,7 @@ case class RTree(root: RTreeNode) extends Index {
   }
 
   def kNN(query: Point, distFunc: (Point, MBR) => Double, k: Int, keepSame: Boolean): Array[(MBR, Int)] = {
-    val ans = mutable.ListBuffer[(MBR, Int)]()
+    val ans = mutable.ArrayBuffer[(MBR, Int)]()
     val pq = new mutable.PriorityQueue[(_, Double)]()(new NNOrdering())
     var cnt = 0
     var kNN_dis = 0.0
@@ -161,7 +161,7 @@ case class RTree(root: RTreeNode) extends Index {
   }
 
   def kNN(query: MBR, distFunc: (MBR, MBR) => Double, k: Int, keepSame: Boolean): Array[(MBR, Int)] = {
-    val ans = mutable.ListBuffer[(MBR, Int)]()
+    val ans = mutable.ArrayBuffer[(MBR, Int)]()
     val pq = new mutable.PriorityQueue[(_, Double)]()(new NNOrdering())
     var cnt = 0
     var kNN_dis = 0.0
@@ -214,7 +214,7 @@ object RTree {
     }
 
     val grouped = recursiveGroupPoint(entries, 0, dimension - 1)
-    val rtree_nodes = mutable.ListBuffer[(MBR, RTreeNode)]()
+    val rtree_nodes = mutable.ArrayBuffer[(MBR, RTreeNode)]()
     grouped.foreach(list => {
       val min = new Array[Double](dimension).map(x => Double.MaxValue)
       val max = new Array[Double](dimension).map(x => Double.MinValue)
@@ -257,7 +257,7 @@ object RTree {
 
     while (!over(dim)) {
       val grouped = recursiveGroupRTreeNode(cur_rtree_nodes, 0, dimension - 1)
-      var tmp_nodes = mutable.ListBuffer[(MBR, RTreeNode)]()
+      var tmp_nodes = mutable.ArrayBuffer[(MBR, RTreeNode)]()
       grouped.foreach(list => {
         val min = new Array[Double](dimension).map(x => Double.MaxValue)
         val max = new Array[Double](dimension).map(x => Double.MinValue)
@@ -315,7 +315,7 @@ object RTree {
     }
 
     val grouped = recursiveGroupMBR(entries, 0, dimension - 1)
-    val rtree_nodes = mutable.ListBuffer[(MBR, RTreeNode)]()
+    val rtree_nodes = mutable.ArrayBuffer[(MBR, RTreeNode)]()
     grouped.foreach(list => {
       val min = new Array[Double](dimension).map(x => Double.MaxValue)
       val max = new Array[Double](dimension).map(x => Double.MinValue)
@@ -359,7 +359,7 @@ object RTree {
 
     while (!over(dim)) {
       val grouped = recursiveGroupRTreeNode(cur_rtree_nodes, 0, dimension - 1)
-      var tmp_nodes = mutable.ListBuffer[(MBR, RTreeNode)]()
+      var tmp_nodes = mutable.ArrayBuffer[(MBR, RTreeNode)]()
       grouped.foreach(list => {
         val min = new Array[Double](dimension).map(x => Double.MaxValue)
         val max = new Array[Double](dimension).map(x => Double.MinValue)

@@ -79,6 +79,8 @@ abstract class Expression extends TreeNode[Expression] {
 
   def nullable: Boolean
 
+  def hasSpatial: Boolean = false
+
   def references: AttributeSet = AttributeSet(children.flatMap(_.references.iterator))
 
   /** Returns the result of evaluating this expression on a given input Row */

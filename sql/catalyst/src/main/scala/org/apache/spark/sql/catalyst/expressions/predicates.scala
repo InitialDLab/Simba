@@ -49,6 +49,80 @@ trait Predicate extends Expression {
 
 
 trait PredicateHelper {
+  protected def toDNF(condition: Expression): Expression = {
+    condition match {
+      case Or(left, right) =>
+        Or(toDNF(left), toDNF(right))
+      case And(left, right) =>
+        var ans: Expression = null
+        val tmp_left = toDNF(left)
+        val tmp_right = toDNF(right)
+        tmp_left match {
+          case Or(l, r) =>
+            ans = Or(And(l, tmp_right), And(r, tmp_right))
+        }
+        tmp_right match {
+          case Or(l, r) =>
+            if (ans == null)
+              ans = Or(And(tmp_left, l), And(tmp_left, r))
+        }
+        if (ans == null)
+          And(tmp_left, tmp_right)
+        else toDNF(ans)
+      case exp => exp
+    }
+  }
+
+  protected def toCNF(condition: Expression): Expression = {
+    condition match {
+      case And(left, right) =>
+        And(toCNF(left), toCNF(right))
+      case Or(left, right) =>
+        var ans: Expression = null
+        val tmp_left = toCNF(left)
+        val tmp_right = toCNF(right)
+        tmp_left match {
+          case And(l, r) =>
+            ans = And(Or(l, tmp_right), Or(r, tmp_right))
+        }
+        tmp_right match {
+          case And(l, r) =>
+            if (ans == null)
+              ans = And(Or(tmp_left, l), Or(tmp_left, r))
+        }
+        if (ans == null)
+          Or(tmp_left, tmp_right)
+        else toCNF(ans)
+      case exp => exp
+    }
+  }
+  protected def dnfExtract(expression: Expression): Seq[Expression] = {
+    expression match {
+      case Or(left, right) =>
+        dnfExtract(left) ++ dnfExtract(right)
+      case And(left @ And(l2, r2), right) =>
+        dnfExtract(And(l2, And(r2, right)))
+      case other =>
+        other :: Nil
+    }
+  }
+
+  protected def cnfExtract(expression: Expression): Seq[Expression] = {
+    expression match {
+      case And(left, right) =>
+        cnfExtract(left) ++ cnfExtract(right)
+      case Or(left @ Or(l2, r2), right) =>
+        cnfExtract(Or(l2, Or(r2, right)))
+      case other =>
+        other :: Nil
+    }
+  }
+
+  protected def splitDNFPredicates(condition: Expression) = dnfExtract(toDNF(condition))
+
+  protected def splitCNFPredicates(condition: Expression) = cnfExtract(toCNF(condition))
+
+
   protected def splitConjunctivePredicates(condition: Expression): Seq[Expression] = {
     condition match {
       case And(cond1, cond2) =>
@@ -169,6 +243,73 @@ case class In(value: Expression, list: Seq[Expression]) extends Predicate
   }
 }
 
+case class InRange(point: Seq[Expression], point_low: Seq[Expression], point_high: Seq[Expression]) extends Predicate {
+  require(point.length == point_low.length && point.length == point_high.length)
+  override def hasSpatial: Boolean = true
+
+  override def children: Seq[Expression] = point ++ point_low ++ point_high
+
+  override def nullable: Boolean = false
+
+  override def toString: String = s" **($point) IN Rectangle ($point_low) - ($point_high)**  "
+
+  //TODO code_gen for range query
+  override def genCode(ctx: CodeGenContext, ev: GeneratedExpressionCode): String = ""
+
+  /** Returns the result of evaluating this expression on a given input Row */
+  override def eval(input: InternalRow): Any = {
+    val eval_point = point.map(_.eval(input).asInstanceOf[Number].doubleValue())
+    val eval_low = point_low.map(_.eval(input).asInstanceOf[Number].doubleValue())
+    val eval_high = point_high.map(_.eval(input).asInstanceOf[Number].doubleValue())
+    for (i <- point.indices)
+      if (eval_point(i) < eval_low(i) || eval_point(i) > eval_high(i))
+        return false
+    true
+  }
+}
+
+case class InCircleRange(point: Seq[Expression], target: Seq[Expression], r: Literal) extends Predicate {
+  require(point.length == target.length)
+  override def hasSpatial: Boolean = true
+
+  override def children: Seq[Expression] = point ++ target ++ Seq(r)
+
+  override def nullable: Boolean = false
+
+  override def toString: String = s" **($point) IN CIRCLERANGE ($target) within  ($r)**  "
+
+  //TODO code_gen for circle range query
+  override def genCode(ctx: CodeGenContext, ev: GeneratedExpressionCode): String = ""
+
+  /** Returns the result of evaluating this expression on a given input Row */
+  override def eval(input: InternalRow): Any = {
+    val eval_point = point.map(_.eval(input).asInstanceOf[Number].doubleValue())
+    val eval_target = target.map(_.eval(input).asInstanceOf[Number].doubleValue())
+    val eval_r = r.value.asInstanceOf[Number].doubleValue()
+    var dis = 0.0
+    for (i <- point.indices)
+      dis += (eval_point(i) - eval_target(i)) * (eval_point(i) - eval_target(i))
+    if (dis <= eval_r * eval_r) true else false
+  }
+}
+
+case class InKNN(point: Seq[Expression], target: Seq[Expression], k: Literal) extends Predicate {
+  override def hasSpatial: Boolean = true
+
+  override def children: Seq[Expression] = point ++ target ++ Seq(k)
+
+  override def nullable: Boolean = false
+
+  override def toString: String = s" **($point) IN KNN ($target) within ($k)"
+
+  //TODO code_gen for knn query (maybe impossible)
+  override def genCode(ctx: CodeGenContext, ev: GeneratedExpressionCode): String = ""
+
+  //XX Tricky hack
+  /** Returns the result of evaluating this expression on a given input Row */
+  override def eval(input: InternalRow): Any = true
+}
+
 /**
  * Optimized version of In clause, when all filter values of In clause are
  * static.
@@ -225,6 +366,8 @@ case class And(left: Expression, right: Expression) extends BinaryOperator with 
 
   override def symbol: String = "&&"
 
+  override def hasSpatial: Boolean = left.hasSpatial || right.hasSpatial
+
   override def eval(input: InternalRow): Any = {
     val input1 = left.eval(input)
     if (input1 == false) {
@@ -273,6 +416,8 @@ case class Or(left: Expression, right: Expression) extends BinaryOperator with P
   override def inputType: AbstractDataType = BooleanType
 
   override def symbol: String = "||"
+
+  override def hasSpatial: Boolean = left.hasSpatial || right.hasSpatial
 
   override def eval(input: InternalRow): Any = {
     val input1 = left.eval(input)

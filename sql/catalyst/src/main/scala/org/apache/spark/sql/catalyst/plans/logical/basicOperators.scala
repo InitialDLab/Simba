@@ -121,6 +121,8 @@ case class Join(
   joinType: JoinType,
   condition: Option[Expression]) extends BinaryNode {
 
+  def isSpatialJoin: Boolean = joinType == DistanceJoin || joinType == KNNJoin || joinType == ZKNNJoin
+
   override def output: Seq[Attribute] = {
     joinType match {
       case LeftSemi =>
@@ -131,6 +133,15 @@ case class Join(
         left.output.map(_.withNullability(true)) ++ right.output
       case FullOuter =>
         left.output.map(_.withNullability(true)) ++ right.output.map(_.withNullability(true))
+      case KNNJoin =>
+        require(condition.get.isInstanceOf[InKNN])
+        left.output ++ right.output
+      case ZKNNJoin =>
+        require(condition.get.isInstanceOf[InKNN])
+        left.output ++ right.output
+      case DistanceJoin =>
+        require(condition.get.isInstanceOf[InCircleRange])
+        left.output ++ right.output.map(_.withNullability(true))
       case _ =>
         left.output ++ right.output
     }
