@@ -6,7 +6,7 @@ import org.apache.spark.sql.catalyst.analysis.MultiInstanceRelation
 import org.apache.spark.sql.catalyst.expressions.{BindReferences, Attribute}
 import org.apache.spark.sql.catalyst.plans.logical.{Statistics, LogicalPlan}
 import org.apache.spark.sql.execution.SparkPlan
-import org.apache.spark.sql.partitioner.{STRPartition, RangePartition}
+import org.apache.spark.sql.partitioner.{HashPartition, STRPartition, RangePartition}
 import org.apache.spark.sql.spatial.Point
 import org.apache.spark.sql.types.{IntegerType, DoubleType}
 import org.apache.spark.storage.StorageLevel
@@ -23,9 +23,9 @@ private[sql] object IndexedRelation {
   def apply(child: SparkPlan, table_name: Option[String], index_type: IndexType,
             column_keys: List[Attribute], index_name: String): IndexedRelation = {
     index_type match {
-      case TreeMapType => null
-      case RTreeType => null
-      case HashMapType => null
+      case TreeMapType => new TreeMapIndexedRelation(child.output, child, table_name, column_keys, index_name)()
+      case RTreeType => new RTreeIndexedRelation(child.output, child, table_name, column_keys, index_name)()
+      case HashMapType => new HashMapIndexedRelation(child.output, child, table_name, column_keys, index_name)()
       case _ => null
     }
   }
@@ -53,7 +53,47 @@ private[sql] abstract class IndexedRelation extends LogicalPlan {
   )
 }
 
-private[sql] case class TreeMapIndexRelation(
+private[sql] case class HashMapIndexedRelation(
+    output: Seq[Attribute],
+    child: SparkPlan,
+    table_name: Option[String],
+    column_keys: List[Attribute],
+    index_name: String)(var _indexedRDD: RDD[PackedPartitionWithIndex] = null)
+  extends IndexedRelation with MultiInstanceRelation {
+  require(column_keys.length == 1)
+
+  if (_indexedRDD == null) {
+    buildIndex()
+  }
+
+  private[sql] def buildIndex(): Unit = {
+    val dataRDD = child.execute().map(row => {
+      val key = BindReferences.bindReference(column_keys.head, child.output).eval(row)
+      (key, row)
+    })
+
+    val partitionedRDD = HashPartition(dataRDD, numShufflePartitions)
+    val indexed = partitionedRDD.mapPartitions(iter => {
+      val data = iter.toArray
+      val index = HashMapIndex(data)
+      Array(PackedPartitionWithIndex(data.map(_._2), index)).iterator
+    }).persist(StorageLevel.MEMORY_AND_DISK_SER)
+
+    indexed.setName(table_name.map(n => s"$n $index_name").getOrElse(child.toString))
+    _indexedRDD = indexed
+  }
+
+  override def newInstance() = {
+    new HashMapIndexedRelation(output.map(_.newInstance()), child, table_name, column_keys, index_name)(_indexedRDD)
+      .asInstanceOf[this.type]
+  }
+
+  override def withOutput(new_output: Seq[Attribute]) = {
+    new HashMapIndexedRelation(new_output, child, table_name, column_keys, index_name)(_indexedRDD)
+  }
+}
+
+private[sql] case class TreeMapIndexedRelation(
     output: Seq[Attribute],
     child: SparkPlan,
     table_name: Option[String],
@@ -86,16 +126,16 @@ private[sql] case class TreeMapIndexRelation(
   }
 
   override def newInstance() = {
-    new TreeMapIndexRelation(output.map(_.newInstance()), child, table_name, column_keys, index_name)(_indexedRDD)
+    new TreeMapIndexedRelation(output.map(_.newInstance()), child, table_name, column_keys, index_name)(_indexedRDD)
       .asInstanceOf[this.type]
   }
 
   override def withOutput(new_output: Seq[Attribute]) = {
-    new TreeMapIndexRelation(new_output, child, table_name, column_keys, index_name)(_indexedRDD, range_bounds)
+    new TreeMapIndexedRelation(new_output, child, table_name, column_keys, index_name)(_indexedRDD, range_bounds)
   }
 }
 
-private[sql] case class RTreeIndexRelation(
+private[sql] case class RTreeIndexedRelation(
     output: Seq[Attribute],
     child: SparkPlan,
     table_name: Option[String],
@@ -146,11 +186,11 @@ private[sql] case class RTreeIndexRelation(
   }
 
   override def newInstance() = {
-    new RTreeIndexRelation(output.map(_.newInstance()), child, table_name, column_keys, index_name)(_indexedRDD)
+    new RTreeIndexedRelation(output.map(_.newInstance()), child, table_name, column_keys, index_name)(_indexedRDD)
       .asInstanceOf[this.type]
   }
 
   override def withOutput(new_output: Seq[Attribute]): IndexedRelation = {
-    RTreeIndexRelation(new_output, child, table_name, column_keys, index_name)(_indexedRDD, global_rtree)
+    RTreeIndexedRelation(new_output, child, table_name, column_keys, index_name)(_indexedRDD, global_rtree)
   }
 }
