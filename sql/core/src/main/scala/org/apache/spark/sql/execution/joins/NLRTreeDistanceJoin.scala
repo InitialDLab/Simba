@@ -1,5 +1,6 @@
 package org.apache.spark.sql.execution.joins
 
+import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.index.RTree
 import org.apache.spark.sql.partitioner.MapDPartition

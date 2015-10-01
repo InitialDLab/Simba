@@ -61,7 +61,7 @@ private[sql] case class IndexedRelationScan(
   }
 
   def conditionToInterval(condition: Expression, column: List[Attribute]): (Array[Interval], Array[Expression]) = {
-    val leaf_nodes = splitDNFPredicates(condition)
+    val leaf_nodes = splitConjunctivePredicates(condition)
     val intervals: Array[Interval] = new Array[Interval](column.length)
     for (i <- column.indices)
       intervals(i) = new Interval(Double.MinValue, Double.MaxValue, false, false)

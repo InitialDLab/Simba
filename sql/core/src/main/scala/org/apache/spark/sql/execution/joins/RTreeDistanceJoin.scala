@@ -12,7 +12,7 @@ import scala.collection.mutable
 
 /**
  * Created by Dong Xie on 9/30/15.
- *
+ * Distance Join based on Two-Level R-Tree Structure
  */
 case class RTreeDistanceJoin(
     left_keys: Seq[Expression],
