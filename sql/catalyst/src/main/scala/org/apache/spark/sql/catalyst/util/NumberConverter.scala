@@ -17,6 +17,8 @@
 
 package org.apache.spark.sql.catalyst.util
 
+import org.apache.spark.sql.catalyst.expressions.Literal
+import org.apache.spark.sql.types.Decimal
 import org.apache.spark.unsafe.types.UTF8String
 
 object NumberConverter {
@@ -172,5 +174,14 @@ object NumberConverter {
       value(resultStartPos) = '-'
     }
     UTF8String.fromBytes(java.util.Arrays.copyOfRange(value, resultStartPos, value.length))
+  }
+
+  def literalToDouble(x: Literal): Double = {
+    x.value match {
+      case double_value: Number =>
+        double_value.doubleValue()
+      case decimal_value: Decimal =>
+        decimal_value.toDouble
+    }
   }
 }

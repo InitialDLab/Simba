@@ -3,6 +3,7 @@ package org.apache.spark.sql.index
 import org.apache.spark.rdd.{PartitionPruningRDD, RDD}
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
+import org.apache.spark.sql.catalyst.util.NumberConverter
 import org.apache.spark.sql.execution.LeafNode
 import org.apache.spark.sql.spatial._
 
@@ -45,16 +46,16 @@ private[sql] case class IndexedRelationScan(
   def getLeafInterval(x: Expression): (Interval, Attribute) = {
     x match {
       case EqualTo(left: NamedExpression, right: Literal) =>
-        val tmp = right.value.asInstanceOf[Number].doubleValue()
+        val tmp = NumberConverter.literalToDouble(right)
         (new Interval(tmp, tmp), left.toAttribute)
       case LessThan(left: NamedExpression, right: Literal) =>
-        (new Interval(Double.MinValue, right.value.asInstanceOf[Number].doubleValue(), false, false), left.toAttribute)
+        (new Interval(Double.MinValue, NumberConverter.literalToDouble(right), false, false), left.toAttribute)
       case LessThanOrEqual(left: NamedExpression, right: Literal) =>
-        (new Interval(Double.MinValue, right.value.asInstanceOf[Number].doubleValue(), false, true), left.toAttribute)
+        (new Interval(Double.MinValue, NumberConverter.literalToDouble(right), false, true), left.toAttribute)
       case GreaterThan(left: NamedExpression, right: Literal) =>
-        (new Interval(right.value.asInstanceOf[Number].doubleValue(), Double.MaxValue, false, false), left.toAttribute)
+        (new Interval(NumberConverter.literalToDouble(right), Double.MaxValue, false, false), left.toAttribute)
       case GreaterThanOrEqual(left: NamedExpression, right: Literal) =>
-        (new Interval(right.value.asInstanceOf[Number].doubleValue(), Double.MaxValue, true, false), left.toAttribute)
+        (new Interval(NumberConverter.literalToDouble(right), Double.MaxValue, true, false), left.toAttribute)
       case _ =>
         null
     }
@@ -165,7 +166,7 @@ private[sql] case class IndexedRelationScan(
 
             exps.foreach {
               case InKNN(point:Seq[NamedExpression], target: Seq[Literal], l: Literal) =>
-                val query_point = new Point(target.map(_.value.asInstanceOf[Number].doubleValue()).toArray)
+                val query_point = new Point(target.map(NumberConverter.literalToDouble).toArray)
                 val k = l.value.asInstanceOf[Number].intValue()
                 val mbr_ans = rtree.global_rtree.kNN(query_point, (a: Point, b: MBR) => {
                   require(a.coord.length == b.low.coord.length)
@@ -205,8 +206,8 @@ private[sql] case class IndexedRelationScan(
                 if (knn_res == null) knn_res = tmp_knn_res
                 else knn_res = knn_res.intersect(tmp_knn_res)
               case InCircleRange(point: Seq[NamedExpression], target:Seq[Literal], l: Literal) =>
-                val query_point = new Point(target.map(_.value.asInstanceOf[Number].doubleValue()).toArray)
-                val r = l.value.asInstanceOf[Number].doubleValue()
+                val query_point = new Point(target.map(NumberConverter.literalToDouble).toArray)
+                val r = NumberConverter.literalToDouble(l)
                 cir_ranges = cir_ranges :+ (query_point, r)
             }
 

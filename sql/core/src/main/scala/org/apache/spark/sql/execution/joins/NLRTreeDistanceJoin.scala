@@ -2,6 +2,7 @@ package org.apache.spark.sql.execution.joins
 
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.catalyst.util.NumberConverter
 import org.apache.spark.sql.index.RTree
 import org.apache.spark.sql.partitioner.MapDPartition
 import org.apache.spark.sql.spatial._
@@ -25,7 +26,7 @@ case class NLRTreeDistanceJoin(
   override def output = left.output ++ right.output
 
   final val num_partitions = sqlContext.conf.numShufflePartitions
-  final val r = l.value.asInstanceOf[Number].doubleValue()
+  final val r = NumberConverter.literalToDouble(l)
   final val max_entries_per_node = sqlContext.conf.maxEntriesPerNode
 
   override protected def doExecute(): RDD[InternalRow] = {

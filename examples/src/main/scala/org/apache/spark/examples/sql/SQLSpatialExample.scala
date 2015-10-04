@@ -27,10 +27,13 @@ object SQLSpatialExample {
     point1.registerTempTable("point1")
     point2.registerTempTable("point2")
 
-    val sqlQueryForRangeAndKNN = "SELECT * FROM ((SELECT * FROM point1 WHERE x >= 8 AND x <= 9 AND y >= 1 AND y <= 5) " +
-      "UNION DISTINCT (SELECT * FROM point1 ORDER BY (x - 3) * (x - 3) + (y - 3) * (y - 3) ASC LIMIT 3)) AS tmp WHERE tmp.y < 4.5"
+    val sqlQueryForRangeAndKNN =
+      "SELECT * FROM ((SELECT * FROM point1 WHERE x >= 8 AND x <= 9 AND y >= 1 AND y <= 5) " +
+      "UNION DISTINCT (SELECT * FROM point1 ORDER BY (x - 3) * (x - 3) + (y - 3) * (y - 3) ASC LIMIT 3)) " +
+      "AS tmp WHERE tmp.y < 4.5"
     val sqlQueryForCircleRange = "SELECT * FROM point1 WHERE (x - 4.5) * (x - 4.5) + (y - 4.5) * (y - 4.5) <= 4"
-    val distanceJoinQuery = "SELECT * FROM point1 LEFT OUTER JOIN point2 ON (point2.x - point1.x) * (point2.x - point1.x)" +
+    val distanceJoinQuery =
+      "SELECT * FROM point1 LEFT OUTER JOIN point2 ON (point2.x - point1.x) * (point2.x - point1.x)" +
       " + (point2.y - point1.y) * (point2.y - point1.y) <= 16"
 
     println("****table content****")

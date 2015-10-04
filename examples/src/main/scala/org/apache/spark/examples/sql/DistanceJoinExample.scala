@@ -29,9 +29,13 @@ object DistanceJoinExample {
     point1.registerTempTable("point1")
     point2.registerTempTable("point2")
 
-    val joinQuery = "SELECT * FROM point1 DISTANCE JOIN point2 ON (POINT(point2.x, point2.y) IN CIRCLERANGE(POINT(point1.x, point1.y), 3.0))"
+    val joinQuery = "SELECT * FROM point1 DISTANCE JOIN point2 " +
+                    "ON (POINT(point2.x, point2.y) IN CIRCLERANGE(POINT(point1.x, point1.y), 3.0))"
     val startTime1 = System.currentTimeMillis()
-    sqlContext.sql(joinQuery).toDF().collect().foreach(println)
+    val df = sqlContext.sql(joinQuery)
+    println(df.queryExecution.analyzed)
+    println(df.queryExecution.executedPlan)
+    df.collect().foreach(println)
     val endTime1 = System.currentTimeMillis()
     println("----------------------------")
     println("Time :  " + (endTime1 - startTime1) / 1000.0 + "s. ")

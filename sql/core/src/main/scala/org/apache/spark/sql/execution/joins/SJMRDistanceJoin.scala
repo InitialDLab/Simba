@@ -3,6 +3,7 @@ package org.apache.spark.sql.execution.joins
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
+import org.apache.spark.sql.catalyst.util.NumberConverter
 import org.apache.spark.sql.execution.{BinaryNode, SparkPlan}
 import org.apache.spark.sql.index.RTree
 import org.apache.spark.sql.partitioner.{MapDPartition, STRPartition}
@@ -27,7 +28,7 @@ case class SJMRDistanceJoin(
   final val sample_rate = sqlContext.conf.sampleRate
   final val max_entries_per_node = sqlContext.conf.maxEntriesPerNode
   final val transfer_threshold = sqlContext.conf.transferThreshold
-  final val r = l.value.asInstanceOf[Number].doubleValue()
+  final val r = NumberConverter.literalToDouble(l)
   final val dimension = left_keys.length
 
   override protected def doExecute(): RDD[InternalRow] = {

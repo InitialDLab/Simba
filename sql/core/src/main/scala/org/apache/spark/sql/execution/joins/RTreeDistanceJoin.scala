@@ -1,6 +1,7 @@
 package org.apache.spark.sql.execution.joins
 
 import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.catalyst.util.NumberConverter
 import org.apache.spark.sql.index.RTree
 import org.apache.spark.sql.partitioner.{MapDPartition, STRPartition}
 import org.apache.spark.sql.spatial._
@@ -28,7 +29,7 @@ case class RTreeDistanceJoin(
   final val max_entries_per_node = sqlContext.conf.maxEntriesPerNode
   final val transfer_threshold = sqlContext.conf.transferThreshold
   final val dimension = left_keys.length
-  final val r = l.value.asInstanceOf[Number].doubleValue()
+  final val r = NumberConverter.literalToDouble(l)
 
   override protected def doExecute(): RDD[InternalRow] = {
     val left_rdd = left.execute().map(row =>

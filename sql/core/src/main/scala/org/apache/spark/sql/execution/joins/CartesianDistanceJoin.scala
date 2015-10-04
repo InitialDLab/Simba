@@ -3,6 +3,7 @@ package org.apache.spark.sql.execution.joins
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
+import org.apache.spark.sql.catalyst.util.NumberConverter
 import org.apache.spark.sql.spatial._
 import org.apache.spark.sql.catalyst.plans.physical.Partitioning
 import org.apache.spark.sql.execution.{SparkPlan, BinaryNode}
@@ -22,7 +23,7 @@ case class CartesianDistanceJoin(
 
   override def output: Seq[Attribute] = left.output ++ right.output
 
-  final val r = l.value.asInstanceOf[Number].doubleValue()
+  final val r = NumberConverter.literalToDouble(l)
 
   override protected def doExecute(): RDD[InternalRow] =
     left.execute().cartesian(right.execute()).mapPartitions { iter =>

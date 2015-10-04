@@ -3,6 +3,7 @@ package org.apache.spark.sql.execution.joins
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
+import org.apache.spark.sql.catalyst.util.NumberConverter
 import org.apache.spark.sql.execution.{SparkPlan, BinaryNode}
 import org.apache.spark.sql.partitioner.MapDPartition
 import org.apache.spark.sql.spatial._
@@ -24,7 +25,7 @@ case class NestedLoopDistanceJoin(
   override def output = left.output ++ right.output
 
   final val num_partitions = sqlContext.conf.numShufflePartitions
-  final val r = l.value.asInstanceOf[Number].doubleValue()
+  final val r = NumberConverter.literalToDouble(l)
   final val dimension = left_keys.length
 
   override protected def doExecute(): RDD[InternalRow] = {

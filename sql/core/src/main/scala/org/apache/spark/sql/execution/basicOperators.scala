@@ -162,13 +162,12 @@ case class Filter(condition: Expression, child: SparkPlan) extends UnaryNode {
                         LessThanOrEqual(Cast(point(i), DoubleType), Cast(point_high(i), DoubleType)))
         cons.foldLeft[Expression](null) {(left, right) => if (left == null) right else And(left, right)}
       case InCircleRange(point, target, r) =>
-        val literal_r = Literal(r.value.asInstanceOf[Number].doubleValue())
         val exps = new Array[Expression](point.length)
         for (i <- point.indices)
           exps(i) = Multiply(Subtract(Cast(point(i), DoubleType), Cast(target(i), DoubleType)),
                              Subtract(Cast(point(i), DoubleType), Cast(target(i), DoubleType)))
         val ans = exps.foldLeft[Expression](null) {(left, right) => if (left == null) right else Add(left, right)}
-        LessThanOrEqual(ans, Multiply(literal_r, literal_r))
+        LessThanOrEqual(ans, Multiply(r, r))
     }
     applyCondition(root_rdd, new_condition, root_rdd)
   }

@@ -21,7 +21,7 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.analysis.TypeCheckResult
 import org.apache.spark.sql.catalyst.expressions.codegen.{CodeGenContext, GeneratedExpressionCode}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
-import org.apache.spark.sql.catalyst.util.TypeUtils
+import org.apache.spark.sql.catalyst.util.{NumberConverter, TypeUtils}
 import org.apache.spark.sql.types._
 import org.apache.spark.util.Utils
 
@@ -285,7 +285,7 @@ case class InCircleRange(point: Seq[Expression], target: Seq[Expression], r: Lit
   override def eval(input: InternalRow): Any = {
     val eval_point = point.map(_.eval(input).asInstanceOf[Number].doubleValue())
     val eval_target = target.map(_.eval(input).asInstanceOf[Number].doubleValue())
-    val eval_r = r.value.asInstanceOf[Number].doubleValue()
+    val eval_r = NumberConverter.literalToDouble(r)
     var dis = 0.0
     for (i <- point.indices)
       dis += (eval_point(i) - eval_target(i)) * (eval_point(i) - eval_target(i))
@@ -334,7 +334,7 @@ case class InSet(child: Expression, hset: Set[Any]) extends UnaryExpression with
     }
   }
 
-  def getHSet(): Set[Any] = hset
+  def getHSet: Set[Any] = hset
 
   override def genCode(ctx: CodeGenContext, ev: GeneratedExpressionCode): String = {
     val setName = classOf[Set[Any]].getName
