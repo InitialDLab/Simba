@@ -151,8 +151,8 @@ case class Filter(condition: Expression, child: SparkPlan) extends UnaryNode {
 
 
   protected override def doExecute(): RDD[InternalRow] = {
-    val numInputRows = longMetric("numInputRows")
-    val numOutputRows = longMetric("numOutputRows")
+    //val numInputRows = longMetric("numInputRows")
+    //val numOutputRows = longMetric("numOutputRows")
     val root_rdd = child.execute()
     val new_condition = condition transform {
       case InRange(point, point_low, point_high) =>

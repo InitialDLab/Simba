@@ -8,6 +8,8 @@ case class MBR(low: Point, high: Point) {
   require(low.coord.length == high.coord.length)
   require(low <= high)
 
+  val centroid = new Point(low.coord.zip(high.coord).map(x => x._1 + x._2 / 2.0))
+
   def isIntersect(other: MBR): Boolean = {
     require(low.coord.length == other.low.coord.length)
     for (i <- low.coord.indices)

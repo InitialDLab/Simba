@@ -48,23 +48,44 @@ class STRPartitioner(est_partition: Int,
   private case class Bounds(min: Array[Double], max: Array[Double])
 
   var (mbrBound, partitions) = {
-    val (data_bounds, total_size) = rdd.aggregate[(Bounds, Long)]((null, 0))((bound, data) => {
-      val new_bound = if (bound == null) {
-        new Bounds(data._1.coord, data._1.coord)
-      } else {
-        new Bounds(bound._1.min.zip(data._1.coord).map(x => Math.min(x._1, x._2)),
-          bound._1.max.zip(data._1.coord).map(x => Math.max(x._1, x._2)))
-      }
-      (new_bound, bound._2 + SizeEstimator.estimate(data._1))
-    }, (left, right) => {
-      val new_bound = if (left == null) right._1
-      else if (right == null) left._1
-      else {
-        new Bounds(left._1.min.zip(right._1.min).map(x => Math.min(x._1, x._2)),
-          left._1.max.zip(right._1.max).map(x => Math.max(x._1, x._2)))
-      }
-      (new_bound, left._2 + right._2)
-    })
+//    val (data_bounds, total_size) = rdd.aggregate[(Bounds, Long)]((null, 0))((bound, data) => {
+//      val new_bound = if (bound == null) {
+//        new Bounds(data._1.coord, data._1.coord)
+//      } else {
+//        new Bounds(bound._1.min.zip(data._1.coord).map(x => Math.min(x._1, x._2)),
+//          bound._1.max.zip(data._1.coord).map(x => Math.max(x._1, x._2)))
+//      }
+//      (new_bound, bound._2 + SizeEstimator.estimate(data._1))
+//    }, (left, right) => {
+//      val new_bound = if (left == null) right._1
+//      else if (right == null) left._1
+//      else {
+//        new Bounds(left._1.min.zip(right._1.min).map(x => Math.min(x._1, x._2)),
+//          left._1.max.zip(right._1.max).map(x => Math.max(x._1, x._2)))
+//      }
+//      (new_bound, left._2 + right._2)
+//    })
+
+    val (data_bounds, total_size) = {
+      rdd.aggregate[(Bounds, Long)]((null, 0))((bound, data) => {
+        val new_bound = if (bound._1 == null) {
+          new Bounds(data._1.coord, data._1.coord)
+        } else {
+          new Bounds(bound._1.min.zip(data._1.coord).map(x => Math.min(x._1, x._2)),
+            bound._1.max.zip(data._1.coord).map(x => Math.max(x._1, x._2)))
+        }
+        (new_bound, bound._2 + SizeEstimator.estimate(data._1))
+      }, (left, right) => {
+        val new_bound = {
+          if (left._1 == null) right._1
+          else if (right._1 == null) left._1
+          else {
+            new Bounds(left._1.min.zip(right._1.min).map(x => Math.min(x._1, x._2)),
+              left._1.max.zip(right._1.max).map(x => Math.max(x._1, x._2)))
+          }}
+        (new_bound, left._2 + right._2)
+      })
+    }
 
     val sampled = if (total_size * sample_rate <= transfer_threshold) {
       rdd.sample(withReplacement = false, sample_rate, System.currentTimeMillis()).map(_._1).collect()

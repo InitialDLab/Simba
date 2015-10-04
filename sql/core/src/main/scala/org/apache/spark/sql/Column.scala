@@ -1067,3 +1067,12 @@ class ColumnName(name: String) extends Column(name) {
    */
   def struct(structType: StructType): StructField = StructField(name, structType)
 }
+
+case class PointFromColumn(cols: Seq[Column])
+
+case class PointFromCoords(coords: Seq[Double])
+
+object Point {
+  def apply(cols: Column*) = PointFromColumn(cols)
+  def apply(coords: Double*) = PointFromCoords(coords)
+}

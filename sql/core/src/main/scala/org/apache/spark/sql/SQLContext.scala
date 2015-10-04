@@ -21,6 +21,8 @@ import java.beans.Introspector
 import java.util.Properties
 import java.util.concurrent.atomic.AtomicReference
 
+import org.apache.spark.sql.index.IndexType
+
 import scala.collection.JavaConversions._
 import scala.collection.immutable
 import scala.reflect.runtime.universe.TypeTag
@@ -233,6 +235,9 @@ class SQLContext(@transient val sparkContext: SparkContext)
   @transient
   protected[sql] val cacheManager = new CacheManager(this)
 
+  @transient
+  protected[sql] val indexManager = new IndexManager(this)
+
   /**
    * :: Experimental ::
    * A collection of methods that are considered experimental, but can be used to hook into
@@ -315,6 +320,22 @@ class SQLContext(@transient val sparkContext: SparkContext)
    * @since 1.3.0
    */
   def clearCache(): Unit = cacheManager.clearCache()
+
+  def hasIndex(tableName: String, indexName: String): Boolean = indexManager.hasIndex(tableName, indexName)
+
+  def indexTable(tableName: String, indexType: IndexType, indexName: String, column: List[Attribute]): Unit =
+    indexManager.createIndex(tableName, indexType, indexName, column)
+
+  def showIndex(tableName: String): Unit = indexManager.showIndex(tableName)
+
+  def persistIndex(indexName: String, fileName: String): Unit = indexManager.persistIndex(indexName, fileName)
+
+  def loadIndex(indexName: String, fileName: String): Unit = indexManager.loadIndex(indexName, fileName)
+
+  def dropIndexTableByName(tableName: String, indexName: String): Unit =
+    indexManager.dropIndexByName(tableName, indexName)
+
+  def clearIndex(): Unit = indexManager.clearIndex()
 
   // scalastyle:off
   // Disable style checker so "implicits" object can start with lowercase i
@@ -797,10 +818,12 @@ class SQLContext(@transient val sparkContext: SparkContext)
       DataSourceStrategy ::
       DDLStrategy ::
       TakeOrderedAndProject ::
+      SpatialJoinExtractor ::
       HashAggregation ::
       Aggregation ::
       LeftSemiJoin ::
       EquiJoinSelection ::
+      IndexRelationScans ::
       InMemoryScans ::
       BasicOperators ::
       CartesianProduct ::
@@ -908,9 +931,14 @@ class SQLContext(@transient val sparkContext: SparkContext)
     def assertAnalyzed(): Unit = analyzer.checkAnalysis(analyzed)
 
     lazy val analyzed: LogicalPlan = analyzer.execute(logical)
+
+    lazy val withIndexedData: LogicalPlan = {
+      assertAnalyzed
+      indexManager.useIndexedData(analyzed)
+    }
     lazy val withCachedData: LogicalPlan = {
-      assertAnalyzed()
-      cacheManager.useCachedData(analyzed)
+      assertAnalyzed
+      cacheManager.useCachedData(withIndexedData)
     }
     lazy val optimizedPlan: LogicalPlan = optimizer.execute(withCachedData)
 

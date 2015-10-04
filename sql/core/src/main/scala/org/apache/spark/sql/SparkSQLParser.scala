@@ -23,6 +23,7 @@ import org.apache.spark.sql.catalyst.AbstractSparkSQLParser
 import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeReference}
 import org.apache.spark.sql.catalyst.plans.logical.{DescribeFunction, LogicalPlan, ShowFunctions}
 import org.apache.spark.sql.execution._
+import org.apache.spark.sql.index._
 import org.apache.spark.sql.types.StringType
 
 
@@ -69,8 +70,51 @@ private[sql] class SparkSQLParser(fallback: String => LogicalPlan) extends Abstr
   protected val TABLES = Keyword("TABLES")
   protected val UNCACHE = Keyword("UNCACHE")
 
+  protected val CREATE   = Keyword("CREATE")
+  protected val ON      = Keyword("ON")
+  protected val USE     = Keyword("USE")
+  protected val INDEX   = Keyword("INDEX")
+  protected val DEINDEX = Keyword("DEINDEX")
+  protected val HASHMAP = Keyword("HASHMAP")
+  protected val TREEMAP = Keyword("TREEMAP")
+  protected val RTREE   = Keyword("RTREE")
+  protected val LOAD    = Keyword("LOAD")
+  protected val PERSIST = Keyword("PERSIST")
+
   override protected lazy val start: Parser[LogicalPlan] =
-    cache | uncache | set | show | desc | others
+    index | deindex | persistIndex | loadIndex | cache | uncache | set | show | desc | others
+
+  private lazy val index: Parser[LogicalPlan] =
+    (CREATE ~> INDEX ~> ident) ~ (ON ~> ident ~ ("(" ~> repsep(ident, ",") <~ ")")) ~ (USE ~> indexType) ^^ {
+      case indexName ~ (tableName ~ columnName) ~ index_type =>
+        IndexTableCommand(tableName, columnName, index_type, indexName)
+    }
+
+  protected lazy val indexType: Parser[IndexType] =
+    ( RTREE           ^^^ RTreeType
+      | TREEMAP       ^^^ TreeMapType
+      | HASHMAP       ^^^ HashMapType
+      )
+
+  private lazy val deindex: Parser[LogicalPlan] = (
+    DEINDEX ~> ident ~ (ON ~> ident) ^^ {
+      case indexName ~ tableName => DeindexTableByNameCommand(tableName, indexName)
+    }
+      | CLEAR ~> INDEX ~> (ON ~> ident) ^^ {
+      case tableName => DeindexTableCommand(tableName)
+    }
+      | CLEAR ~> INDEX ^^^ ClearIndexCommand
+    )
+
+  private lazy val persistIndex: Parser[LogicalPlan] =
+    PERSIST ~> ident ~ (IN ~> restInput) ^^ {
+      case indexName ~ fileName => PersistIndexCommand(indexName, fileName.trim)
+    }
+
+  private lazy val loadIndex: Parser[LogicalPlan] =
+    (LOAD ~> INDEX ~> ident) ~ (IN ~> restInput) ^^ {
+      case indexName ~ fileName => LoadIndexCommand(indexName, fileName.trim)
+    }
 
   private lazy val cache: Parser[LogicalPlan] =
     CACHE ~> LAZY.? ~ (TABLE ~> ident) ~ (AS ~> restInput).? ^^ {
@@ -103,6 +147,9 @@ private[sql] class SparkSQLParser(fallback: String => LogicalPlan) extends Abstr
         case Some(f) => ShowFunctions(f._1, Some(f._2))
         case None => ShowFunctions(None, None)
       }
+    | SHOW ~> INDEX ~> ON ~> ident ^^ {
+      case tableName => ShowIndexCommand(tableName)
+    }
     )
 
   private lazy val desc: Parser[LogicalPlan] =

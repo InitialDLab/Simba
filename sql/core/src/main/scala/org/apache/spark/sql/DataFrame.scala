@@ -20,6 +20,8 @@ package org.apache.spark.sql
 import java.io.CharArrayWriter
 import java.util.Properties
 
+import org.apache.spark.sql.index.IndexType
+
 import scala.language.implicitConversions
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe.TypeTag
@@ -35,7 +37,7 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.analysis._
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.plans.logical._
-import org.apache.spark.sql.catalyst.plans.{Inner, JoinType}
+import org.apache.spark.sql.catalyst.plans.{KNNJoin, DistanceJoin, Inner, JoinType}
 import org.apache.spark.sql.catalyst.{CatalystTypeConverters, ScalaReflection, SqlParser}
 import org.apache.spark.sql.execution.{EvaluatePython, ExplainCommand, FileRelation, LogicalRDD, SQLExecution}
 import org.apache.spark.sql.execution.datasources.{CreateTableUsingAsSelect, LogicalRelation}
@@ -1065,6 +1067,107 @@ class DataFrame private[sql](
   }
 
   /**
+   * a private auxiliary function to extract Attribute information from an input string
+   * object.
+   * @param keys  An array of String input by user
+   * @param attrs A Seq of Attributes in which to search
+   * @return An Array of Attribute extracted from the String
+   */
+  private def getAttributes(
+                             keys: Array[String],
+                             attrs: Seq[Attribute] = this.queryExecution.analyzed.output): Array[Attribute] = {
+    keys.map(key => {
+      val temp = attrs.indexWhere(_.name.equals(key))
+      if (temp >= 0) attrs(temp)
+      else null
+    })
+  }
+
+  /**
+   * Spatial operation, range query
+   * {{{
+   *   point.range(Point(point1("x"), point1("y")), Point(1.0, 1.0), Point(2.0, 2.0))
+   * }}}
+   */
+  def range(keys: PointFromColumn, point1: PointFromCoords, point2: PointFromCoords): DataFrame ={
+    Filter(InRange(keys.cols.map(_.expr), point1.coords.map(Literal(_)), point2.coords.map(Literal(_))), logicalPlan)
+  }
+
+  /**
+   * Spatial operation, range query.
+   * {{{
+   *   point.range(Array("x", "y"), Array(10, 10), Array(20, 20))
+   *   point.filter($"x" >= 10 && $"x" <= 20 && $"y" >= 10 && $"y" <= 20)
+   * }}}
+   */
+  def range(keys: Array[String], point1: Array[Double], point2: Array[Double]): DataFrame = {
+    val attrs = getAttributes(keys)
+    attrs.foreach(attr => assert(attr != null, "column not found"))
+
+    Filter(InRange(attrs, point1.map(Literal(_)), point2.map(Literal(_))), logicalPlan)
+  }
+
+  def circleRange(keys: PointFromColumn, point: PointFromCoords, r: Double): DataFrame = {
+    Filter(InCircleRange(keys.cols.map(_.expr), point.coords.map(Literal(_)), Literal(r)), logicalPlan)
+  }
+
+  /**
+   * Spatial operation circle range query
+   * {{{
+   *   point.circleRange(Array("x", "y"), Array(10, 10), 5)
+   *   point.filter(($"x" - 10) * ($"x" - 10) + ($"y" - 10) * ($"y" - 10) <= 5 * 5)
+   * }}}
+   */
+  def circleRange(keys: Array[String], point: Array[Double], r: Double): DataFrame = {
+    val attrs = getAttributes(keys)
+    attrs.foreach(attr => assert(attr != null, "column not found"))
+    Filter(InCircleRange(attrs, point.map(Literal(_)), Literal(r)), logicalPlan)
+  }
+
+  /**
+   * Spatial operation knn
+   * Find k nearest neighbor of a given point
+   */
+  def knn(keys: Array[String], point: Array[Double], k: Int): DataFrame = {
+    val attrs = getAttributes(keys)
+    attrs.foreach(attr => assert(attr != null, "column not found"))
+    Filter(InKNN(attrs, point.map(Literal(_)), Literal(k)), logicalPlan)
+  }
+
+  def knn(keys: PointFromColumn, point: PointFromCoords, k: Int): DataFrame ={
+    Filter(InKNN(keys.cols.map(_.expr), point.coords.map(Literal(_)), Literal(k)), logicalPlan)
+  }
+
+  /**
+   * Spatial operation DistanceJoin
+   */
+  def distanceJoin(right: DataFrame, leftKeys: Array[String],
+                   rightKeys: Array[String], r: Double) : DataFrame = {
+    val leftAttrs = getAttributes(leftKeys)
+    val rightAttrs = getAttributes(rightKeys, right.queryExecution.analyzed.output)
+    Join(this.logicalPlan, right.logicalPlan, DistanceJoin, Some(InCircleRange(rightAttrs, leftAttrs, Literal(r))))
+  }
+
+  def distanceJoin(right:DataFrame, leftKeys: PointFromColumn, rightKeys: PointFromColumn, r: Double): DataFrame = {
+    Join(this.logicalPlan, right.logicalPlan, DistanceJoin,
+      Some(InCircleRange(rightKeys.cols.map(_.expr), leftKeys.cols.map(_.expr), Literal(r))))
+  }
+
+  /**
+   * Spatial operation KNNJoin
+   */
+  def knnJoin(right: DataFrame, leftKeys: Array[String], rightKeys: Array[String], k : Int) : DataFrame = {
+    val leftAttrs = getAttributes(leftKeys)
+    val rightAttrs = getAttributes(rightKeys, right.queryExecution.analyzed.output)
+    Join(this.logicalPlan, right.logicalPlan, KNNJoin, Some(InKNN(rightAttrs, leftAttrs, Literal(k))))
+  }
+
+  def knnJoin(right:DataFrame, leftKeys: PointFromColumn, rightKeys: PointFromColumn, k: Int): DataFrame = {
+    Join(this.logicalPlan, right.logicalPlan, KNNJoin,
+      Some(InKNN(rightKeys.cols.map(_.expr), leftKeys.cols.map(_.expr), Literal(k))))
+  }
+
+  /**
    * (Scala-specific) Returns a new [[DataFrame]] where each row has been expanded to zero or more
    * rows by the provided function.  This is similar to a `LATERAL VIEW` in HiveQL. The columns of
    * the input row are implicitly joined with each row that is output by the function.
@@ -1469,6 +1572,62 @@ class DataFrame private[sql](
    * @since 1.3.0
    */
   def unpersist(): this.type = unpersist(blocking = false)
+
+  /////////////////////////////////////////////////////////////////////////////
+  // Index operations
+  /////////////////////////////////////////////////////////////////////////////
+  /**
+   * @group extended
+   */
+  def index(indexType: IndexType, indexName: String, column: List[Attribute]): this.type = {
+    sqlContext.indexManager.createIndexQuery(this, indexType, indexName, column)
+    this
+  }
+
+  /**
+   * @group extended
+   */
+  def setStorageLevel(indexName: String, level: StorageLevel): this.type = {
+    sqlContext.indexManager.setStorageLevel(this, indexName, level)
+    this
+  }
+
+  /**
+   * @group extended
+   */
+  def deindex(blocking: Boolean): this.type = {
+    sqlContext.indexManager.tryDropIndexQuery(this, blocking)
+    this
+  }
+
+  /**
+   * @group extended
+   */
+  def deindex(): this.type = deindex(blocking = false)
+
+  /**
+   * @group extended
+   */
+  def deindexByName(indexName : String) : this.type = {
+    sqlContext.indexManager.tryDropIndexByNameQuery(this, indexName, blocking = false)
+    this
+  }
+
+  /**
+   * @group extended
+   */
+  def persistIndex(indexName: String, fileName: String): this.type = {
+    sqlContext.indexManager.persistIndex(indexName, fileName)
+    this
+  }
+
+  /**
+   * @group extended
+   */
+  def loadIndex(indexName: String, fileName: String): this.type = {
+    sqlContext.indexManager.loadIndex(indexName, fileName)
+    this
+  }
 
   /////////////////////////////////////////////////////////////////////////////
   // I/O
