@@ -31,7 +31,7 @@ class NNOrdering() extends Ordering[(_, Double)] {
   def compare(a: (_, Double), b: (_, Double)): Int = -a._2.compare(b._2)
 }
 
-case class RTree(root: RTreeNode) extends Index {
+case class RTree(root: RTreeNode) extends Index with Serializable {
   def range(query: MBR): Array[(MBR, Int)] = {
     val ans = mutable.ArrayBuffer[(MBR, Int)]()
     val st = new mutable.Stack[RTreeNode]()

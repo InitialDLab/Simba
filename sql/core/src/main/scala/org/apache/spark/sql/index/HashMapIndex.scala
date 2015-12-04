@@ -6,7 +6,7 @@ import org.apache.spark.sql.catalyst.InternalRow
  * Created by Dong Xie on 9/23/15.
  * Encapsulated HashMap Index
  */
-class HashMapIndex[T] extends Index {
+class HashMapIndex[T] extends Index with Serializable {
   var index = new java.util.HashMap[T, Int]()
 }
 

@@ -24,19 +24,19 @@ import scala.util.hashing._
 object RangePartition {
   def sortBasedShuffleOn = SparkEnv.get.shuffleManager.isInstanceOf[SortShuffleManager]
 
-  def apply[T](origin: RDD[(Double, (T, InternalRow))], num_partitions: Int)
-  : (RDD[(Double, (T, InternalRow))], Array[Double]) = {
+  def apply[K : Ordering: ClassTag, T](origin: RDD[(K, (T, InternalRow))], num_partitions: Int)
+  : (RDD[(K, (T, InternalRow))], Array[K]) = {
     val rdd = if (sortBasedShuffleOn) {
       origin.mapPartitions {iter => iter.map(row => (row._1, (row._2._1, row._2._2.copy())))}
     } else {
       origin.mapPartitions {iter =>
-        val mutablePair = new MutablePair[Double, (T, InternalRow)]()
+        val mutablePair = new MutablePair[K, (T, InternalRow)]()
         iter.map(row => mutablePair.update(row._1, (row._2._1, row._2._2.copy())))
       }
     }
 
     val part = new RangePartitioner(num_partitions, rdd, ascending = true)
-    val shuffled = new ShuffledRDD[Double, (T, InternalRow), (T, InternalRow)](rdd, part)
+    val shuffled = new ShuffledRDD[K, (T, InternalRow), (T, InternalRow)](rdd, part)
     shuffled.setSerializer(new SparkSqlSerializer(new SparkConf(false)))
 
     (shuffled, part.rangeBounds)
