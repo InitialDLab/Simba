@@ -683,7 +683,8 @@ object PushPredicateThroughJoin extends Rule[LogicalPlan] with PredicateHelper {
 
           (rightFilterConditions ++ commonFilterCondition).
             reduceLeftOption(And).map(Filter(_, newJoin)).getOrElse(newJoin)
-        case FullOuter => f // DO Nothing for Full Outer Join
+        case _ => f
+        //case FullOuter => f // DO Nothing for Full Outer Join
       }
 
     // push down the join filter into sub query scanning if applicable
