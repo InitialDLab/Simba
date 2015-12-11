@@ -1,4 +1,4 @@
-SparkSpatial
+Simba
 ==========
 
 This project aims at implementing a spatial database on Apache Spark, led by Associate Processor [Feifei Li](http://www.cs.utah.edu/~lifeifei) from [The University of Utah](http://www.utah.edu)  and Associate Processor [Bin Yao](http://www.cs.sjtu.edu.cn/~yaobin)  from [Shanghai Jiao Tong University](http://www.sjtu.edu.cn).

@@ -1,7 +1,7 @@
 <?php
 #session_start();
 /* @var $this yii\web\View */
-$this->title = 'SparkSpatial SqlDemo';
+$this->title = 'Simba SqlDemo';
 # setcookie("demotime",date('Y-m-d H:i:s',time()), time()+300);
 if(!isset($_COOKIE['demotime'])){
 	setcookie("demotime",date('Y-m-d H:i:s',time()), time()+3600);
@@ -81,7 +81,7 @@ word-break:break-all;
     }
 </script>
 <div class='page header'>
-    <h1>SparkSpatial SqlDemo</h1>
+    <h1>Simba SqlDemo</h1>
 </div>
 <div class="site-index">
 	<div class='alert alert-info'>

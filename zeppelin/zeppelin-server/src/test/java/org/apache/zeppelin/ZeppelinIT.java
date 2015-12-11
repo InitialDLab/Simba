@@ -17,33 +17,30 @@
 
 package org.apache.zeppelin;
 
-import static org.junit.Assert.*;
-
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
-
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-import org.openqa.selenium.By;
-import org.openqa.selenium.Keys;
-import org.openqa.selenium.TimeoutException;
-import org.openqa.selenium.WebDriver;
-import org.openqa.selenium.WebElement;
+import org.openqa.selenium.*;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.firefox.FirefoxBinary;
 import org.openqa.selenium.firefox.FirefoxDriver;
 import org.openqa.selenium.firefox.FirefoxProfile;
 import org.openqa.selenium.safari.SafariDriver;
 import org.openqa.selenium.support.ui.ExpectedCondition;
+import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
+
+import java.util.LinkedList;
+import java.util.List;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.fail;
 
 /**
  * Test Zeppelin with web brower.
- * 
+ *
  * To test, ZeppelinServer should be running on port 8080
- * On OSX, you'll need firefox 31.0 installed. 
+ * On OSX, you'll need firefox 42.0 installed.
  *
  */
 public class ZeppelinIT {
@@ -140,9 +137,11 @@ public class ZeppelinIT {
     (new WebDriverWait(driver, 60)).until(new ExpectedCondition<Boolean>() {
       public Boolean apply(WebDriver d) {
         return driver.findElement(By.xpath(getParagraphXPath(paragraphNo)
-                + "//div[@class=\"control\"]//span[1][text()=\" " + state + " \"]"))
+            + "//div[@class='control']//span[1][contains(.,'" + state + "')]"))
             .isDisplayed();
-      };
+      }
+
+      ;
     });
   }
 
@@ -150,17 +149,29 @@ public class ZeppelinIT {
     return null != System.getenv("CI");
   }
 
-	@Test
+  boolean waitForText(final String txt, final By by) {
+    try {
+      new WebDriverWait(driver, 5).until(new ExpectedCondition<Boolean>() {
+        @Override
+        public Boolean apply(WebDriver d) {
+          return txt.equals(driver.findElement(by).getText());
+        }
+      });
+      return true;
+    } catch (TimeoutException e) {
+      return false;
+    }
+  }
+
+  @Test
   public void testAngularDisplay() throws InterruptedException{
     if (!endToEndTestEnabled()) {
       return;
     }
+    createNewNote();
 
-	  String noteName = createNewNoteAndGetName();
-	  driver.findElement(By.partialLinkText(noteName)).click();
-
-	  // wait for first paragraph's " READY " status text
-	  waitForParagraph(1, "READY");
+    // wait for first paragraph's " READY " status text
+    waitForParagraph(1, "READY");
 
     /*
      * print angular template
@@ -176,8 +187,8 @@ public class ZeppelinIT {
     waitForParagraph(1, "FINISHED");
 
     // check expected text
-    assertEquals("BindingTest__", driver.findElement(By.xpath(
-        getParagraphXPath(1) + "//div[@id=\"angularTestButton\"]")).getText());
+    waitForText("BindingTest__", By.xpath(
+        getParagraphXPath(1) + "//div[@id=\"angularTestButton\"]"));
 
     /*
      * Bind variable
@@ -190,8 +201,8 @@ public class ZeppelinIT {
     waitForParagraph(2, "FINISHED");
 
     // check expected text
-    assertEquals("BindingTest_1_", driver.findElement(By.xpath(
-        getParagraphXPath(1) + "//div[@id=\"angularTestButton\"]")).getText());
+    waitForText("BindingTest_1_", By.xpath(
+        getParagraphXPath(1) + "//div[@id=\"angularTestButton\"]"));
 
 
     /*
@@ -206,8 +217,8 @@ public class ZeppelinIT {
     waitForParagraph(3, "FINISHED");
 
     // check expected text
-    assertEquals("myVar=1", driver.findElement(By.xpath(
-        getParagraphXPath(3) + "//div[@ng-bind=\"paragraph.result.msg\"]")).getText());
+    waitForText("myVar=1", By.xpath(
+        getParagraphXPath(3) + "//div[@ng-bind=\"paragraph.result.msg\"]"));
 
     /*
      * Click element
@@ -216,8 +227,8 @@ public class ZeppelinIT {
         getParagraphXPath(1) + "//div[@id=\"angularTestButton\"]")).click();
 
     // check expected text
-    assertEquals("BindingTest_2_", driver.findElement(By.xpath(
-        getParagraphXPath(1) + "//div[@id=\"angularTestButton\"]")).getText());
+    waitForText("BindingTest_2_", By.xpath(
+        getParagraphXPath(1) + "//div[@id=\"angularTestButton\"]"));
 
     /*
      * Register watcher
@@ -242,13 +253,13 @@ public class ZeppelinIT {
         getParagraphXPath(1) + "//div[@id=\"angularTestButton\"]")).click();
 
     // check expected text
-    assertEquals("BindingTest_3_", driver.findElement(By.xpath(
-        getParagraphXPath(1) + "//div[@id=\"angularTestButton\"]")).getText());
+    waitForText("BindingTest_3_", By.xpath(
+        getParagraphXPath(1) + "//div[@id=\"angularTestButton\"]"));
     waitForParagraph(3, "FINISHED");
 
     // check expected text by watcher
-    assertEquals("myVar=3", driver.findElement(By.xpath(
-        getParagraphXPath(3) + "//div[@ng-bind=\"paragraph.result.msg\"]")).getText());
+    waitForText("myVar=3", By.xpath(
+        getParagraphXPath(3) + "//div[@ng-bind=\"paragraph.result.msg\"]"));
 
     /*
      * Unbind
@@ -261,8 +272,8 @@ public class ZeppelinIT {
     waitForParagraph(5, "FINISHED");
 
     // check expected text
-    assertEquals("BindingTest__", driver.findElement(By.xpath(
-        getParagraphXPath(1) + "//div[@id=\"angularTestButton\"]")).getText());
+    waitForText("BindingTest__",
+        By.xpath(getParagraphXPath(1) + "//div[@id=\"angularTestButton\"]"));
 
     /*
      * Bind again and see rebind works.
@@ -272,13 +283,13 @@ public class ZeppelinIT {
     waitForParagraph(2, "FINISHED");
 
     // check expected text
-    assertEquals("BindingTest_1_", driver.findElement(By.xpath(
-        getParagraphXPath(1) + "//div[@id=\"angularTestButton\"]")).getText());
+    waitForText("BindingTest_1_",
+        By.xpath(getParagraphXPath(1) + "//div[@id=\"angularTestButton\"]"));
 
     System.out.println("testCreateNotebook Test executed");
   }
 
-  private String createNewNoteAndGetName() {
+  private void createNewNote() {
     List<WebElement> notebookLinks = driver.findElements(By
         .xpath("//div[contains(@class, \"col-md-4\")]/div/ul/li"));    
     List<String> notebookTitles = new LinkedList<String>();
@@ -286,27 +297,17 @@ public class ZeppelinIT {
       notebookTitles.add(el.getText());
     }
     
-    WebElement createNoteLink = driver.findElement(By.partialLinkText("Create new note"));
+    WebElement createNoteLink = driver.findElement(By.xpath("//div[contains(@class, \"col-md-4\")]/div/h5/a[contains(.,'Create new note')]"));
     createNoteLink.click();
+
+    WebDriverWait block = new WebDriverWait(driver, 10);
+    WebElement modal = block.until(ExpectedConditions.visibilityOfElementLocated(By.id("noteNameModal")));
+    WebElement createNoteButton = modal.findElement(By.id("createNoteButton"));
+    createNoteButton.click();
 
     try {
       Thread.sleep(500); // wait for notebook list updated
     } catch (InterruptedException e) {
     } 
-
-    List<WebElement> notebookLinksAfterCreate = driver.findElements(By
-        .xpath("//div[contains(@class, \"col-md-4\")]/div/ul/li"));
-
-    Iterator<WebElement> it = notebookLinksAfterCreate.iterator();
-    while (it.hasNext()) {
-      WebElement newEl = it.next();
-      if (notebookTitles.contains(newEl.getText())) {
-        
-        it.remove();
-      }
-    }
-
-    assertEquals(1, notebookLinksAfterCreate.size());
-    return notebookLinksAfterCreate.get(0).getText();
   }
 }

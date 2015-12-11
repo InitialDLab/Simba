@@ -61,7 +61,7 @@ public class IgniteInterpreterTest {
     ignite = Ignition.start(cfg);
 
     Properties props = new Properties();
-    props.setProperty(IgniteSqlInterpreter.IGNITE_JDBC_URL, "jdbc:intp://localhost:11211/person");
+    props.setProperty(IgniteSqlInterpreter.IGNITE_JDBC_URL, "jdbc:ignite:cfg://cache=person@default-ignite-jdbc.xml");
     props.setProperty(IgniteInterpreter.IGNITE_CLIENT_MODE, "false");
     props.setProperty(IgniteInterpreter.IGNITE_PEER_CLASS_LOADING_ENABLED, "false");
 
@@ -84,6 +84,9 @@ public class IgniteInterpreterTest {
 
     assertEquals(InterpreterResult.Code.SUCCESS, result.code());
     assertTrue(result.message().contains(sizeVal + ": Int = " + ignite.cluster().nodes().size()));
+
+    result = intp.interpret("\"123\"\n  .toInt", INTP_CONTEXT);
+    assertEquals(InterpreterResult.Code.SUCCESS, result.code());
   }
 
   @Test
@@ -92,4 +95,5 @@ public class IgniteInterpreterTest {
 
     assertEquals(InterpreterResult.Code.ERROR, result.code());
   }
+
 }

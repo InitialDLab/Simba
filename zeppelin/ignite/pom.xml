@@ -23,6 +23,7 @@
     <artifactId>zeppelin</artifactId>
     <groupId>org.apache.zeppelin</groupId>
     <version>0.6.0-incubating-SNAPSHOT</version>
+    <relativePath>..</relativePath>
   </parent>
 
   <artifactId>zeppelin-ignite</artifactId>
@@ -32,7 +33,7 @@
   <url>http://zeppelin.incubator.apache.org</url>
 
   <properties>
-    <ignite.version>1.1.0-incubating</ignite.version>
+    <ignite.version>1.4.0</ignite.version>
     <ignite.scala.binary.version>2.10</ignite.scala.binary.version>
     <ignite.scala.version>2.10.4</ignite.scala.version>
   </properties>

@@ -17,14 +17,21 @@ angular.module('zeppelinWebApp').service('websocketMsgSrv', function($rootScope,
 
   return {
 
-    createNotebook: function() {
-      websocketEvents.sendNewEvent({op: 'NEW_NOTE'});
+    getHomeNotebook: function() {
+      websocketEvents.sendNewEvent({op: 'GET_HOME_NOTE'});
+    },
+
+    createNotebook: function(noteName) {
+      websocketEvents.sendNewEvent({op: 'NEW_NOTE',data: {name: noteName}});
     },
 
     deleteNotebook: function(noteId) {
       websocketEvents.sendNewEvent({op: 'DEL_NOTE', data: {id: noteId}});
     },
 
+    cloneNotebook: function(noteIdToClone, newNoteName ) {
+      websocketEvents.sendNewEvent({op: 'CLONE_NOTE', data: {id: noteIdToClone, name: newNoteName}});
+    },
     getNotebookList: function() {
       websocketEvents.sendNewEvent({op: 'LIST_NOTES'});
     },
@@ -78,6 +85,10 @@ angular.module('zeppelinWebApp').service('websocketMsgSrv', function($rootScope,
       websocketEvents.sendNewEvent({op: 'PARAGRAPH_REMOVE', data: {id: paragraphId}});
     },
 
+    clearParagraphOutput: function(paragraphId) {
+      websocketEvents.sendNewEvent({op: 'PARAGRAPH_CLEAR_OUTPUT', data: {id: paragraphId}});
+    },
+
     completion: function(paragraphId, buf, cursor) {
       websocketEvents.sendNewEvent({
         op : 'COMPLETION',
@@ -100,6 +111,19 @@ angular.module('zeppelinWebApp').service('websocketMsgSrv', function($rootScope,
           params: paragraphParams
         }
       });
+    },
+
+    importNotebook: function(notebook) {
+      websocketEvents.sendNewEvent({
+        op: 'IMPORT_NOTE',
+        data: {
+          notebook: notebook
+        }
+      });
+    },
+
+    isConnected: function(){
+      return websocketEvents.isConnected();
     }
 
   };

@@ -25,7 +25,6 @@ limitations under the License.
 
 	<module name="FileTabCharacter">
 		<!-- Checks that there are no tab characters in the file. -->
-		<property name="severity" value="warning" />
 	</module>
 
 	<module name="NewlineAtEndOfFile">
@@ -57,7 +56,7 @@ limitations under the License.
 
 		<module name="RedundantImport">
 			<!-- Checks for redundant import statements. -->
-			<property name="severity" value="warning" />
+			<property name="severity" value="error" />
 		</module>
 		<!-- <module name="ImportOrder"> Checks for out of order import statements 
 			<property name="severity" value="warning"/> <property name="groups" value="com.google,android,junit,net,org,java,javax"/> 
@@ -80,7 +79,7 @@ limitations under the License.
 
 		<module name="JavadocType">
 			<property name="scope" value="protected" />
-			<property name="severity" value="warning" />
+			<property name="severity" value="error" />
 		</module>
 
 		<module name="JavadocStyle">
@@ -175,7 +174,7 @@ limitations under the License.
 			<property name="max"
 				value="${com.puppycrawl.tools.checkstyle.checks.sizes.LineLength.max}"
 				default="100" />
-			<property name="severity" value="warning" />
+			<property name="severity" value="error" />
 
 			<!-- The default ignore pattern exempts the following elements: - import 
 				statements - long URLs inside comments -->
@@ -207,7 +206,7 @@ limitations under the License.
 
 		<module name="UpperEll">
 			<!-- Checks that long constants are defined with an upper ell. -->
-			<property name="severity" value="warning" />
+			<property name="severity" value="error" />
 		</module>
 
 		<module name="FallThrough">
@@ -217,7 +216,7 @@ limitations under the License.
 				through' (or some other variants which we don't publicized to promote consistency). -->
 			<property name="reliefPattern"
 				value="fall through|Fall through|fallthru|Fallthru|falls through|Falls through|fallthrough|Fallthrough|No break|NO break|no break|continue on" />
-			<property name="severity" value="warning" />
+			<property name="severity" value="error" />
 		</module>
 
 
@@ -243,7 +242,7 @@ limitations under the License.
         LITERAL_SYNCHRONIZED, LITERAL_TRY, LITERAL_WHILE, LOR, LT, MINUS,
         MINUS_ASSIGN, MOD, MOD_ASSIGN, NOT_EQUAL, PLUS, PLUS_ASSIGN, QUESTION,
         SL, SL_ASSIGN, SR_ASSIGN, STAR, STAR_ASSIGN" />
-			<property name="severity" value="warning" />
+			<property name="severity" value="error" />
 		</module>
 
 		<module name="WhitespaceAfter">
@@ -258,7 +257,7 @@ limitations under the License.
 				value="BNOT, DEC, DOT, INC, LNOT, UNARY_MINUS,
         UNARY_PLUS" />
 			<property name="allowLineBreaks" value="true" />
-			<property name="severity" value="warning" />
+			<property name="severity" value="error" />
 		</module>
 
 		<module name="NoWhitespaceBefore">
@@ -266,7 +265,7 @@ limitations under the License.
 				Linebreaks are allowed. -->
 			<property name="tokens" value="SEMI, DOT, POST_DEC, POST_INC" />
 			<property name="allowLineBreaks" value="true" />
-			<property name="severity" value="warning" />
+			<property name="severity" value="error" />
 		</module>
 
 		<module name="ParenPad">
@@ -275,10 +274,9 @@ limitations under the License.
 			<property name="severity" value="warning" />
 		</module>
 
-        <module name="Indentation">
-            <!-- Checks code indentation -->
-            <property name="basicOffset" value="2" />
-			<property name="severity" value="warning" />
-		</module>
+                <module name="Indentation">
+                        <!-- Checks code indentation -->
+                        <property name="basicOffset" value="2" />
+                </module>
 	</module>
 </module>

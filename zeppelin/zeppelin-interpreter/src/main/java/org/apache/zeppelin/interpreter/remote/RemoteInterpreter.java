@@ -32,6 +32,7 @@ import org.apache.zeppelin.interpreter.InterpreterGroup;
 import org.apache.zeppelin.interpreter.InterpreterResult;
 import org.apache.zeppelin.interpreter.InterpreterResult.Code;
 import org.apache.zeppelin.interpreter.InterpreterResult.Type;
+import org.apache.zeppelin.interpreter.WrappedInterpreter;
 import org.apache.zeppelin.interpreter.thrift.RemoteInterpreterContext;
 import org.apache.zeppelin.interpreter.thrift.RemoteInterpreterResult;
 import org.apache.zeppelin.interpreter.thrift.RemoteInterpreterService.Client;
@@ -86,7 +87,7 @@ public class RemoteInterpreter extends Interpreter {
     this.interpreterRunner = interpreterRunner;
     this.interpreterPath = interpreterPath;
     this.env = env;
-    this.connectTimeout = connectTimeout;  
+    this.connectTimeout = connectTimeout;
   }
 
   @Override
@@ -105,7 +106,8 @@ public class RemoteInterpreter extends Interpreter {
           throw new InterpreterException(e);
         }
       } else {
-        throw new InterpreterException("Unexpected error");
+        // closed or not opened yet
+        return null;
       }
     }
   }
@@ -180,11 +182,18 @@ public class RemoteInterpreter extends Interpreter {
       interpreterProcess.releaseClient(client);
     }
 
-    interpreterProcess.dereference();
+    int r = interpreterProcess.dereference();
+    if (r == 0) {
+      synchronized (interpreterGroupReference) {
+        InterpreterGroup intpGroup = getInterpreterGroup();
+        interpreterGroupReference.remove(getInterpreterGroupKey(intpGroup));
+      }
+    }
   }
 
   @Override
   public InterpreterResult interpret(String st, InterpreterContext context) {
+    logger.debug("st: {}", st);
     FormType form = getFormType();
     RemoteInterpreterProcess interpreterProcess = getInterpreterProcess();
     Client client = null;
@@ -321,10 +330,13 @@ public class RemoteInterpreter extends Interpreter {
   public Scheduler getScheduler() {
     int maxConcurrency = 10;
     RemoteInterpreterProcess interpreterProcess = getInterpreterProcess();
-    return SchedulerFactory.singleton().createOrGetRemoteScheduler(
-        "remoteinterpreter_" + interpreterProcess.hashCode(),
-        getInterpreterProcess(),
-        maxConcurrency);
+    if (interpreterProcess == null) {
+      return null;
+    } else {
+      return SchedulerFactory.singleton().createOrGetRemoteScheduler(
+          "remoteinterpreter_" + interpreterProcess.hashCode(), interpreterProcess,
+          maxConcurrency);
+    }
   }
 
 

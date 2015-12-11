@@ -5,6 +5,9 @@
 *.war
 *.ear
 
+# interpreter
+/interpreter/
+
 # conf file
 conf/zeppelin-env.sh
 conf/zeppelin-site.xml
@@ -14,6 +17,7 @@ conf/interpreter.json
 
 # other generated files
 spark/dependency-reduced-pom.xml
+reports
 
 #webapp
 zeppelin-web/node_modules

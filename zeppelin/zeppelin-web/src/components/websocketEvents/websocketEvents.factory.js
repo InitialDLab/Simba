@@ -16,19 +16,24 @@
 angular.module('zeppelinWebApp').factory('websocketEvents', function($rootScope, $websocket, baseUrlSrv) {
   var websocketCalls = {};
 
-  websocketCalls.ws = $websocket(baseUrlSrv.getWebsocketProtocol() + '://' + location.hostname + ':' + baseUrlSrv.getPort());
+  websocketCalls.ws = $websocket(baseUrlSrv.getWebsocketUrl());
+  websocketCalls.ws.reconnectIfNotNormalClose = true;
 
   websocketCalls.ws.onOpen(function() {
     console.log('Websocket created');
     $rootScope.$broadcast('setConnectedStatus', true);
     setInterval(function(){
       websocketCalls.sendNewEvent({op: 'PING'});
-    }, 60000);
+    }, 10000);
   });
 
   websocketCalls.sendNewEvent = function(data) {
     console.log('Send >> %o, %o', data.op, data);
     websocketCalls.ws.send(JSON.stringify(data));
+  };
+
+  websocketCalls.isConnected = function() {
+    return (websocketCalls.ws.socket.readyState === 1);
   };
 
   websocketCalls.ws.onMessage(function(event) {

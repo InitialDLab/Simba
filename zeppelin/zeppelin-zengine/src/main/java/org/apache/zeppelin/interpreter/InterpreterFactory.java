@@ -41,6 +41,7 @@ import java.util.Properties;
 import java.util.Set;
 
 import org.apache.commons.lang.ArrayUtils;
+import org.apache.commons.lang.NullArgumentException;
 import org.apache.zeppelin.conf.ZeppelinConfiguration;
 import org.apache.zeppelin.conf.ZeppelinConfiguration.ConfVars;
 import org.apache.zeppelin.display.AngularObjectRegistry;
@@ -48,6 +49,8 @@ import org.apache.zeppelin.display.AngularObjectRegistryListener;
 import org.apache.zeppelin.interpreter.Interpreter.RegisteredInterpreter;
 import org.apache.zeppelin.interpreter.remote.RemoteAngularObjectRegistry;
 import org.apache.zeppelin.interpreter.remote.RemoteInterpreter;
+import org.apache.zeppelin.scheduler.Job;
+import org.apache.zeppelin.scheduler.Job.Status;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -314,9 +317,11 @@ public class InterpreterFactory {
     List<RegisteredInterpreter> registeredInterpreters = new LinkedList<RegisteredInterpreter>();
 
     for (String className : interpreterClassList) {
-      registeredInterpreters.add(Interpreter.findRegisteredInterpreterByClassName(className));
+      RegisteredInterpreter ri = Interpreter.findRegisteredInterpreterByClassName(className);
+      if (ri != null) {
+        registeredInterpreters.add(ri);
+      }
     }
-
     return registeredInterpreters;
   }
 
@@ -353,7 +358,14 @@ public class InterpreterFactory {
       String groupName,
       InterpreterOption option,
       Properties properties)
-      throws InterpreterException {
+      throws InterpreterException , NullArgumentException {
+
+    //When called from REST API without option we receive NPE
+    if (option == null )
+      throw new NullArgumentException("option");
+    //When called from REST API without option we receive NPE
+    if (properties == null )
+      throw new NullArgumentException("properties");
 
     AngularObjectRegistry angularObjectRegistry;
 
@@ -526,20 +538,34 @@ public class InterpreterFactory {
 
   public void restart(String id) {
     synchronized (interpreterSettings) {
-      synchronized (interpreterSettings) {
-        InterpreterSetting intpsetting = interpreterSettings.get(id);
-        if (intpsetting != null) {
-          intpsetting.getInterpreterGroup().close();
-          intpsetting.getInterpreterGroup().destroy();
+      InterpreterSetting intpsetting = interpreterSettings.get(id);
+      if (intpsetting != null) {
 
-          InterpreterGroup interpreterGroup = createInterpreterGroup(
-              intpsetting.id(),
-              intpsetting.getGroup(), intpsetting.getOption(), intpsetting.getProperties());
-          intpsetting.setInterpreterGroup(interpreterGroup);
-        } else {
-          throw new InterpreterException("Interpreter setting id " + id
-              + " not found");
+        for (Interpreter intp : intpsetting.getInterpreterGroup()) {
+          for (Job job : intp.getScheduler().getJobsRunning()) {
+            job.abort();
+            job.setStatus(Status.ABORT);
+            logger.info("Job " + job.getJobName() + " aborted ");
+          }
+              
+          for (Job job : intp.getScheduler().getJobsWaiting()) {
+            job.abort();
+            job.setStatus(Status.ABORT);
+            logger.info("Job " + job.getJobName() + " aborted ");
+          }
         }
+
+
+        intpsetting.getInterpreterGroup().close();
+        intpsetting.getInterpreterGroup().destroy();
+
+        InterpreterGroup interpreterGroup = createInterpreterGroup(
+            intpsetting.id(),
+            intpsetting.getGroup(), intpsetting.getOption(), intpsetting.getProperties());
+        intpsetting.setInterpreterGroup(interpreterGroup);
+      } else {
+        throw new InterpreterException("Interpreter setting id " + id
+            + " not found");
       }
     }
   }
@@ -591,7 +617,7 @@ public class InterpreterFactory {
           separateCL = false;
         }
       } catch (Exception e) {
-        // nothing to do.
+        logger.error("exception checking server classloader driver" , e);
       }
 
       URLClassLoader cl;

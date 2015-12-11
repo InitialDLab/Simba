@@ -27,58 +27,154 @@ To know more about Zeppelin, visit our web site [http://zeppelin.incubator.apach
 ### Before Build
 If you don't have requirements prepared, install it. 
 (The installation method may vary according to your environment, example is for Ubuntu.)
+
 ```
 sudo apt-get update
-sudo apt-get install openjdk-7-jdk
 sudo apt-get install git
-sudo apt-get install maven
+sudo apt-get install openjdk-7-jdk
 sudo apt-get install npm
+sudo apt-get install libfontconfig
+
+# install maven
+wget http://www.eu.apache.org/dist/maven/maven-3/3.3.3/binaries/apache-maven-3.3.3-bin.tar.gz
+sudo tar -zxf apache-maven-3.3.3-bin.tar.gz -C /usr/local/
+sudo ln -s /usr/local/apache-maven-3.3.3/bin/mvn /usr/local/bin/mvn
 ```
+
+_Notes:_ 
+ - Ensure node is installed by running `node --version`  
+ - Ensure maven is running version 3.1.x or higher with `mvn -version`
 
 ### Build
-If you want to build Zeppelin from the source, please first clone this repository. And then:
-```
-mvn clean package
-```
-Build with specific version
+If you want to build Zeppelin from the source, please first clone this repository, then:
 
-Spark 1.1.x
 ```
-mvn clean package -Pspark-1.1 -Dhadoop.version=2.2.0 -Phadoop-2.2 -DskipTests 
+mvn clean package -DskipTests [Options]
 ```
-Spark 1.2.x
+
+Each Interpreter requires different Options.
+
+
+#### Spark Interpreter
+
+To build with a specific Spark version, Hadoop version or specific features, define one or more of the following profiles and options:
+
+##### -Pspark-[version]
+
+Set spark major version
+
+Available profiles are
+
 ```
-mvn clean package -Pspark-1.2 -Dhadoop.version=2.2.0 -Phadoop-2.2 -DskipTests 
+-Pspark-1.5
+-Pspark-1.4
+-Pspark-1.3
+-Pspark-1.2
+-Pspark-1.1
+-Pcassandra-spark-1.5
+-Pcassandra-spark-1.4
+-Pcassandra-spark-1.3
+-Pcassandra-spark-1.2
+-Pcassandra-spark-1.1
 ```
-Spark 1.3.x
+
+minor version can be adjusted by `-Dspark.version=x.x.x`
+
+
+##### -Phadoop-[version]
+
+set hadoop major version
+
+Available profiles are
+
 ```
-mvn clean package -Pspark-1.3 -Dhadoop.version=2.2.0 -Phadoop-2.2 -DskipTests
+-Phadoop-0.23
+-Phadoop-1
+-Phadoop-2.2
+-Phadoop-2.3
+-Phadoop-2.4
+-Phadoop-2.6
 ```
-Spark 1.4.x
+
+minor version can be adjusted by `-Dhadoop.version=x.x.x`
+
+##### -Pyarn (optional)
+
+enable YARN support for local mode
+
+
+##### -Ppyspark (optional)
+
+enable PySpark support for local mode
+
+
+##### -Pvendor-repo (optional)
+
+enable 3rd party vendor repository (cloudera)
+
+
+##### -Pmapr[version] (optional)
+
+For the MapR Hadoop Distribution, these profiles will handle the Hadoop version. As MapR allows different versions
+of Spark to be installed, you should specify which version of Spark is installed on the cluster by adding a Spark profile (-Pspark-1.2, -Pspark-1.3, etc.) as needed. For Hive, check the hive/pom.xml and adjust the version installed as well. The correct Maven
+artifacts can be found for every version of MapR at http://doc.mapr.com
+
+Available profiles are
+
 ```
-mvn clean package -Pspark-1.4 -Dhadoop.version=2.2.0 -Phadoop-2.2 -DskipTests
+-Pmapr3
+-Pmapr40
+-Pmapr41
+-Pmapr50
 ```
-CDH 5.X
+
+
+Here're some examples:
+
 ```
-mvn clean package -Pspark-1.2 -Dhadoop.version=2.5.0-cdh5.3.0 -Phadoop-2.4 -DskipTests
+# basic build
+mvn clean package -Pspark-1.5 -Phadoop-2.4 -Pyarn -Ppyspark
+
+# spark-cassandra integration
+mvn clean package -Pcassandra-spark-1.5 -Dhadoop.version=2.6.0 -Phadoop-2.6 -DskipTests
+
+# with CDH
+mvn clean package -Pspark-1.2 -Dhadoop.version=2.5.0-cdh5.3.0 -Phadoop-2.4 -Pvendor-repo -DskipTests
+
+# with MapR
+mvn clean package -Pspark-1.5 -Pmapr50 -DskipTests
 ```
-Yarn (Hadoop 2.2.x and later)
-```
-mvn clean package -Pspark-1.1 -Dhadoop.version=2.2.0 -Phadoop-2.2 -Pyarn -DskipTests
-```
-Ignite (1.1.0-incubating and later)
+
+
+#### Ignite Interpreter
+
 ```
 mvn clean package -Dignite.version=1.1.0-incubating -DskipTests
 ```
 
+
 ### Configure
 If you wish to configure Zeppelin option (like port number), configure the following files:
+
 ```
 ./conf/zeppelin-env.sh
 ./conf/zeppelin-site.xml
 ```
 (You can copy ```./conf/zeppelin-env.sh.template``` into ```./conf/zeppelin-env.sh```. 
-Same for ```zeppein-site.xml```.)
+Same for ```zeppelin-site.xml```.)
+
+
+#### Setting SPARK_HOME and HADOOP_HOME
+
+Without SPARK_HOME and HADOOP_HOME, Zeppelin uses embedded Spark and Hadoop binaries that you have specified with mvn build option.
+If you want to use system provided Spark and Hadoop, export SPARK_HOME and HADOOP_HOME in zeppelin-env.sh
+You can use any supported version of spark without rebuilding Zeppelin.
+
+```
+# ./conf/zeppelin-env.sh
+export SPARK_HOME=...
+export HADOOP_HOME=...
+```
 
 #### External cluster configuration
 Mesos
@@ -93,22 +189,26 @@ If you set `SPARK_HOME`, you should deploy spark binary on the same location to 
 Yarn
 
     # ./conf/zeppelin-env.sh
-    export HADOOP_CONF_DIR=/path/to/hadoop_conf_dir
-  
-`HADOOP_CONF_DIR` should contains yarn-site.xml and core-site.xml.
+    export SPARK_HOME=/path/to/spark_dir
 
 ### Run
     ./bin/zeppelin-daemon.sh start
 
-    browse localhost:8080 in your browser. 8081 port should be accessible for websocket connection.
+    browse localhost:8080 in your browser.
 
 
 For configuration details check __./conf__ subdirectory.
 
 ### Package
-To package final distribution do:
+To package the final distribution including the compressed archive, run:
 
-      mvn clean package -P build-distr
+      mvn clean package -Pbuild-distr
+
+To build a distribution with specific profiles, run:
+
+      mvn clean package -Pbuild-distr -Pspark-1.5 -Phadoop-2.4 -Pyarn -Ppyspark
+
+The profiles `-Pspark-1.5 -Phadoop-2.4 -Pyarn -Ppyspark` can be adjusted if you wish to build to a specific spark versions, or omit support such as `yarn`.  
 
 The archive is generated under _zeppelin-distribution/target_ directory
 
