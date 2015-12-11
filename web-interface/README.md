@@ -1,6 +1,6 @@
 Web Demo
 -------------------------------------------
-This is a web demo module for SparkSpatial Project. It includes a php client and a java server project running as a Spark Application. You can follow the configuration below to build the web demo and use it.
+This is a web demo module for Simba Project. It includes a php client and a java server project running as a Spark Application. You can follow the configuration below to build the web demo and use it.
 
 ### Configuration
 You need to setup spark spatial environment and php environment before configuring the web demo.
@@ -60,4 +60,4 @@ Finally, genenerate the SparkHttpPost.jar file in the directory `/path/to/sparks
 > $ java -jar SparkHttpPost.jar
 > ```
 
-* enter the url `https://your webspace/basic/web/index.php` in your browser, then you can immediately use the web demo module for SparkSpatial Project
+* enter the url `https://your webspace/basic/web/index.php` in your browser, then you can immediately use the web demo module for Simba Project
