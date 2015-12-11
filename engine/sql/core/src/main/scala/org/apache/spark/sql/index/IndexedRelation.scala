@@ -13,7 +13,7 @@ import org.apache.spark.storage.StorageLevel
 
 /**
  * Created by Dong Xie on 9/28/15.
- * Index Relation Structures for SparkSpatial
+ * Index Relation Structures for Simba
  */
 
 

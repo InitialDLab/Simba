@@ -87,7 +87,7 @@ word-break:break-all;
 	<div class='alert alert-info'>
 		<button type="button" class="close" data-dismiss="alert" aria-hidden="true">*</button>
 		<strong>Note!<strong>
-		 Edit your sql sentence using the sparkspatial sql syntax below:
+		 Edit your sql sentence using the Simba sql syntax below:
 	</div>
 	<div id="monitor" name="displayer">
 	<div id="firstdiv">&nbsp;>>> </div>

@@ -3,13 +3,13 @@ Web Demo
 This is a web demo module for Simba Project. It includes a php client and a java server project running as a Spark Application. You can follow the configuration below to build the web demo and use it.
 
 ### Configuration
-You need to setup spark spatial environment and php environment before configuring the web demo.
+You need to setup Simba environment and php environment before configuring the web demo.
 
 * php web client
 
-> Just copy the file directory `/path/to/sparkspatial/web/php/basic` to any place on your webspace.	  
+> Just copy the file directory `/path/to/simba/web/php/basic` to any place on your webspace.	  
 
-* spark spatial conf
+* Simba conf
 
 > Open the SparkHttpPost Project, and configure the hdfs path and the master in the file SparkHttpPost.java,
 
@@ -29,7 +29,7 @@ You need to setup spark spatial environment and php environment before configuri
 
 > In this web demo, the default socket Port is 9090. If you want to change the default port, please follow the steps bellow:       
 
-> Firstly, get into the `/path/to/sparkspatial/web/php/basic/views/site/` directory and open the file index.php and configure the clientsocket Port in this line,       
+> Firstly, get into the `/path/to/simba/web/php/basic/views/site/` directory and open the file index.php and configure the clientsocket Port in this line,       
 
 > ```
 > $connect = socket_connect($socket, 'localhost', 9090);
@@ -45,16 +45,16 @@ You need to setup spark spatial environment and php environment before configuri
 
 * import the lib directory
 
-> You need to import the lib directory of the sparkspatial-distribution package to the project.
+> You need to import the lib directory of the simba-distribution package to the project.
 
-Finally, genenerate the SparkHttpPost.jar file in the directory `/path/to/sparkspatialweb/java/SparkHttpPost/out/artifacts/SparkHttpPost_jar/`. 
+Finally, genenerate the SparkHttpPost.jar file in the directory `/path/to/simba_web/java/SparkHttpPost/out/artifacts/SparkHttpPost_jar/`. 
        
 ### Run
-* you need to run the spark spatial cluster and your web server (such as Nginx, Apache) firstly.
+* you need to run the Simba cluster and your web server (such as Nginx, Apache) firstly.
    
 * run the java server
       
-> You can copy the jar file to the `/path/to/sparkspatial/` directory.  Then get into the directory and execute the jar file in the command line
+> You can copy the jar file to the `/path/to/simba/` directory.  Then get into the directory and execute the jar file in the command line
 
 > ```	  
 > $ java -jar SparkHttpPost.jar
