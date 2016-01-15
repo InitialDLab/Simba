@@ -461,6 +461,28 @@ private[spark] object SQLConf {
         "used to benchmark the performance impact of using DistinctAggregationRewriter to " +
         "plan aggregation queries with a single distinct column.")
 
+  //Join Parameters
+  val DISTANCE_JOIN_METHOD = stringConf("spark.sql.joins.distanceJoinMethod", defaultValue = Some("SJMRDistanceJoin"))
+  val KNN_JOIN_METHOD = stringConf("spark.sql.joins.knnJoinMethod", defaultValue = Some("RTreeKNNJoin"))
+
+  //RTree Parameters
+  val MAX_ENTRIES_PER_NODE = intConf("spark.sql.spatial.rtree.maxEntriesPerNode", defaultValue = Some(25))
+
+  //zKNN Join Parameters
+  val ZKNN_SHIFT_TIMES = intConf("spark.sql.joins.zknn.shiftTimes", defaultValue = Some(2))
+
+  //Voronoi KNN Join Parameters
+  val VORONOI_PIVOTSET_SIZE = intConf("spark.sql.joins.voronoi.pivotSetSize", defaultValue = Some(10))
+
+  val THETA_BOOST = intConf("spark.sql.joins.thetaBoost", defaultValue = Some(16))
+
+  val SAMPLE_RATE = doubleConf("spark.sql.sampleRate", defaultValue = Some(0.01))
+
+  val TRANSFER_THRESHOLD = longConf("spark.sql.transferThreshold", defaultValue = Some(800 * 1024 * 1024))
+
+  //Threshold determine where rtree index using local index or brute force filter
+  val INDEX_SIZE_THRESHOLD = intConf("spark.sql.index.threshold", defaultValue = Some(1000))
+
   object Deprecated {
     val MAPRED_REDUCE_TASKS = "mapred.reduce.tasks"
     val EXTERNAL_SORT = "spark.sql.planner.externalSort"
@@ -581,6 +603,24 @@ private[sql] class SQLConf extends Serializable with CatalystConf {
 
   protected[spark] override def specializeSingleDistinctAggPlanning: Boolean =
     getConf(SPECIALIZE_SINGLE_DISTINCT_AGG_PLANNING)
+
+  private[spark] def distanceJoinMethod: String = getConf(DISTANCE_JOIN_METHOD)
+
+  private[spark] def knnJoinMethod: String = getConf(KNN_JOIN_METHOD)
+
+  private[spark] def maxEntriesPerNode: Int = getConf(MAX_ENTRIES_PER_NODE)
+
+  private[spark] def zknnShiftTimes: Int = getConf(ZKNN_SHIFT_TIMES)
+
+  private[spark] def voronoiPivotSetSize: Int = getConf(VORONOI_PIVOTSET_SIZE)
+
+  private[spark] def thetaBoost: Int = getConf(THETA_BOOST)
+
+  private[spark] def sampleRate: Double = getConf(SAMPLE_RATE)
+
+  private[spark] def indexSizeThreshold: Int = getConf(INDEX_SIZE_THRESHOLD)
+
+  private[spark] def transferThreshold: Long = getConf(TRANSFER_THRESHOLD)
 
   /** ********************** SQLConf functionality methods ************ */
 
