@@ -1,0 +1,533 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.spark.sql.execution
+
+import org.apache.spark.sql.catalyst.planning._
+import org.apache.spark.sql.catalyst.plans._
+import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
+import org.apache.spark.sql.catalyst.plans.physical._
+import org.apache.spark.sql.columnar.{InMemoryColumnarTableScan, InMemoryRelation}
+import org.apache.spark.sql.execution.{DescribeCommand => RunnableDescribeCommand}
+import org.apache.spark.sql.index.{IndexType, IndexRelationScan, IndexedRelation}
+import org.apache.spark.sql.parquet._
+import org.apache.spark.sql.sources.{CreateTableUsing, CreateTempTableUsing, DescribeCommand => LogicalDescribeCommand, _}
+import org.apache.spark.sql.catalyst.expressions._
+import org.apache.spark.sql.types._
+import org.apache.spark.sql.{IndexInfo, Strategy, SQLContext, execution}
+import org.apache.spark.sql.execution.joins._
+import org.apache.spark.sql.index._
+
+
+private[sql] abstract class SparkStrategies extends QueryPlanner[SparkPlan] {
+  self: SQLContext#SparkPlanner =>
+
+  object SpatialJoinExtractor extends Strategy with PredicateHelper{
+    def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match{
+      case ExtractSpatialJoinKeys(leftKeys, rightKeys, k, KNNJoin, left, right) =>
+        sqlContext.conf.knnJoinMethod match {
+          case "RTreeKNNJoin" =>
+            RTreeKNNJoin(leftKeys, rightKeys, k, planLater(left), planLater(right)) :: Nil
+          case "CartesianKNNJoin" =>
+            CartesianKNNJoinExecution(leftKeys, rightKeys, k, planLater(left), planLater(right)) :: Nil
+          case "VoronoiKNNJoin" =>
+            VoronoiKNNJoin(leftKeys, rightKeys, k, planLater(left), planLater(right)) :: Nil
+          case "NestedLoopKNNJoin" =>
+            NestedLoopKNNJoin(leftKeys, rightKeys, k, planLater(left), planLater(right)) :: Nil
+          case "NLRTreeKNNJoin" =>
+            NLRTreeKNNJoin(leftKeys, rightKeys, k, planLater(left), planLater(right)) :: Nil
+          case _ =>
+            RTreeKNNJoin(leftKeys, rightKeys, k, planLater(left), planLater(right)) :: Nil
+        }
+      case ExtractSpatialJoinKeys(leftKeys, rightKeys, k, ZKNNJoin, left, right) =>
+        zKNNJoin(leftKeys, rightKeys, k, planLater(left), planLater(right)) :: Nil
+      case ExtractSpatialJoinKeys(leftKeys, rightKeys, r, DistanceJoin, left, right) =>
+        sqlContext.conf.distanceJoinMethod match {
+          case "RTreeDistanceJoin" =>
+            RTreeDistanceJoin(leftKeys, rightKeys, r, planLater(left), planLater(right)) :: Nil
+          case "SJMRDistanceJoin" =>
+            SJMRDistanceJoin(leftKeys, rightKeys, r, planLater(left), planLater(right)) :: Nil
+          case "CartesianDistanceJoin" =>
+            CartesianDistanceJoinExecution(leftKeys, rightKeys, r, planLater(left), planLater(right)) :: Nil
+          case "NestedLoopDistanceJoin" =>
+            NestedLoopDistanceJoin(leftKeys, rightKeys, r, planLater(left), planLater(right)) :: Nil
+          case "NLRTreeDistanceJoin" =>
+            NLRTreeDistanceJoin(leftKeys, rightKeys, r, planLater(left), planLater(right)) :: Nil
+          case _ =>
+            RTreeDistanceJoin(leftKeys, rightKeys, r, planLater(left), planLater(right)) :: Nil
+        }
+      case _ => Nil
+    }
+  }
+
+  object LeftSemiJoin extends Strategy with PredicateHelper {
+    def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
+      case ExtractEquiJoinKeys(LeftSemi, leftKeys, rightKeys, condition, left, right)
+        if sqlContext.conf.autoBroadcastJoinThreshold > 0 &&
+          right.statistics.sizeInBytes <= sqlContext.conf.autoBroadcastJoinThreshold =>
+        val semiJoin = joins.BroadcastLeftSemiJoinHash(
+          leftKeys, rightKeys, planLater(left), planLater(right))
+        condition.map(Filter(_, semiJoin)).getOrElse(semiJoin) :: Nil
+      // Find left semi joins where at least some predicates can be evaluated by matching join keys
+      case ExtractEquiJoinKeys(LeftSemi, leftKeys, rightKeys, condition, left, right) =>
+        val semiJoin = joins.LeftSemiJoinHash(
+          leftKeys, rightKeys, planLater(left), planLater(right))
+        condition.map(Filter(_, semiJoin)).getOrElse(semiJoin) :: Nil
+      // no predicate can be evaluated by matching hash keys
+      case logical.Join(left, right, LeftSemi, condition) =>
+        joins.LeftSemiJoinBNL(planLater(left), planLater(right), condition) :: Nil
+      case _ => Nil
+    }
+  }
+
+  /**
+   * Uses the ExtractEquiJoinKeys pattern to find joins where at least some of the predicates can be
+   * evaluated by matching hash keys.
+   *
+   * This strategy applies a simple optimization based on the estimates of the physical sizes of
+   * the two join sides.  When planning a [[joins.BroadcastHashJoin]], if one side has an
+   * estimated physical size smaller than the user-settable threshold
+   * [[org.apache.spark.sql.SQLConf.AUTO_BROADCASTJOIN_THRESHOLD]], the planner would mark it as the
+   * ''build'' relation and mark the other relation as the ''stream'' side.  The build table will be
+   * ''broadcasted'' to all of the executors involved in the join, as a
+   * [[org.apache.spark.broadcast.Broadcast]] object.  If both estimates exceed the threshold, they
+   * will instead be used to decide the build side in a [[joins.ShuffledHashJoin]].
+   */
+  object HashJoin extends Strategy with PredicateHelper {
+
+    private[this] def makeBroadcastHashJoin(
+        leftKeys: Seq[Expression],
+        rightKeys: Seq[Expression],
+        left: LogicalPlan,
+        right: LogicalPlan,
+        condition: Option[Expression],
+        side: joins.BuildSide) = {
+      val broadcastHashJoin = execution.joins.BroadcastHashJoin(
+        leftKeys, rightKeys, side, planLater(left), planLater(right))
+      condition.map(Filter(_, broadcastHashJoin)).getOrElse(broadcastHashJoin) :: Nil
+    }
+
+    def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
+      case ExtractEquiJoinKeys(Inner, leftKeys, rightKeys, condition, left, right)
+        if sqlContext.conf.autoBroadcastJoinThreshold > 0 &&
+           right.statistics.sizeInBytes <= sqlContext.conf.autoBroadcastJoinThreshold =>
+        makeBroadcastHashJoin(leftKeys, rightKeys, left, right, condition, joins.BuildRight)
+
+      case ExtractEquiJoinKeys(Inner, leftKeys, rightKeys, condition, left, right)
+        if sqlContext.conf.autoBroadcastJoinThreshold > 0 &&
+           left.statistics.sizeInBytes <= sqlContext.conf.autoBroadcastJoinThreshold =>
+          makeBroadcastHashJoin(leftKeys, rightKeys, left, right, condition, joins.BuildLeft)
+
+      case ExtractEquiJoinKeys(Inner, leftKeys, rightKeys, condition, left, right) =>
+        val buildSide =
+          if (right.statistics.sizeInBytes <= left.statistics.sizeInBytes) {
+            joins.BuildRight
+          } else {
+            joins.BuildLeft
+          }
+        val hashJoin = joins.ShuffledHashJoin(
+          leftKeys, rightKeys, buildSide, planLater(left), planLater(right))
+        condition.map(Filter(_, hashJoin)).getOrElse(hashJoin) :: Nil
+
+      case ExtractEquiJoinKeys(joinType, leftKeys, rightKeys, condition, left, right) =>
+        joins.HashOuterJoin(
+          leftKeys, rightKeys, joinType, condition, planLater(left), planLater(right)) :: Nil
+
+      case _ => Nil
+    }
+  }
+
+  object HashAggregation extends Strategy {
+    def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
+      // Aggregations that can be performed in two phases, before and after the shuffle.
+
+      // Cases where all aggregates can be codegened.
+      case PartialAggregation(
+             namedGroupingAttributes,
+             rewrittenAggregateExpressions,
+             groupingExpressions,
+             partialComputation,
+             child)
+             if canBeCodeGened(
+                  allAggregates(partialComputation) ++
+                  allAggregates(rewrittenAggregateExpressions)) &&
+               codegenEnabled =>
+          execution.GeneratedAggregate(
+            partial = false,
+            namedGroupingAttributes,
+            rewrittenAggregateExpressions,
+            execution.GeneratedAggregate(
+              partial = true,
+              groupingExpressions,
+              partialComputation,
+              planLater(child))) :: Nil
+
+      // Cases where some aggregate can not be codegened
+      case PartialAggregation(
+             namedGroupingAttributes,
+             rewrittenAggregateExpressions,
+             groupingExpressions,
+             partialComputation,
+             child) =>
+        execution.Aggregate(
+          partial = false,
+          namedGroupingAttributes,
+          rewrittenAggregateExpressions,
+          execution.Aggregate(
+            partial = true,
+            groupingExpressions,
+            partialComputation,
+            planLater(child))) :: Nil
+
+      case _ => Nil
+    }
+
+    def canBeCodeGened(aggs: Seq[AggregateExpression]) = !aggs.exists {
+      case _: Sum | _: Count | _: Max | _: CombineSetsAndCount => false
+      // The generated set implementation is pretty limited ATM.
+      case CollectHashSet(exprs) if exprs.size == 1  &&
+           Seq(IntegerType, LongType).contains(exprs.head.dataType) => false
+      case _ => true
+    }
+
+    def allAggregates(exprs: Seq[Expression]) =
+      exprs.flatMap(_.collect { case a: AggregateExpression => a })
+  }
+
+  object BroadcastNestedLoopJoin extends Strategy {
+    def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
+      case logical.Join(left, right, joinType, condition) =>
+        val buildSide =
+          if (right.statistics.sizeInBytes <= left.statistics.sizeInBytes) {
+            joins.BuildRight
+          } else {
+            joins.BuildLeft
+          }
+        joins.BroadcastNestedLoopJoin(
+          planLater(left), planLater(right), buildSide, joinType, condition) :: Nil
+      case _ => Nil
+    }
+  }
+
+  object CartesianProduct extends Strategy {
+    def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
+      case logical.Join(left, right, _, None) =>
+        execution.joins.CartesianProduct(planLater(left), planLater(right)) :: Nil
+      case logical.Join(left, right, Inner, Some(condition)) =>
+        execution.Filter(condition,
+          execution.joins.CartesianProduct(planLater(left), planLater(right))) :: Nil
+      case _ => Nil
+    }
+  }
+
+  protected lazy val singleRowRdd =
+    sparkContext.parallelize(Seq(new GenericRow(Array[Any]()): Row), 1)
+
+  object TakeOrdered extends Strategy {
+    def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
+      case logical.Limit(IntegerLiteral(limit), logical.Sort(order, true, child)) =>
+        execution.TakeOrdered(limit, order, planLater(child)) :: Nil
+      case _ => Nil
+    }
+  }
+
+  object ParquetOperations extends Strategy {
+    def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
+      // TODO: need to support writing to other types of files.  Unify the below code paths.
+      case logical.WriteToFile(path, child) =>
+        val relation =
+          ParquetRelation.create(path, child, sparkContext.hadoopConfiguration, sqlContext)
+        // Note: overwrite=false because otherwise the metadata we just created will be deleted
+        InsertIntoParquetTable(relation, planLater(child), overwrite = false) :: Nil
+      case logical.InsertIntoTable(table: ParquetRelation, partition, child, overwrite) =>
+        InsertIntoParquetTable(table, planLater(child), overwrite) :: Nil
+      case PhysicalOperation(projectList, filters: Seq[Expression], relation: ParquetRelation) =>
+        val prunePushedDownFilters =
+          if (sqlContext.conf.parquetFilterPushDown) {
+            (predicates: Seq[Expression]) => {
+              // Note: filters cannot be pushed down to Parquet if they contain more complex
+              // expressions than simple "Attribute cmp Literal" comparisons. Here we remove all
+              // filters that have been pushed down. Note that a predicate such as "(A AND B) OR C"
+              // can result in "A OR C" being pushed down. Here we are conservative in the sense
+              // that even if "A" was pushed and we check for "A AND B" we still want to keep
+              // "A AND B" in the higher-level filter, not just "B".
+              predicates.map(p => p -> ParquetFilters.createFilter(p)).collect {
+                case (predicate, None) => predicate
+              }
+            }
+          } else {
+            identity[Seq[Expression]] _
+          }
+        pruneFilterProject(
+          projectList,
+          filters,
+          prunePushedDownFilters,
+          ParquetTableScan(
+            _,
+            relation,
+            if (sqlContext.conf.parquetFilterPushDown) filters else Nil)) :: Nil
+
+      case _ => Nil
+    }
+  }
+
+  object IndexRelationScans extends Strategy with PredicateHelper{
+    import org.apache.spark.sql.catalyst.expressions._
+    val indexInfos = sqlContext.indexManager.getIndexInfo
+    // lookup
+    def lookupIndexInfo(attributes: Seq[Attribute]): IndexInfo = {
+      var result: IndexInfo = null
+      indexInfos.foreach(item => {
+        if (item.indexType == RTreeType){
+          val temp = item.attributes
+          var found : Boolean = true
+          if (temp.length != attributes.length)
+            found = false
+          else
+            for (i <- 0 to attributes.length - 1)
+              if (temp(i) != attributes(i))
+                found = false
+          if (found) result = item
+        } else if (item.indexType == TreeMapType) {
+          if (attributes.length == 1 && item.attributes.head == attributes.head){
+            result = item
+          }
+        }
+      })
+      result
+    }
+
+//    var indexedOperations: Seq[Expression] = Seq()
+//    var tempIndexedOperations: Seq[Expression] = Seq()
+
+    // return a Boolean variable whether this leafnode can be indexed
+    // Add the Operation that can be indexed to indexOperations at the same time
+    def leafNodeCanBeIndexed(expression: Expression): Boolean = {
+      val indexInfo = expression match {
+        case l @ LessThan(left: NamedExpression, right: Literal) =>
+          lookupIndexInfo(Array(left.toAttribute))
+        case EqualTo(left: NamedExpression, right: Literal) =>
+          lookupIndexInfo(Array(left.toAttribute))
+        case LessThanOrEqual(left: NamedExpression, right: Literal) =>
+          lookupIndexInfo(Array(left.toAttribute))
+        case GreaterThan(left: NamedExpression, right: Literal) =>
+          lookupIndexInfo(Array(left.toAttribute))
+        case GreaterThanOrEqual(left: NamedExpression, right: Literal) =>
+          lookupIndexInfo(Array(left.toAttribute))
+
+        case InRange(point: Seq[NamedExpression], boundL: Seq[Expression], boundR: Seq[Expression]) =>
+          lookupIndexInfo(point.map(x => x.toAttribute))
+        case InKNN(point: Seq[NamedExpression], target: Seq[Expression], k: Literal) =>
+          lookupIndexInfo(point.map(x => x.toAttribute))
+        case InCircleRange(point: Seq[NamedExpression], target: Seq[Expression], r: Literal) =>
+          lookupIndexInfo(point.map(x => x.toAttribute))
+        case _ =>
+          null
+      }
+//      if (indexInfo != null)
+//        tempIndexedOperations = tempIndexedOperations :+ expression
+      indexInfo != null
+    }
+
+//    def extractIndexOperation(expression: Expression): Expression = {
+//      expression match {
+//        case And(l1 @ And(l2, r2), r1) =>
+//          extractIndexOperation(And(l2, And(r2, r1)))
+//        case And(l1, r1 @ And(l2, r2)) =>
+//          val temp = extractIndexOperation(r1)
+//          if (leafNodeCanBeIndexed(l1))
+//            temp
+//          else
+//            And(l1, temp)
+//        case And(left, right) =>
+//          val leftCanBeIndexed = leafNodeCanBeIndexed(left)
+//          val rightCanBeIndexed = leafNodeCanBeIndexed(right)
+//          if (!leftCanBeIndexed && !rightCanBeIndexed) And(left, right)
+//          else if (!leftCanBeIndexed)  left
+//          else if (!rightCanBeIndexed) right
+//          else null
+//        case other =>
+//          if (!leafNodeCanBeIndexed(other)) other
+//          else null
+//      }
+//    }
+
+    def extractIndexOperation(expression: Expression): Seq[Expression] = {
+      expression match {
+        case And(l1 @ And(l2, r2), r1) =>
+          extractIndexOperation(And(l2, And(r2, r1)))
+        case And(l1, r1 @ And(l2, r2)) =>
+          val temp = extractIndexOperation(r1)
+          if (leafNodeCanBeIndexed(l1))
+            temp :+ l1
+          else temp
+        case And(left, right) =>
+//          val leftCanBeIndexed = leafNodeCanBeIndexed(left)
+//          val rightCanBeIndexed = leafNodeCanBeIndexed(right)
+//          if (!leftCanBeIndexed && !rightCanBeIndexed) Seq()
+//          else if (!leftCanBeIndexed)  Seq(right)
+//          else if (!rightCanBeIndexed) right
+//          else null
+          var ans = Seq[Expression]()
+          if (leafNodeCanBeIndexed(left)) ans = ans :+ left
+          if (leafNodeCanBeIndexed(right)) ans = ans :+ right
+          ans
+        case other =>
+          if (!leafNodeCanBeIndexed(other)) Seq[Expression]()
+          else Seq[Expression](other)
+      }
+    }
+
+//    def extractIndexOperation(expression: Expression): Expression = {
+//      tempIndexedOperations = Seq()
+//      val res = _extractIndexOperation(expression)
+//      if (tempIndexedOperations.size != 0){
+//        indexedOperations = indexedOperations :+ tempIndexedOperations.reduce((a,b) => {
+//          if (a == null) b
+//          else if (b == null) a
+//          else And(a,b)
+//        })
+//      }
+//      res
+//    }
+
+    def selectFilter(predicates: Seq[Expression]): Seq[Expression] = {
+      val originalPredicate = predicates.reduceLeftOption(And).getOrElse(Literal(true))
+      val dnf_clauses = splitDNFPredicates(originalPredicate)
+      //val remainingPredicate = dnf_clauses.map(extractIndexOperation).reduceLeft(Or)
+//      var remainingPredicate: Expression = null
+      var indexedOperations = Seq[Expression]()
+      dnf_clauses.foreach(dnf => {
+        //tempIndexedOperations = Seq()
+        val tempIndexedOperations = extractIndexOperation(dnf)
+        if (tempIndexedOperations.size != 0){
+          indexedOperations = indexedOperations :+ tempIndexedOperations.reduce((a,b) => {
+            if (a == null) b
+            else if (b == null) a
+            else And(a,b)
+          })
+        }
+//        if (remainingPredicate == null) remainingPredicate = res
+//        else if (res != null) remainingPredicate = Or(remainingPredicate, res)
+      })
+      indexedOperations
+//      (indexedOperations, dnfExtract(remainingPredicate))
+    }
+
+    def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
+        case PhysicalOperation(projectList, filters, indexed: IndexedRelation)=>
+          val predicatesCanBeIndexed = selectFilter(filters)
+          pruneFilterProject(
+            projectList,
+            filters,   // the parent Filter node of IndexRelationSca
+            identity[Seq[Expression]],
+            IndexRelationScan(_, predicatesCanBeIndexed, indexed)) :: Nil //filter processed inside IndexRelationScan
+        case _ => Nil
+    }
+  }
+
+  object InMemoryScans extends Strategy {
+    def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
+      case PhysicalOperation(projectList, filters, mem: InMemoryRelation) =>
+        pruneFilterProject(
+          projectList,
+          filters,
+          identity[Seq[Expression]], // All filters still need to be evaluated.
+          InMemoryColumnarTableScan(_,  filters, mem)) :: Nil
+      case _ => Nil
+    }
+  }
+
+  // Can we automate these 'pass through' operations?
+  object BasicOperators extends Strategy {
+    def numPartitions = self.numPartitions
+
+    def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
+      case r: RunnableCommand => ExecutedCommand(r) :: Nil
+
+      case logical.Distinct(child) =>
+        execution.Distinct(partial = false,
+          execution.Distinct(partial = true, planLater(child))) :: Nil
+
+      case logical.SortPartitions(sortExprs, child) =>
+        // This sort only sorts tuples within a partition. Its requiredDistribution will be
+        // an UnspecifiedDistribution.
+        execution.Sort(sortExprs, global = false, planLater(child)) :: Nil
+      case logical.Sort(sortExprs, global, child) if sqlContext.conf.externalSortEnabled =>
+        execution.ExternalSort(sortExprs, global, planLater(child)):: Nil
+      case logical.Sort(sortExprs, global, child) =>
+        execution.Sort(sortExprs, global, planLater(child)):: Nil
+      case logical.Project(projectList, child) =>
+        execution.Project(projectList, planLater(child)) :: Nil
+      case logical.Filter(condition, child) =>
+        execution.Filter(condition, planLater(child)) :: Nil
+      case logical.Expand(projections, output, child) =>
+        execution.Expand(projections, output, planLater(child)) :: Nil
+      case logical.Aggregate(group, agg, child) =>
+        execution.Aggregate(partial = false, group, agg, planLater(child)) :: Nil
+      case logical.Sample(fraction, withReplacement, seed, child) =>
+        execution.Sample(fraction, withReplacement, seed, planLater(child)) :: Nil
+      case logical.LocalRelation(output, data) =>
+        LocalTableScan(output, data) :: Nil
+      case logical.Limit(IntegerLiteral(limit), child) =>
+        execution.Limit(limit, planLater(child)) :: Nil
+      case Unions(unionChildren) =>
+        execution.Union(unionChildren.map(planLater)) :: Nil
+      case logical.Except(left, right) =>
+        execution.Except(planLater(left), planLater(right)) :: Nil
+      case logical.Intersect(left, right) =>
+        execution.Intersect(planLater(left), planLater(right)) :: Nil
+      case logical.Generate(generator, join, outer, _, child) =>
+        execution.Generate(generator, join = join, outer = outer, planLater(child)) :: Nil
+      case logical.NoRelation =>
+        execution.PhysicalRDD(Nil, singleRowRdd) :: Nil
+      case logical.Repartition(expressions, child) =>
+        execution.Exchange(HashPartitioning(expressions, numPartitions), planLater(child)) :: Nil
+      case e @ EvaluatePython(udf, child, _) =>
+        BatchPythonEvaluation(udf, e.output, planLater(child)) :: Nil
+      case LogicalRDD(output, rdd) => PhysicalRDD(output, rdd) :: Nil
+      case _ => Nil
+    }
+  }
+
+  object DDLStrategy extends Strategy {
+    def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
+      case CreateTableUsing(tableName, userSpecifiedSchema, provider, true, opts, false, _) =>
+        ExecutedCommand(
+          CreateTempTableUsing(
+            tableName, userSpecifiedSchema, provider, opts)) :: Nil
+      case c: CreateTableUsing if !c.temporary =>
+        sys.error("Tables created with SQLContext must be TEMPORARY. Use a HiveContext instead.")
+      case c: CreateTableUsing if c.temporary && c.allowExisting =>
+        sys.error("allowExisting should be set to false when creating a temporary table.")
+
+      case CreateTableUsingAsSelect(tableName, provider, true, mode, opts, query) =>
+        val cmd =
+          CreateTempTableUsingAsSelect(tableName, provider, mode, opts, query)
+        ExecutedCommand(cmd) :: Nil
+      case c: CreateTableUsingAsSelect if !c.temporary =>
+        sys.error("Tables created with SQLContext must be TEMPORARY. Use a HiveContext instead.")
+
+      case LogicalDescribeCommand(table, isExtended) =>
+        val resultPlan = self.sqlContext.executePlan(table).executedPlan
+        ExecutedCommand(
+          RunnableDescribeCommand(resultPlan, resultPlan.output, isExtended)) :: Nil
+
+      case _ => Nil
+    }
+  }
+}
