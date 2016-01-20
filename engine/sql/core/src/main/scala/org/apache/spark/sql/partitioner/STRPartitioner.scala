@@ -1,13 +1,30 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.apache.spark.sql.partitioner
 
+import org.apache.spark.rdd.{RDD, ShuffledRDD}
 import org.apache.spark.shuffle.sort.SortShuffleManager
-import org.apache.spark.sql.execution.SparkSqlSerializer
-import org.apache.spark.{SparkConf, SparkEnv, Partitioner}
-import org.apache.spark.rdd.{ShuffledRDD, RDD}
 import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.execution.SparkSqlSerializer
 import org.apache.spark.sql.index.RTree
 import org.apache.spark.sql.spatial.{MBR, Point}
-import org.apache.spark.util.{SizeEstimator, MutablePair}
+import org.apache.spark.util.{MutablePair, SizeEstimator}
+import org.apache.spark.{Partitioner, SparkConf, SparkEnv}
 
 import scala.collection.mutable
 
@@ -16,10 +33,11 @@ import scala.collection.mutable
  * A Multi-Dimensional Data Partitioner based on Sorted-Tile Recursive Algorithm
  */
 object STRPartition {
-  def sortBasedShuffleOn = SparkEnv.get.shuffleManager.isInstanceOf[SortShuffleManager]
+  def sortBasedShuffleOn: Boolean = SparkEnv.get.shuffleManager.isInstanceOf[SortShuffleManager]
 
-  def apply(origin: RDD[(Point, InternalRow)], dimension: Int, est_partition: Int, sample_rate: Double,
-            transfer_threshold: Long, max_entries_per_node: Int): (RDD[(Point, InternalRow)], Array[(MBR, Int)]) = {
+  def apply(origin: RDD[(Point, InternalRow)], dimension: Int, est_partition: Int,
+            sample_rate: Double, transfer_threshold: Long, max_entries_per_node: Int)
+  : (RDD[(Point, InternalRow)], Array[(MBR, Int)]) = {
     val rdd = if (sortBasedShuffleOn) {
       origin.mapPartitions {iter => iter.map(row => (row._1, row._2.copy()))}
     } else {
@@ -29,7 +47,8 @@ object STRPartition {
       }
     }
 
-    val part = new STRPartitioner(est_partition, sample_rate, dimension, transfer_threshold, max_entries_per_node, rdd)
+    val part = new STRPartitioner(est_partition, sample_rate, dimension,
+                                  transfer_threshold, max_entries_per_node, rdd)
     val shuffled = new ShuffledRDD[Point, InternalRow, InternalRow](rdd, part)
     shuffled.setSerializer(new SparkSqlSerializer(new SparkConf(false)))
     (shuffled, part.mbrBound)
@@ -43,7 +62,7 @@ class STRPartitioner(est_partition: Int,
                      max_entries_per_node: Int,
                      rdd: RDD[_ <: Product2[Point, Any]])
   extends Partitioner {
-  def numPartitions = partitions
+  def numPartitions: Int = partitions
 
   private case class Bounds(min: Array[Double], max: Array[Double])
 
@@ -69,16 +88,16 @@ class STRPartitioner(est_partition: Int,
       })
     }
 
+    val seed = System.currentTimeMillis()
     val sampled = if (total_size * sample_rate <= transfer_threshold) {
-      rdd.sample(withReplacement = false, sample_rate, System.currentTimeMillis()).map(_._1).collect()
+      rdd.sample(withReplacement = false, sample_rate, seed).map(_._1).collect()
     } else {
-      rdd.sample(withReplacement = false, transfer_threshold / total_size, System.currentTimeMillis())
-        .map(_._1).collect()
+      rdd.sample(withReplacement = false, transfer_threshold / total_size, seed).map(_._1).collect()
     }
 
     val dim = new Array[Int](dimension)
     var remaining = est_partition.toDouble
-    for (i <- 0 to dimension - 1) {
+    for (i <- 0 until dimension) {
       dim(i) = Math.ceil(Math.pow(remaining, 1.0 / (dimension - i))).toInt
       remaining /= dim(i)
     }

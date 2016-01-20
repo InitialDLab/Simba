@@ -20,16 +20,17 @@ package org.apache.spark.sql.execution
 import java.nio.ByteBuffer
 import java.util.{HashMap => JavaHashMap}
 
-import scala.reflect.ClassTag
-
 import com.esotericsoftware.kryo.io.{Input, Output}
 import com.esotericsoftware.kryo.{Kryo, Serializer}
 import com.twitter.chill.ResourcePool
-
 import org.apache.spark.serializer.{KryoSerializer, SerializerInstance}
+import org.apache.spark.sql.index._
+import org.apache.spark.sql.spatial._
 import org.apache.spark.sql.types.Decimal
 import org.apache.spark.util.MutablePair
 import org.apache.spark.{SparkConf, SparkEnv}
+
+import scala.reflect.ClassTag
 
 
 private[sql] class SparkSqlSerializer(conf: SparkConf) extends KryoSerializer(conf) {
@@ -45,6 +46,16 @@ private[sql] class SparkSqlSerializer(conf: SparkConf) extends KryoSerializer(co
 
     kryo.register(classOf[Decimal])
     kryo.register(classOf[JavaHashMap[_, _]])
+
+    kryo.register(classOf[Point])
+    kryo.register(classOf[MBR])
+    kryo.register(classOf[RTreeNode])
+    kryo.register(classOf[RTreeEntry])
+    kryo.register(classOf[RTree])
+    kryo.register(classOf[java.util.TreeMap[_, _]])
+    kryo.register(classOf[java.util.HashMap[_, _]])
+    kryo.register(classOf[TreeMapIndex[_]])
+    kryo.register(classOf[HashMapIndex[_]])
 
     kryo.setReferences(false)
     kryo

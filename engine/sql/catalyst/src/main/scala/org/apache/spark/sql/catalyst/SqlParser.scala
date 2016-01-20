@@ -17,8 +17,6 @@
 
 package org.apache.spark.sql.catalyst
 
-import scala.language.implicitConversions
-
 import org.apache.spark.sql.AnalysisException
 import org.apache.spark.sql.catalyst.analysis._
 import org.apache.spark.sql.catalyst.expressions._
@@ -28,6 +26,8 @@ import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.catalyst.util.DataTypeParser
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.types.CalendarInterval
+
+import scala.language.implicitConversions
 
 /**
  * A very simple SQL parser.  Based loosely on:
@@ -112,6 +112,14 @@ object SqlParser extends AbstractSparkSQLParser with DataTypeParser {
   protected val WHERE = Keyword("WHERE")
   protected val WITH = Keyword("WITH")
 
+  // Spatial Keywords
+  protected val POINT = Keyword("POINT")
+  protected val RANGE = Keyword("RANGE")
+  protected val KNN = Keyword("KNN")
+  protected val ZKNN = Keyword("ZKNN")
+  protected val CIRCLERANGE = Keyword("CIRCLERANGE")
+  protected val DISTANCE = Keyword("DISTANCE")
+
   protected lazy val start: Parser[LogicalPlan] =
     start1 | insert | cte
 
@@ -187,7 +195,12 @@ object SqlParser extends AbstractSparkSQLParser with DataTypeParser {
     }
 
   protected lazy val joinConditions: Parser[Expression] =
-    ON ~> expression
+    ( ON ~> (POINT ~ "(" ~> repsep(termExpression, ",")  <~ ")") ~
+      (IN ~ KNN ~ "(" ~ POINT ~ "(" ~> repsep(termExpression, ",") <~ ")")
+      ~ ("," ~> literal <~ ")") ^^
+      { case point ~ target ~ l => InKNN(point, target, l) }
+    | ON ~> expression
+    )
 
   protected lazy val joinType: Parser[JoinType] =
     ( INNER           ^^^ Inner
@@ -195,6 +208,9 @@ object SqlParser extends AbstractSparkSQLParser with DataTypeParser {
     | LEFT  ~ OUTER.? ^^^ LeftOuter
     | RIGHT ~ OUTER.? ^^^ RightOuter
     | FULL  ~ OUTER.? ^^^ FullOuter
+    | KNN             ^^^ KNNJoin
+    | ZKNN            ^^^ ZKNNJoin
+    | DISTANCE        ^^^ DistanceJoin
     )
 
   protected lazy val sortType: Parser[LogicalPlan => LogicalPlan] =
@@ -203,10 +219,9 @@ object SqlParser extends AbstractSparkSQLParser with DataTypeParser {
     )
 
   protected lazy val ordering: Parser[Seq[SortOrder]] =
-    ( rep1sep(expression ~ direction.? , ",") ^^ {
+    rep1sep(expression ~ direction.? , ",") ^^ {
         case exps => exps.map(pair => SortOrder(pair._1, pair._2.getOrElse(Ascending)))
       }
-    )
 
   protected lazy val direction: Parser[SortDirection] =
     ( ASC  ^^^ Ascending
@@ -226,7 +241,18 @@ object SqlParser extends AbstractSparkSQLParser with DataTypeParser {
     NOT.? ~ comparisonExpression ^^ { case maybeNot ~ e => maybeNot.map(_ => Not(e)).getOrElse(e) }
 
   protected lazy val comparisonExpression: Parser[Expression] =
-    ( termExpression ~ ("="  ~> termExpression) ^^ { case e1 ~ e2 => EqualTo(e1, e2) }
+    ( (POINT ~> "(" ~> repsep(termExpression, ",")  <~ ")") ~
+      (IN ~ RANGE ~ "(" ~ POINT ~ "(" ~> repsep(termExpression, ",") <~ ")" ~ ",") ~
+      (POINT ~> "(" ~> repsep(termExpression, ",") <~ ")") <~ ")" ^^
+      { case point ~ point_low ~ point_high => InRange(point, point_low, point_high) }
+    | (POINT ~> "(" ~> repsep(termExpression, ",")  <~ ")") ~
+      (IN ~ KNN ~ "(" ~ POINT ~ "(" ~> repsep(literal, ",") <~ ")") ~ ("," ~> literal <~ ")") ^^
+      { case point ~ target ~ l => InKNN(point, target, l) }
+    | (POINT ~> "(" ~> repsep(termExpression, ",")  <~ ")") ~
+      (IN ~ CIRCLERANGE ~ "(" ~ POINT ~ "(" ~> repsep(termExpression, ",") <~ ")") ~
+      ("," ~> literal <~ ")") ^^
+      { case point ~ target ~ l => InCircleRange(point, target, l) }
+    | termExpression ~ ("="  ~> termExpression) ^^ { case e1 ~ e2 => EqualTo(e1, e2) }
     | termExpression ~ ("<"  ~> termExpression) ^^ { case e1 ~ e2 => LessThan(e1, e2) }
     | termExpression ~ ("<=" ~> termExpression) ^^ { case e1 ~ e2 => LessThanOrEqual(e1, e2) }
     | termExpression ~ (">"  ~> termExpression) ^^ { case e1 ~ e2 => GreaterThan(e1, e2) }

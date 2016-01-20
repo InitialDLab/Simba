@@ -24,13 +24,16 @@ object JoinType {
     case "leftouter" | "left" => LeftOuter
     case "rightouter" | "right" => RightOuter
     case "leftsemi" => LeftSemi
+    case "knn" => KNNJoin
+    case "distance" => DistanceJoin
+    case "zknn" => ZKNNJoin
     case _ =>
       val supported = Seq(
         "inner",
         "outer", "full", "fullouter",
         "leftouter", "left",
         "rightouter", "right",
-        "leftsemi")
+        "leftsemi", "knn", "distance", "zknn")
 
       throw new IllegalArgumentException(s"Unsupported join type '$typ'. " +
         "Supported join types include: " + supported.mkString("'", "', '", "'") + ".")
@@ -48,3 +51,9 @@ case object RightOuter extends JoinType
 case object FullOuter extends JoinType
 
 case object LeftSemi extends JoinType
+
+case object KNNJoin extends JoinType
+
+case object DistanceJoin extends JoinType
+
+case object ZKNNJoin extends JoinType

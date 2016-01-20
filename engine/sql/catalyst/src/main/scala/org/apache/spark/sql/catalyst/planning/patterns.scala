@@ -21,7 +21,6 @@ import org.apache.spark.Logging
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.plans._
 import org.apache.spark.sql.catalyst.plans.logical._
-import org.apache.spark.sql.catalyst.trees.TreeNodeRef
 
 /**
  * A pattern that matches any number of project or filter operations on top of another relational
@@ -129,6 +128,49 @@ object ExtractEquiJoinKeys extends Logging with PredicateHelper {
         None
       }
     case _ => None
+  }
+}
+
+object ExtractSpatialJoinKeys extends Logging with PredicateHelper {
+  type ReturnType = (Seq[Expression], Seq[Expression], Literal, JoinType, LogicalPlan, LogicalPlan)
+
+  def unapply(plan: LogicalPlan): Option[ReturnType] = {
+    plan match {
+      case Join(left, right, KNNJoin, condition) =>
+        val children = condition.get.children
+        val len = (children.length - 1) >> 1
+        var left_keys = Seq[Expression]()
+        var right_keys = Seq[Expression]()
+        for (i <- 0 until len) {
+          right_keys = right_keys :+ children(i)
+          left_keys = left_keys :+ children(len + i)
+        }
+        val k = children.last.asInstanceOf[Literal]
+        Some((left_keys, right_keys, k, KNNJoin, left, right))
+      case Join(left, right, ZKNNJoin, condition) =>
+        val children = condition.get.children
+        val len = (children.length - 1) >> 1
+        var left_keys = Seq[Expression]()
+        var right_keys = Seq[Expression]()
+        for (i <- 0 until len) {
+          right_keys = right_keys :+ children(i)
+          left_keys = left_keys :+ children(len + i)
+        }
+        val k = children.last.asInstanceOf[Literal]
+        Some((left_keys, right_keys, k, ZKNNJoin, left, right))
+      case Join(left, right, DistanceJoin, condition) =>
+        val children = condition.get.children
+        val len = (children.length - 1) >> 1
+        var left_keys = Seq[Expression]()
+        var right_keys = Seq[Expression]()
+        for (i <- 0 until len) {
+          right_keys = right_keys :+ children(i)
+          left_keys = left_keys :+ children(len + i)
+        }
+        val r = children.last.asInstanceOf[Literal]
+        Some((left_keys, right_keys, r, DistanceJoin, left, right))
+      case _ => None
+    }
   }
 }
 

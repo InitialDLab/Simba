@@ -1,14 +1,31 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.apache.spark.sql.index
 
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.analysis.MultiInstanceRelation
-import org.apache.spark.sql.catalyst.expressions.{BindReferences, Attribute}
-import org.apache.spark.sql.catalyst.plans.logical.{Statistics, LogicalPlan}
+import org.apache.spark.sql.catalyst.expressions.{Attribute, BindReferences}
+import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, Statistics}
 import org.apache.spark.sql.execution.SparkPlan
-import org.apache.spark.sql.partitioner.{HashPartition, STRPartition, RangePartition}
+import org.apache.spark.sql.partitioner.{HashPartition, RangePartition, STRPartition}
 import org.apache.spark.sql.spatial.Point
-import org.apache.spark.sql.types.{IntegerType, DoubleType}
+import org.apache.spark.sql.types.{DoubleType, IntegerType}
 import org.apache.spark.storage.StorageLevel
 
 /**
@@ -21,9 +38,12 @@ private[sql] object IndexedRelation {
   def apply(child: SparkPlan, table_name: Option[String], index_type: IndexType,
             column_keys: List[Attribute], index_name: String): IndexedRelation = {
     index_type match {
-      case TreeMapType => new TreeMapIndexedRelation(child.output, child, table_name, column_keys, index_name)()
-      case RTreeType => new RTreeIndexedRelation(child.output, child, table_name, column_keys, index_name)()
-      case HashMapType => new HashMapIndexedRelation(child.output, child, table_name, column_keys, index_name)()
+      case TreeMapType =>
+        new TreeMapIndexedRelation(child.output, child, table_name, column_keys, index_name)()
+      case RTreeType =>
+        new RTreeIndexedRelation(child.output, child, table_name, column_keys, index_name)()
+      case HashMapType =>
+        new HashMapIndexedRelation(child.output, child, table_name, column_keys, index_name)()
       case _ => null
     }
   }
@@ -32,9 +52,9 @@ private[sql] object IndexedRelation {
 private[sql] abstract class IndexedRelation extends LogicalPlan {
   self: Product =>
   var _indexedRDD: RDD[PackedPartitionWithIndex]
-  def indexedRDD = _indexedRDD
+  def indexedRDD: RDD[PackedPartitionWithIndex] = _indexedRDD
 
-  override def children = Seq.empty
+  override def children: Seq[LogicalPlan] = Nil
   def output: Seq[Attribute]
 
   def withOutput(newOutput: Seq[Attribute]): IndexedRelation
@@ -74,12 +94,12 @@ private[sql] case class HashMapIndexedRelation(
     _indexedRDD = indexed
   }
 
-  override def newInstance() = {
-    new HashMapIndexedRelation(output.map(_.newInstance()), child, table_name, column_keys, index_name)(_indexedRDD)
-      .asInstanceOf[this.type]
+  override def newInstance(): IndexedRelation = {
+    new HashMapIndexedRelation(output.map(_.newInstance()), child, table_name,
+      column_keys, index_name)(_indexedRDD).asInstanceOf[this.type]
   }
 
-  override def withOutput(new_output: Seq[Attribute]) = {
+  override def withOutput(new_output: Seq[Attribute]): IndexedRelation = {
     new HashMapIndexedRelation(new_output, child, table_name, column_keys, index_name)(_indexedRDD)
   }
 
@@ -110,7 +130,8 @@ private[sql] case class TreeMapIndexedRelation(
 
   private[sql] def buildIndex(): Unit = {
     val dataRDD = child.execute().map(row => {
-      val key = BindReferences.bindReference(column_keys.head, child.output).eval(row).asInstanceOf[Number].doubleValue
+      val key = BindReferences.bindReference(column_keys.head, child.output).eval(row)
+        .asInstanceOf[Number].doubleValue
       (key, row)
     })
 
@@ -126,13 +147,15 @@ private[sql] case class TreeMapIndexedRelation(
     _indexedRDD = indexed
   }
 
-  override def newInstance() = {
-    new TreeMapIndexedRelation(output.map(_.newInstance()), child, table_name, column_keys, index_name)(_indexedRDD)
+  override def newInstance(): IndexedRelation = {
+    new TreeMapIndexedRelation(output.map(_.newInstance()), child, table_name,
+      column_keys, index_name)(_indexedRDD)
       .asInstanceOf[this.type]
   }
 
-  override def withOutput(new_output: Seq[Attribute]) = {
-    new TreeMapIndexedRelation(new_output, child, table_name, column_keys, index_name)(_indexedRDD, range_bounds)
+  override def withOutput(new_output: Seq[Attribute]): IndexedRelation = {
+    new TreeMapIndexedRelation(new_output, child, table_name,
+      column_keys, index_name)(_indexedRDD, range_bounds)
   }
 
   @transient override lazy val statistics = Statistics(
@@ -152,8 +175,10 @@ private[sql] case class RTreeIndexedRelation(
   extends IndexedRelation with MultiInstanceRelation {
   private def checkKeys: Boolean = {
     for (i <- column_keys.indices)
-      if (!(column_keys(i).dataType.isInstanceOf[DoubleType] || column_keys(i).dataType.isInstanceOf[IntegerType]))
+      if (!(column_keys(i).dataType.isInstanceOf[DoubleType] ||
+        column_keys(i).dataType.isInstanceOf[IntegerType])) {
         return false
+      }
     true
   }
   require(checkKeys)
@@ -190,18 +215,20 @@ private[sql] case class RTreeIndexedRelation(
 
     val partitionSize = indexed.mapPartitions(iter => iter.map(_.data.length)).collect()
 
-    global_rtree = RTree(mbr_bounds.zip(partitionSize).map(x => (x._1._1, x._1._2, x._2)), max_entries_per_node)
+    global_rtree = RTree(mbr_bounds.zip(partitionSize)
+      .map(x => (x._1._1, x._1._2, x._2)), max_entries_per_node)
     indexed.setName(table_name.map(n => s"$n $index_name").getOrElse(child.toString))
     _indexedRDD = indexed
   }
 
-  override def newInstance() = {
-    new RTreeIndexedRelation(output.map(_.newInstance()), child, table_name, column_keys, index_name)(_indexedRDD)
-      .asInstanceOf[this.type]
+  override def newInstance(): IndexedRelation = {
+    new RTreeIndexedRelation(output.map(_.newInstance()), child, table_name,
+      column_keys, index_name)(_indexedRDD).asInstanceOf[this.type]
   }
 
   override def withOutput(new_output: Seq[Attribute]): IndexedRelation = {
-    RTreeIndexedRelation(new_output, child, table_name, column_keys, index_name)(_indexedRDD, global_rtree)
+    RTreeIndexedRelation(new_output, child, table_name,
+      column_keys, index_name)(_indexedRDD, global_rtree)
   }
 
   @transient override lazy val statistics = Statistics(

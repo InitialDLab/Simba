@@ -25,6 +25,7 @@ import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateUnsafeRowJoiner
 import org.apache.spark.sql.catalyst.plans.physical._
 import org.apache.spark.sql.execution.metric.SQLMetrics
+import org.apache.spark.sql.types.DoubleType
 import org.apache.spark.util.MutablePair
 import org.apache.spark.util.random.PoissonSampler
 import org.apache.spark.{HashPartitioner, SparkEnv}
@@ -60,22 +61,96 @@ case class Project(projectList: Seq[NamedExpression], child: SparkPlan) extends 
 case class Filter(condition: Expression, child: SparkPlan) extends UnaryNode {
   override def output: Seq[Attribute] = child.output
 
-  private[sql] override lazy val metrics = Map(
-    "numInputRows" -> SQLMetrics.createLongMetric(sparkContext, "number of input rows"),
-    "numOutputRows" -> SQLMetrics.createLongMetric(sparkContext, "number of output rows"))
+  // NOTE: we remove metrics in filter. Should be back somewhere
+//  private[sql] override lazy val metrics = Map(
+//    "numInputRows" -> SQLMetrics.createLongMetric(sparkContext, "number of input rows"),
+//    "numOutputRows" -> SQLMetrics.createLongMetric(sparkContext, "number of output rows"))
 
-  protected override def doExecute(): RDD[InternalRow] = {
-    val numInputRows = longMetric("numInputRows")
-    val numOutputRows = longMetric("numOutputRows")
-    child.execute().mapPartitionsInternal { iter =>
-      val predicate = newPredicate(condition, child.output)
-      iter.filter { row =>
-        numInputRows += 1
-        val r = predicate(row)
-        if (r) numOutputRows += 1
-        r
+  private class DistanceOrdering(point: Seq[Expression],
+                                 target: Seq[Double]) extends Ordering[InternalRow] {
+    override def compare(x: InternalRow, y: InternalRow): Int = {
+      var dis_x: Double = 0
+      for (i <- point.indices) {
+        val tmp = BindReferences.bindReference(point(i), child.output).eval(x)
+          .asInstanceOf[Number].doubleValue()
+        dis_x += (tmp - target(i)) * (tmp - target(i))
+      }
+      var dis_y: Double = 0
+      for (i <- point.indices) {
+        val tmp = BindReferences.bindReference(point(i), child.output).eval(y)
+          .asInstanceOf[Number].doubleValue()
+        dis_y += (tmp - target(i)) * (tmp - target(i))
+      }
+      dis_x.compare(dis_y)
+    }
+  }
+
+  // TODO change target partition from 1 to some good value
+  def knn(rdd: RDD[InternalRow], point: Seq[Expression],
+          target: Seq[Double], k: Int): RDD[InternalRow] =
+    sparkContext.parallelize(rdd.map(_.copy())
+      .takeOrdered(k)(new DistanceOrdering(point, target)), 1)
+
+  def applyCondition(rdd: RDD[InternalRow],
+                     condition: Expression,
+                     rootRDD: RDD[InternalRow]): RDD[InternalRow] = {
+    if (!condition.hasSpatial) {
+      return rdd.mapPartitionsInternal { iter =>
+        iter.filter(newPredicate(condition, child.output))
       }
     }
+    condition match {
+      case And(left, right) =>
+        val left_res = {
+          if (!left.hasSpatial) {
+            rdd.mapPartitionsInternal { iter => iter.filter(newPredicate(left, child.output)) }
+          } else applyCondition(rdd, left, rootRDD)
+        }
+        val right_res = {
+          if (!right.hasSpatial) {
+            rdd.mapPartitionsInternal { iter => iter.filter(newPredicate(right, child.output)) }
+          } else applyCondition(rdd, right, rootRDD)
+        }
+        left_res.map(_.copy()).intersection(right_res.map(_.copy()))
+      case Or(left, right) =>
+        val left_res = {
+          if (!left.hasSpatial) {
+            rdd.mapPartitionsInternal { iter => iter.filter(newPredicate(left, child.output)) }
+          }
+          else applyCondition(rdd, left, rootRDD)
+        }
+        val right_res = {
+          if (!right.hasSpatial) {
+            rdd.mapPartitionsInternal {iter => iter.filter(newPredicate(right, child.output))}
+          } else applyCondition(rdd, right, rootRDD)
+        }
+        left_res.union(right_res).mapPartitionsInternal(iter => iter.map(_.copy())).distinct()
+      case InKNN(point, target, k) =>
+        knn(rootRDD, point, target.map(x => x.toString.toDouble),
+            k.value.asInstanceOf[Number].intValue())
+    }
+  }
+
+  protected override def doExecute(): RDD[InternalRow] = {
+    val root_rdd = child.execute()
+    val new_condition = condition transform {
+      case InRange(point, point_low, point_high) =>
+        val cons = new Array[Expression](point.length)
+        for (i <- point.indices)
+          cons(i) = And(LessThanOrEqual(Cast(point_low(i), DoubleType), Cast(point(i), DoubleType)),
+            LessThanOrEqual(Cast(point(i), DoubleType), Cast(point_high(i), DoubleType)))
+        cons.foldLeft[Expression](null)
+          { (left, right) => if (left == null) right else And(left, right) }
+      case InCircleRange(point, target, r) =>
+        val exps = new Array[Expression](point.length)
+        for (i <- point.indices)
+          exps(i) = Multiply(Subtract(Cast(point(i), DoubleType), Cast(target(i), DoubleType)),
+            Subtract(Cast(point(i), DoubleType), Cast(target(i), DoubleType)))
+        val ans = exps.foldLeft[Expression](null)
+          { (left, right) => if (left == null) right else Add(left, right) }
+        LessThanOrEqual(ans, Multiply(r, r))
+    }
+    applyCondition(root_rdd, new_condition, root_rdd)
   }
 
   override def outputOrdering: Seq[SortOrder] = child.outputOrdering

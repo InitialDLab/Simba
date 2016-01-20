@@ -23,6 +23,7 @@ import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.aggregate.AggregateExpression
 import org.apache.spark.sql.catalyst.plans._
 import org.apache.spark.sql.types._
+
 import scala.collection.mutable.ArrayBuffer
 
 case class Project(projectList: Seq[NamedExpression], child: LogicalPlan) extends UnaryNode {
@@ -138,6 +139,15 @@ case class Join(
         left.output.map(_.withNullability(true)) ++ right.output
       case FullOuter =>
         left.output.map(_.withNullability(true)) ++ right.output.map(_.withNullability(true))
+      case KNNJoin =>
+        require(condition.get.isInstanceOf[InKNN])
+        left.output ++ right.output
+      case ZKNNJoin =>
+        require(condition.get.isInstanceOf[InKNN])
+        left.output ++ right.output
+      case DistanceJoin =>
+        require(condition.get.isInstanceOf[InCircleRange])
+        left.output ++ right.output.map(_.withNullability(true))
       case _ =>
         left.output ++ right.output
     }
