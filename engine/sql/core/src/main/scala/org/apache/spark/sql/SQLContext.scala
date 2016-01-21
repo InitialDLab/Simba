@@ -21,11 +21,6 @@ import java.beans.{BeanInfo, Introspector}
 import java.util.Properties
 import java.util.concurrent.atomic.AtomicReference
 
-import scala.collection.JavaConverters._
-import scala.collection.immutable
-import scala.reflect.runtime.universe.TypeTag
-import scala.util.control.NonFatal
-
 import org.apache.spark.annotation.{DeveloperApi, Experimental}
 import org.apache.spark.api.java.{JavaRDD, JavaSparkContext}
 import org.apache.spark.rdd.RDD
@@ -42,12 +37,18 @@ import org.apache.spark.sql.catalyst.{InternalRow, ParserDialect, _}
 import org.apache.spark.sql.execution._
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.ui.{SQLListener, SQLTab}
+import org.apache.spark.sql.index.IndexType
 import org.apache.spark.sql.sources.BaseRelation
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.util.ExecutionListenerManager
 import org.apache.spark.sql.{execution => sparkexecution}
 import org.apache.spark.util.Utils
 import org.apache.spark.{SparkContext, SparkException}
+
+import scala.collection.JavaConverters._
+import scala.collection.immutable
+import scala.reflect.runtime.universe.TypeTag
+import scala.util.control.NonFatal
 
 /**
  * The entry point for working with structured data (rows and columns) in Spark.  Allows the
@@ -61,12 +62,12 @@ import org.apache.spark.{SparkContext, SparkException}
  * @groupname config Configuration
  * @groupname dataframes Custom DataFrame Creation
  * @groupname Ungrouped Support functions for language integrated queries
- *
- * @since 1.0.0
+  * @since 1.0.0
  */
 class SQLContext private[sql](
     @transient val sparkContext: SparkContext,
     @transient protected[sql] val cacheManager: CacheManager,
+    @transient protected[sql] val indexManager: IndexManager,
     @transient private[sql] val listener: SQLListener,
     val isRootContext: Boolean)
   extends org.apache.spark.Logging with Serializable {
@@ -74,7 +75,8 @@ class SQLContext private[sql](
   self =>
 
   def this(sparkContext: SparkContext) = {
-    this(sparkContext, new CacheManager, SQLContext.createListenerAndUI(sparkContext), true)
+    this(sparkContext, new CacheManager, new IndexManager,
+      SQLContext.createListenerAndUI(sparkContext), true)
   }
   def this(sparkContext: JavaSparkContext) = this(sparkContext.sc)
 
@@ -109,6 +111,7 @@ class SQLContext private[sql](
   def newSession(): SQLContext = {
     new SQLContext(
       sparkContext = sparkContext,
+      indexManager = indexManager,
       cacheManager = cacheManager,
       listener = listener,
       isRootContext = false)
@@ -331,7 +334,8 @@ class SQLContext private[sql](
 
   /**
    * Returns true if the table is currently cached in-memory.
-   * @group cachemgmt
+    *
+    * @group cachemgmt
    * @since 1.3.0
    */
   def isCached(tableName: String): Boolean = {
@@ -340,6 +344,7 @@ class SQLContext private[sql](
 
   /**
     * Returns true if the [[Queryable]] is currently cached in-memory.
+    *
     * @group cachemgmt
     * @since 1.3.0
     */
@@ -349,7 +354,8 @@ class SQLContext private[sql](
 
   /**
    * Caches the specified table in-memory.
-   * @group cachemgmt
+    *
+    * @group cachemgmt
    * @since 1.3.0
    */
   def cacheTable(tableName: String): Unit = {
@@ -358,16 +364,38 @@ class SQLContext private[sql](
 
   /**
    * Removes the specified table from the in-memory cache.
-   * @group cachemgmt
+    *
+    * @group cachemgmt
    * @since 1.3.0
    */
   def uncacheTable(tableName: String): Unit = cacheManager.uncacheQuery(table(tableName))
 
   /**
    * Removes all cached tables from the in-memory cache.
-   * @since 1.3.0
+    *
+    * @since 1.3.0
    */
   def clearCache(): Unit = cacheManager.clearCache()
+
+  def hasIndex(tableName: String, indexName: String): Boolean =
+    indexManager.lookupIndexedData(table(tableName), indexName).nonEmpty
+
+  def indexTable(tableName: String, indexType: IndexType,
+                 indexName: String, column: List[Attribute]): Unit =
+    indexManager.createIndexQuery(table(tableName), indexType, indexName, column, Some(tableName))
+
+  def showIndex(tableName: String): Unit = indexManager.showQuery(this, tableName)
+
+  def persistIndex(indexName: String, fileName: String): Unit =
+    indexManager.persistIndex(this, indexName, fileName)
+
+  def loadIndex(indexName: String, fileName: String): Unit =
+    indexManager.loadIndex(this, indexName, fileName)
+
+  def dropIndexTableByName(tableName: String, indexName: String): Unit =
+    indexManager.dropIndexByNameQuery(table(tableName), indexName)
+
+  def clearIndex(): Unit = indexManager.clearIndex()
 
   // scalastyle:off
   // Disable style checker so "implicits" object can start with lowercase i
@@ -390,7 +418,8 @@ class SQLContext private[sql](
 
     /**
      * Converts $"col name" into an [[Column]].
-     * @since 1.3.0
+      *
+      * @since 1.3.0
      */
     // This must live here to preserve binary compatibility with Spark < 1.5.
     implicit class StringToColumn(val sc: StringContext) {
@@ -565,7 +594,8 @@ class SQLContext private[sql](
    *
    * WARNING: Since there is no guaranteed ordering for fields in a Java Bean,
    *          SELECT * queries will return the columns in an undefined order.
-   * @group dataframes
+    *
+    * @group dataframes
    * @since 1.3.0
    */
   def createDataFrame(rdd: RDD[_], beanClass: Class[_]): DataFrame = {
@@ -584,7 +614,8 @@ class SQLContext private[sql](
    *
    * WARNING: Since there is no guaranteed ordering for fields in a Java Bean,
    *          SELECT * queries will return the columns in an undefined order.
-   * @group dataframes
+    *
+    * @group dataframes
    * @since 1.3.0
    */
   def createDataFrame(rdd: JavaRDD[_], beanClass: Class[_]): DataFrame = {
@@ -596,7 +627,8 @@ class SQLContext private[sql](
    *
    * WARNING: Since there is no guaranteed ordering for fields in a Java Bean,
    *          SELECT * queries will return the columns in an undefined order.
-   * @group dataframes
+    *
+    * @group dataframes
    * @since 1.6.0
    */
   def createDataFrame(data: java.util.List[_], beanClass: Class[_]): DataFrame = {
@@ -755,8 +787,7 @@ class SQLContext private[sql](
    * cached/persisted before, it's also unpersisted.
    *
    * @param tableName the name of the table to be unregistered.
-   *
-   * @group basic
+    * @group basic
    * @since 1.3.0
    */
   def dropTempTable(tableName: String): Unit = {

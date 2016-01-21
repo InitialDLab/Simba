@@ -67,6 +67,7 @@ trait PredicateHelper {
         }
         if (ans == null) And(tmp_left, tmp_right)
         else toDNF(ans)
+      case exp => exp
     }
   }
 

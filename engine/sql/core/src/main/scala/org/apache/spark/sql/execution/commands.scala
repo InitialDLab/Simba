@@ -21,11 +21,12 @@ import java.util.NoSuchElementException
 
 import org.apache.spark.Logging
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.catalyst.{InternalRow, CatalystTypeConverters}
 import org.apache.spark.sql.catalyst.errors.TreeNodeException
 import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeReference}
 import org.apache.spark.sql.catalyst.plans.logical
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
+import org.apache.spark.sql.catalyst.{CatalystTypeConverters, InternalRow}
+import org.apache.spark.sql.index.IndexType
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, Row, SQLConf, SQLContext}
 
@@ -290,6 +291,77 @@ case object ClearCacheCommand extends RunnableCommand {
 
   override def run(sqlContext: SQLContext): Seq[Row] = {
     sqlContext.clearCache()
+    Seq.empty[Row]
+  }
+
+  override def output: Seq[Attribute] = Seq.empty
+}
+
+case class PersistIndexCommand(indexName: String, fileName: String)
+  extends RunnableCommand {
+  override def run(sqlContext: SQLContext): Seq[Row] = {
+    sqlContext.persistIndex(indexName, fileName)
+    Seq.empty[Row]
+  }
+}
+
+case class LoadIndexCommand(indexName: String, fileName: String)
+  extends RunnableCommand {
+  override def run(sqlContext: SQLContext): Seq[Row] = {
+    sqlContext.loadIndex(indexName, fileName)
+    Seq.empty[Row]
+  }
+}
+
+case class IndexTableCommand(tableName: String, columnName: List[String],
+                             indexType: IndexType, indexName: String) extends RunnableCommand {
+  override def run(sqlContext: SQLContext): Seq[Row] = {
+    val table = sqlContext.table(tableName)
+    assert(table != null, "Table not found!")
+    val attrs = table.queryExecution.analyzed.output
+    val columnKeys = columnName.map(attr => {
+      var ans : Attribute = null
+      for (i <- attrs.indices)
+        if (attrs(i).name.equals(attr)) ans = attrs(i)
+      assert(ans != null, "Attribute not found")
+      ans
+    })
+    sqlContext.indexTable(tableName, indexType, indexName, columnKeys)
+    Seq.empty[Row]
+  }
+
+  override def output: Seq[Attribute] = Seq.empty
+}
+
+case class ShowIndexCommand(tableName: String) extends RunnableCommand {
+  override def run(sqlContext: SQLContext): Seq[Row] = {
+    val table = sqlContext.table(tableName)
+    assert(table != null, "Table not found!")
+    val attrs = table.queryExecution.analyzed.output
+    sqlContext.showIndex(tableName)
+    Seq.empty[Row]
+  }
+}
+
+case class DeindexTableCommand(tableName: String) extends RunnableCommand {
+  override def run(sqlContext: SQLContext): Seq[Row] = {
+    sqlContext.table(tableName).deindex(blocking = false)
+    Seq.empty[Row]
+  }
+  override def output: Seq[Attribute] = Seq.empty
+}
+case class DeindexTableByNameCommand(tableName: String, indexName : String)
+  extends RunnableCommand {
+  override def run(sqlContext: SQLContext): Seq[Row] = {
+    sqlContext.table(tableName).deindexByName(indexName)
+    Seq.empty[Row]
+  }
+  override def output: Seq[Attribute] = Seq.empty
+}
+
+case object ClearIndexCommand extends RunnableCommand {
+  override def run(sqlContext: SQLContext): Seq[Row] = {
+    sqlContext.clearIndex()
     Seq.empty[Row]
   }
 

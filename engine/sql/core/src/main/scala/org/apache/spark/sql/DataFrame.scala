@@ -20,31 +20,30 @@ package org.apache.spark.sql
 import java.io.CharArrayWriter
 import java.util.Properties
 
-import scala.language.implicitConversions
-import scala.reflect.ClassTag
-import scala.reflect.runtime.universe.TypeTag
-
 import com.fasterxml.jackson.core.JsonFactory
 import org.apache.commons.lang3.StringUtils
-
 import org.apache.spark.annotation.{DeveloperApi, Experimental}
 import org.apache.spark.api.java.JavaRDD
 import org.apache.spark.api.python.PythonRDD
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.analysis._
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.aggregate._
-import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.catalyst.plans._
-import org.apache.spark.sql.catalyst.{CatalystTypeConverters, ScalaReflection, SqlParser}
-import org.apache.spark.sql.execution.{EvaluatePython, ExplainCommand, FileRelation, LogicalRDD, QueryExecution, Queryable, SQLExecution}
-import org.apache.spark.sql.execution.datasources.{CreateTableUsingAsSelect, LogicalRelation}
+import org.apache.spark.sql.catalyst.plans.logical._
+import org.apache.spark.sql.catalyst.{CatalystTypeConverters, InternalRow, ScalaReflection, SqlParser}
 import org.apache.spark.sql.execution.datasources.json.JacksonGenerator
+import org.apache.spark.sql.execution.datasources.{CreateTableUsingAsSelect, LogicalRelation}
+import org.apache.spark.sql.execution.{EvaluatePython, ExplainCommand, FileRelation, LogicalRDD, QueryExecution, Queryable, SQLExecution}
+import org.apache.spark.sql.index.IndexType
 import org.apache.spark.sql.sources.HadoopFsRelation
 import org.apache.spark.sql.types._
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.util.Utils
+
+import scala.language.implicitConversions
+import scala.reflect.ClassTag
+import scala.reflect.runtime.universe.TypeTag
 
 
 private[sql] object DataFrame {
@@ -162,7 +161,8 @@ class DataFrame private[sql](
 
   /**
    * Compose the string representing rows for output
-   * @param _numRows Number of rows to show
+    *
+    * @param _numRows Number of rows to show
    * @param truncate Whether truncate long strings and align cells right
    */
   private[sql] def showString(_numRows: Int, truncate: Boolean = true): String = {
@@ -235,7 +235,8 @@ class DataFrame private[sql](
 
   /**
    * Returns the object itself.
-   * @group basic
+    *
+    * @group basic
    * @since 1.3.0
    */
   // This is declared with parentheses to prevent the Scala compiler from treating
@@ -246,7 +247,8 @@ class DataFrame private[sql](
    * :: Experimental ::
    * Converts this [[DataFrame]] to a strongly-typed [[Dataset]] containing objects of the
    * specified type, `U`.
-   * @group basic
+    *
+    * @group basic
    * @since 1.6.0
    */
   @Experimental
@@ -260,7 +262,8 @@ class DataFrame private[sql](
    *   rdd.toDF()  // this implicit conversion creates a DataFrame with column name _1 and _2
    *   rdd.toDF("id", "name")  // this creates a DataFrame with column name "id" and "name"
    * }}}
-   * @group basic
+    *
+    * @group basic
    * @since 1.3.0
    */
   @scala.annotation.varargs
@@ -278,14 +281,16 @@ class DataFrame private[sql](
 
   /**
    * Returns the schema of this [[DataFrame]].
-   * @group basic
+    *
+    * @group basic
    * @since 1.3.0
    */
   def schema: StructType = queryExecution.analyzed.schema
 
   /**
    * Prints the schema to the console in a nice tree format.
-   * @group basic
+    *
+    * @group basic
    * @since 1.3.0
    */
   // scalastyle:off println
@@ -294,7 +299,8 @@ class DataFrame private[sql](
 
   /**
    * Prints the plans (logical and physical) to the console for debugging purposes.
-   * @group basic
+    *
+    * @group basic
    * @since 1.3.0
    */
   override def explain(extended: Boolean): Unit = {
@@ -308,13 +314,15 @@ class DataFrame private[sql](
 
   /**
    * Prints the physical plan to the console for debugging purposes.
-   * @since 1.3.0
+    *
+    * @since 1.3.0
    */
   override def explain(): Unit = explain(extended = false)
 
   /**
    * Returns all column names and their data types as an array.
-   * @group basic
+    *
+    * @group basic
    * @since 1.3.0
    */
   def dtypes: Array[(String, String)] = schema.fields.map { field =>
@@ -323,7 +331,8 @@ class DataFrame private[sql](
 
   /**
    * Returns all column names as an array.
-   * @group basic
+    *
+    * @group basic
    * @since 1.3.0
    */
   def columns: Array[String] = schema.fields.map(_.name)
@@ -331,7 +340,8 @@ class DataFrame private[sql](
   /**
    * Returns true if the `collect` and `take` methods can be run locally
    * (without any Spark executors).
-   * @group basic
+    *
+    * @group basic
    * @since 1.3.0
    */
   def isLocal: Boolean = logicalPlan.isInstanceOf[LocalRelation]
@@ -347,9 +357,9 @@ class DataFrame private[sql](
    *   1983  03    0.410516        0.442194
    *   1984  04    0.450090        0.483521
    * }}}
-   * @param numRows Number of rows to show
-   *
-   * @group action
+    *
+    * @param numRows Number of rows to show
+    * @group action
    * @since 1.3.0
    */
   def show(numRows: Int): Unit = show(numRows, truncate = true)
@@ -357,7 +367,8 @@ class DataFrame private[sql](
   /**
    * Displays the top 20 rows of [[DataFrame]] in a tabular form. Strings more than 20 characters
    * will be truncated, and all cells will be aligned right.
-   * @group action
+    *
+    * @group action
    * @since 1.3.0
    */
   def show(): Unit = show(20)
@@ -367,8 +378,7 @@ class DataFrame private[sql](
    *
    * @param truncate Whether truncate long strings. If true, strings more than 20 characters will
    *              be truncated and all cells will be aligned right
-   *
-   * @group action
+    * @group action
    * @since 1.5.0
    */
   def show(truncate: Boolean): Unit = show(20, truncate)
@@ -383,11 +393,11 @@ class DataFrame private[sql](
    *   1983  03    0.410516        0.442194
    *   1984  04    0.450090        0.483521
    * }}}
-   * @param numRows Number of rows to show
+    *
+    * @param numRows Number of rows to show
    * @param truncate Whether truncate long strings. If true, strings more than 20 characters will
    *              be truncated and all cells will be aligned right
-   *
-   * @group action
+    * @group action
    * @since 1.5.0
    */
   // scalastyle:off println
@@ -546,7 +556,8 @@ class DataFrame private[sql](
    *   df1.join(df2, $"df1Key" === $"df2Key")
    *   df1.join(df2).where($"df1Key" === $"df2Key")
    * }}}
-   * @group dfops
+    *
+    * @group dfops
    * @since 1.3.0
    */
   def join(right: DataFrame, joinExprs: Column): DataFrame = join(right, joinExprs, "inner")
@@ -648,7 +659,8 @@ class DataFrame private[sql](
    *   df.sort($"sortcol")
    *   df.sort($"sortcol".asc)
    * }}}
-   * @group dfops
+    *
+    * @group dfops
    * @since 1.3.0
    */
   @scala.annotation.varargs
@@ -661,7 +673,8 @@ class DataFrame private[sql](
    * {{{
    *   df.sort($"col1", $"col2".desc)
    * }}}
-   * @group dfops
+    *
+    * @group dfops
    * @since 1.3.0
    */
   @scala.annotation.varargs
@@ -672,7 +685,8 @@ class DataFrame private[sql](
   /**
    * Returns a new [[DataFrame]] sorted by the given expressions.
    * This is an alias of the `sort` function.
-   * @group dfops
+    *
+    * @group dfops
    * @since 1.3.0
    */
   @scala.annotation.varargs
@@ -681,7 +695,8 @@ class DataFrame private[sql](
   /**
    * Returns a new [[DataFrame]] sorted by the given expressions.
    * This is an alias of the `sort` function.
-   * @group dfops
+    *
+    * @group dfops
    * @since 1.3.0
    */
   @scala.annotation.varargs
@@ -690,7 +705,8 @@ class DataFrame private[sql](
   /**
    * Selects column based on the column name and return it as a [[Column]].
    * Note that the column name can also reference to a nested column like `a.b`.
-   * @group dfops
+    *
+    * @group dfops
    * @since 1.3.0
    */
   def apply(colName: String): Column = col(colName)
@@ -698,7 +714,8 @@ class DataFrame private[sql](
   /**
    * Selects column based on the column name and return it as a [[Column]].
    * Note that the column name can also reference to a nested column like `a.b`.
-   * @group dfops
+    *
+    * @group dfops
    * @since 1.3.0
    */
   def col(colName: String): Column = colName match {
@@ -711,7 +728,8 @@ class DataFrame private[sql](
 
   /**
    * Returns a new [[DataFrame]] with an alias set.
-   * @group dfops
+    *
+    * @group dfops
    * @since 1.3.0
    */
   def as(alias: String): DataFrame = withPlan {
@@ -720,21 +738,24 @@ class DataFrame private[sql](
 
   /**
    * (Scala-specific) Returns a new [[DataFrame]] with an alias set.
-   * @group dfops
+    *
+    * @group dfops
    * @since 1.3.0
    */
   def as(alias: Symbol): DataFrame = as(alias.name)
 
   /**
    * Returns a new [[DataFrame]] with an alias set. Same as `as`.
-   * @group dfops
+    *
+    * @group dfops
    * @since 1.6.0
    */
   def alias(alias: String): DataFrame = as(alias)
 
   /**
    * (Scala-specific) Returns a new [[DataFrame]] with an alias set. Same as `as`.
-   * @group dfops
+    *
+    * @group dfops
    * @since 1.6.0
    */
   def alias(alias: Symbol): DataFrame = as(alias)
@@ -744,7 +765,8 @@ class DataFrame private[sql](
    * {{{
    *   df.select($"colA", $"colB" + 1)
    * }}}
-   * @group dfops
+    *
+    * @group dfops
    * @since 1.3.0
    */
   @scala.annotation.varargs
@@ -761,7 +783,8 @@ class DataFrame private[sql](
    *   df.select("colA", "colB")
    *   df.select($"colA", $"colB")
    * }}}
-   * @group dfops
+    *
+    * @group dfops
    * @since 1.3.0
    */
   @scala.annotation.varargs
@@ -776,7 +799,8 @@ class DataFrame private[sql](
    *   df.selectExpr("colA", "colB as newName", "abs(colC)")
    *   df.select(expr("colA"), expr("colB as newName"), expr("abs(colC)"))
    * }}}
-   * @group dfops
+    *
+    * @group dfops
    * @since 1.3.0
    */
   @scala.annotation.varargs
@@ -793,7 +817,8 @@ class DataFrame private[sql](
    *   peopleDf.filter($"age" > 15)
    *   peopleDf.where($"age" > 15)
    * }}}
-   * @group dfops
+    *
+    * @group dfops
    * @since 1.3.0
    */
   def filter(condition: Column): DataFrame = withPlan {
@@ -805,7 +830,8 @@ class DataFrame private[sql](
    * {{{
    *   peopleDf.filter("age > 15")
    * }}}
-   * @group dfops
+    *
+    * @group dfops
    * @since 1.3.0
    */
   def filter(conditionExpr: String): DataFrame = {
@@ -819,7 +845,8 @@ class DataFrame private[sql](
    *   peopleDf.filter($"age" > 15)
    *   peopleDf.where($"age" > 15)
    * }}}
-   * @group dfops
+    *
+    * @group dfops
    * @since 1.3.0
    */
   def where(condition: Column): DataFrame = filter(condition)
@@ -829,7 +856,8 @@ class DataFrame private[sql](
    * {{{
    *   peopleDf.where("age > 15")
    * }}}
-   * @group dfops
+    *
+    * @group dfops
    * @since 1.5.0
    */
   def where(conditionExpr: String): DataFrame = {
@@ -850,7 +878,8 @@ class DataFrame private[sql](
    *     "age" -> "max"
    *   ))
    * }}}
-   * @group dfops
+    *
+    * @group dfops
    * @since 1.3.0
    */
   @scala.annotation.varargs
@@ -873,7 +902,8 @@ class DataFrame private[sql](
    *     "age" -> "max"
    *   ))
    * }}}
-   * @group dfops
+    *
+    * @group dfops
    * @since 1.4.0
    */
   @scala.annotation.varargs
@@ -896,7 +926,8 @@ class DataFrame private[sql](
    *     "age" -> "max"
    *   ))
    * }}}
-   * @group dfops
+    *
+    * @group dfops
    * @since 1.4.0
    */
   @scala.annotation.varargs
@@ -919,7 +950,8 @@ class DataFrame private[sql](
    *     "age" -> "max"
    *   ))
    * }}}
-   * @group dfops
+    *
+    * @group dfops
    * @since 1.3.0
    */
   @scala.annotation.varargs
@@ -946,7 +978,8 @@ class DataFrame private[sql](
    *     "age" -> "max"
    *   ))
    * }}}
-   * @group dfops
+    *
+    * @group dfops
    * @since 1.4.0
    */
   @scala.annotation.varargs
@@ -973,7 +1006,8 @@ class DataFrame private[sql](
    *     "age" -> "max"
    *   ))
    * }}}
-   * @group dfops
+    *
+    * @group dfops
    * @since 1.4.0
    */
   @scala.annotation.varargs
@@ -989,7 +1023,8 @@ class DataFrame private[sql](
    *   df.agg("age" -> "max", "salary" -> "avg")
    *   df.groupBy().agg("age" -> "max", "salary" -> "avg")
    * }}}
-   * @group dfops
+    *
+    * @group dfops
    * @since 1.3.0
    */
   def agg(aggExpr: (String, String), aggExprs: (String, String)*): DataFrame = {
@@ -1003,7 +1038,8 @@ class DataFrame private[sql](
    *   df.agg(Map("age" -> "max", "salary" -> "avg"))
    *   df.groupBy().agg(Map("age" -> "max", "salary" -> "avg"))
    * }}}
-   * @group dfops
+    *
+    * @group dfops
    * @since 1.3.0
    */
   def agg(exprs: Map[String, String]): DataFrame = groupBy().agg(exprs)
@@ -1015,7 +1051,8 @@ class DataFrame private[sql](
    *   df.agg(Map("age" -> "max", "salary" -> "avg"))
    *   df.groupBy().agg(Map("age" -> "max", "salary" -> "avg"))
    * }}}
-   * @group dfops
+    *
+    * @group dfops
    * @since 1.3.0
    */
   def agg(exprs: java.util.Map[String, String]): DataFrame = groupBy().agg(exprs)
@@ -1027,7 +1064,8 @@ class DataFrame private[sql](
    *   df.agg(max($"age"), avg($"salary"))
    *   df.groupBy().agg(max($"age"), avg($"salary"))
    * }}}
-   * @group dfops
+    *
+    * @group dfops
    * @since 1.3.0
    */
   @scala.annotation.varargs
@@ -1036,7 +1074,8 @@ class DataFrame private[sql](
   /**
    * Returns a new [[DataFrame]] by taking the first `n` rows. The difference between this function
    * and `head` is that `head` returns an array while `limit` returns a new [[DataFrame]].
-   * @group dfops
+    *
+    * @group dfops
    * @since 1.3.0
    */
   def limit(n: Int): DataFrame = withPlan {
@@ -1046,7 +1085,8 @@ class DataFrame private[sql](
   /**
    * Returns a new [[DataFrame]] containing union of rows in this frame and another frame.
    * This is equivalent to `UNION ALL` in SQL.
-   * @group dfops
+    *
+    * @group dfops
    * @since 1.3.0
    */
   def unionAll(other: DataFrame): DataFrame = withPlan {
@@ -1056,7 +1096,8 @@ class DataFrame private[sql](
   /**
    * Returns a new [[DataFrame]] containing rows only in both this frame and another frame.
    * This is equivalent to `INTERSECT` in SQL.
-   * @group dfops
+    *
+    * @group dfops
    * @since 1.3.0
    */
   def intersect(other: DataFrame): DataFrame = withPlan {
@@ -1066,7 +1107,8 @@ class DataFrame private[sql](
   /**
    * Returns a new [[DataFrame]] containing rows in this frame but not in another frame.
    * This is equivalent to `EXCEPT` in SQL.
-   * @group dfops
+    *
+    * @group dfops
    * @since 1.3.0
    */
   def except(other: DataFrame): DataFrame = withPlan {
@@ -1137,6 +1179,117 @@ class DataFrame private[sql](
   }
 
   /**
+    * a private auxiliary function to extract Attribute information from an input string
+    * object.
+    * @param keys  An array of String input by user
+    * @param attrs A Seq of Attributes in which to search
+    * @return An Array of Attribute extracted from the String
+    */
+  private def getAttributes(keys: Array[String],
+                            attrs: Seq[Attribute] = this.queryExecution.analyzed.output)
+  : Array[Attribute] = {
+    keys.map(key => {
+      val temp = attrs.indexWhere(_.name == key)
+      if (temp >= 0) attrs(temp)
+      else null
+    })
+  }
+
+  /**
+    * Spatial operation, range query
+    * {{{
+    *   point.range(Point(point1("x"), point1("y")), Point(1.0, 1.0), Point(2.0, 2.0))
+    * }}}
+    */
+  def range(keys: PointFromColumn, point1: PointFromCoords, point2: PointFromCoords): DataFrame =
+    withPlan {
+      Filter(InRange(keys.cols.map(_.expr), point1.coords.map(Literal(_)),
+        point2.coords.map(Literal(_))), logicalPlan)
+    }
+
+  /**
+    * Spatial operation, range query.
+    * {{{
+    *   point.range(Array("x", "y"), Array(10, 10), Array(20, 20))
+    *   point.filter($"x" >= 10 && $"x" <= 20 && $"y" >= 10 && $"y" <= 20)
+    * }}}
+    */
+  def range(keys: Array[String], point1: Array[Double], point2: Array[Double]): DataFrame =
+   withPlan {
+      val attrs = getAttributes(keys)
+      attrs.foreach(attr => assert(attr != null, "column not found"))
+
+      Filter(InRange(attrs, point1.map(Literal(_)), point2.map(Literal(_))), logicalPlan)
+    }
+
+  def circleRange(keys: PointFromColumn, point: PointFromCoords, r: Double): DataFrame =
+    withPlan {
+      Filter(InCircleRange(keys.cols.map(_.expr), point.coords.map(Literal(_)),
+        Literal(r)), logicalPlan)
+    }
+
+  /**
+    * Spatial operation circle range query
+    * {{{
+    *   point.circleRange(Array("x", "y"), Array(10, 10), 5)
+    *   point.filter(($"x" - 10) * ($"x" - 10) + ($"y" - 10) * ($"y" - 10) <= 5 * 5)
+    * }}}
+    */
+  def circleRange(keys: Array[String], point: Array[Double], r: Double): DataFrame = withPlan {
+    val attrs = getAttributes(keys)
+    attrs.foreach(attr => assert(attr != null, "column not found"))
+    Filter(InCircleRange(attrs, point.map(Literal(_)), Literal(r)), logicalPlan)
+  }
+
+  /**
+    * Spatial operation knn
+    * Find k nearest neighbor of a given point
+    */
+  def knn(keys: Array[String], point: Array[Double], k: Int): DataFrame = withPlan{
+    val attrs = getAttributes(keys)
+    attrs.foreach(attr => assert(attr != null, "column not found"))
+    Filter(InKNN(attrs, point.map(Literal(_)), Literal(k)), logicalPlan)
+  }
+
+  def knn(keys: PointFromColumn, point: PointFromCoords, k: Int): DataFrame = withPlan {
+    Filter(InKNN(keys.cols.map(_.expr), point.coords.map(Literal(_)), Literal(k)), logicalPlan)
+  }
+
+  /**
+    * Spatial operation DistanceJoin
+    */
+  def distanceJoin(right: DataFrame, leftKeys: Array[String],
+                   rightKeys: Array[String], r: Double) : DataFrame = withPlan {
+    val leftAttrs = getAttributes(leftKeys)
+    val rightAttrs = getAttributes(rightKeys, right.queryExecution.analyzed.output)
+    Join(this.logicalPlan, right.logicalPlan, DistanceJoin,
+      Some(InCircleRange(rightAttrs, leftAttrs, Literal(r))))
+  }
+
+  def distanceJoin(right: DataFrame, leftKeys: PointFromColumn,
+                   rightKeys: PointFromColumn, r: Double): DataFrame = withPlan {
+    Join(this.logicalPlan, right.logicalPlan, DistanceJoin,
+      Some(InCircleRange(rightKeys.cols.map(_.expr), leftKeys.cols.map(_.expr), Literal(r))))
+  }
+
+  /**
+    * Spatial operation KNNJoin
+    */
+  def knnJoin(right: DataFrame, leftKeys: Array[String],
+              rightKeys: Array[String], k : Int) : DataFrame = withPlan {
+    val leftAttrs = getAttributes(leftKeys)
+    val rightAttrs = getAttributes(rightKeys, right.queryExecution.analyzed.output)
+    Join(this.logicalPlan, right.logicalPlan, KNNJoin,
+      Some(InKNN(rightAttrs, leftAttrs, Literal(k))))
+  }
+
+  def knnJoin(right: DataFrame, leftKeys: PointFromColumn,
+              rightKeys: PointFromColumn, k: Int): DataFrame = withPlan {
+    Join(this.logicalPlan, right.logicalPlan, KNNJoin,
+      Some(InKNN(rightKeys.cols.map(_.expr), leftKeys.cols.map(_.expr), Literal(k))))
+  }
+
+  /**
    * (Scala-specific) Returns a new [[DataFrame]] where each row has been expanded to zero or more
    * rows by the provided function.  This is similar to a `LATERAL VIEW` in HiveQL. The columns of
    * the input row are implicitly joined with each row that is output by the function.
@@ -1154,7 +1307,8 @@ class DataFrame private[sql](
    *   }
    *
    *   val bookCountPerWord = allWords.groupBy("word").agg(countDistinct("title"))
-   * }}}
+    * }}}
+ *
    * @group dfops
    * @since 1.3.0
    */
@@ -1184,6 +1338,7 @@ class DataFrame private[sql](
    * {{{
    *   df.explode("words", "word"){words: String => words.split(" ")}
    * }}}
+ *
    * @group dfops
    * @since 1.3.0
    */
@@ -1211,6 +1366,7 @@ class DataFrame private[sql](
   /**
    * Returns a new [[DataFrame]] by adding a column or replacing the existing column that has
    * the same name.
+ *
    * @group dfops
    * @since 1.3.0
    */
@@ -1248,6 +1404,7 @@ class DataFrame private[sql](
   /**
    * Returns a new [[DataFrame]] with a column renamed.
    * This is a no-op if schema doesn't contain existingName.
+ *
    * @group dfops
    * @since 1.3.0
    */
@@ -1272,6 +1429,7 @@ class DataFrame private[sql](
   /**
    * Returns a new [[DataFrame]] with a column dropped.
    * This is a no-op if schema doesn't contain column name.
+ *
    * @group dfops
    * @since 1.4.0
    */
@@ -1294,6 +1452,7 @@ class DataFrame private[sql](
    * This version of drop accepts a Column rather than a name.
    * This is a no-op if the DataFrame doesn't have a column
    * with an equivalent expression.
+ *
    * @group dfops
    * @since 1.4.1
    */
@@ -1313,6 +1472,7 @@ class DataFrame private[sql](
   /**
    * Returns a new [[DataFrame]] that contains only the unique rows from this [[DataFrame]].
    * This is an alias for `distinct`.
+ *
    * @group dfops
    * @since 1.4.0
    */
@@ -1350,7 +1510,7 @@ class DataFrame private[sql](
   /**
    * Computes statistics for numeric columns, including count, mean, stddev, min, and max.
    * If no columns are given, this function computes statistics for all numerical columns.
-   *
+    *
    * This function is meant for exploratory data analysis, as we make no guarantee about the
    * backward compatibility of the schema of the resulting [[DataFrame]]. If you want to
    * programmatically compute summary statistics, use the `agg` function instead.
@@ -1407,6 +1567,7 @@ class DataFrame private[sql](
 
   /**
    * Returns the first `n` rows.
+ *
    * @group action
    * @since 1.3.0
    */
@@ -1416,6 +1577,7 @@ class DataFrame private[sql](
 
   /**
    * Returns the first row.
+ *
    * @group action
    * @since 1.3.0
    */
@@ -1423,6 +1585,7 @@ class DataFrame private[sql](
 
   /**
    * Returns the first row. Alias for head().
+ *
    * @group action
    * @since 1.3.0
    */
@@ -1437,12 +1600,14 @@ class DataFrame private[sql](
    *     .transform(featurize)
    *     .transform(...)
    * }}}
+ *
    * @since 1.6.0
    */
   def transform[U](t: DataFrame => DataFrame): DataFrame = t(this)
 
   /**
    * Returns a new RDD by applying a function to all rows of this DataFrame.
+ *
    * @group rdd
    * @since 1.3.0
    */
@@ -1451,6 +1616,7 @@ class DataFrame private[sql](
   /**
    * Returns a new RDD by first applying a function to all rows of this [[DataFrame]],
    * and then flattening the results.
+ *
    * @group rdd
    * @since 1.3.0
    */
@@ -1458,6 +1624,7 @@ class DataFrame private[sql](
 
   /**
    * Returns a new RDD by applying a function to each partition of this DataFrame.
+ *
    * @group rdd
    * @since 1.3.0
    */
@@ -1467,6 +1634,7 @@ class DataFrame private[sql](
 
   /**
    * Applies a function `f` to all rows.
+ *
    * @group rdd
    * @since 1.3.0
    */
@@ -1476,6 +1644,7 @@ class DataFrame private[sql](
 
   /**
    * Applies a function f to each partition of this [[DataFrame]].
+ *
    * @group rdd
    * @since 1.3.0
    */
@@ -1547,6 +1716,7 @@ class DataFrame private[sql](
 
   /**
    * Returns the number of rows in the [[DataFrame]].
+ *
    * @group action
    * @since 1.3.0
    */
@@ -1556,6 +1726,7 @@ class DataFrame private[sql](
 
   /**
    * Returns a new [[DataFrame]] that has exactly `numPartitions` partitions.
+ *
    * @group dfops
    * @since 1.3.0
    */
@@ -1596,6 +1767,7 @@ class DataFrame private[sql](
    * Similar to coalesce defined on an [[RDD]], this operation results in a narrow dependency, e.g.
    * if you go from 1000 partitions to 100 partitions, there will not be a shuffle, instead each of
    * the 100 new partitions will claim 10 of the current partitions.
+ *
    * @group rdd
    * @since 1.4.0
    */
@@ -1606,6 +1778,7 @@ class DataFrame private[sql](
   /**
    * Returns a new [[DataFrame]] that contains only the unique rows from this [[DataFrame]].
    * This is an alias for `dropDuplicates`.
+ *
    * @group dfops
    * @since 1.3.0
    */
@@ -1613,6 +1786,7 @@ class DataFrame private[sql](
 
   /**
    * Persist this [[DataFrame]] with the default storage level (`MEMORY_AND_DISK`).
+ *
    * @group basic
    * @since 1.3.0
    */
@@ -1623,6 +1797,7 @@ class DataFrame private[sql](
 
   /**
    * Persist this [[DataFrame]] with the default storage level (`MEMORY_AND_DISK`).
+ *
    * @group basic
    * @since 1.3.0
    */
@@ -1630,6 +1805,7 @@ class DataFrame private[sql](
 
   /**
    * Persist this [[DataFrame]] with the given storage level.
+ *
    * @param newLevel One of: `MEMORY_ONLY`, `MEMORY_AND_DISK`, `MEMORY_ONLY_SER`,
    *                 `MEMORY_AND_DISK_SER`, `DISK_ONLY`, `MEMORY_ONLY_2`,
    *                 `MEMORY_AND_DISK_2`, etc.
@@ -1643,6 +1819,7 @@ class DataFrame private[sql](
 
   /**
    * Mark the [[DataFrame]] as non-persistent, and remove all blocks for it from memory and disk.
+ *
    * @param blocking Whether to block until all blocks are deleted.
    * @group basic
    * @since 1.3.0
@@ -1654,10 +1831,67 @@ class DataFrame private[sql](
 
   /**
    * Mark the [[DataFrame]] as non-persistent, and remove all blocks for it from memory and disk.
+ *
    * @group basic
    * @since 1.3.0
    */
   def unpersist(): this.type = unpersist(blocking = false)
+
+  /////////////////////////////////////////////////////////////////////////////
+  // Index operations
+  /////////////////////////////////////////////////////////////////////////////
+  /**
+    * @group extended
+    */
+  def index(indexType: IndexType, indexName: String, column: List[Attribute]): this.type = {
+    sqlContext.indexManager.createIndexQuery(this, indexType, indexName, column)
+    this
+  }
+
+  /**
+    * @group extended
+    */
+  def setStorageLevel(indexName: String, level: StorageLevel): this.type = {
+    sqlContext.indexManager.setStorageLevel(this, indexName, level)
+    this
+  }
+
+  /**
+    * @group extended
+    */
+  def deindex(blocking: Boolean): this.type = {
+    sqlContext.indexManager.tryDropIndexQuery(this, blocking)
+    this
+  }
+
+  /**
+    * @group extended
+    */
+  def deindex(): this.type = deindex(blocking = false)
+
+  /**
+    * @group extended
+    */
+  def deindexByName(indexName : String) : this.type = {
+    sqlContext.indexManager.tryDropIndexByNameQuery(this, indexName, blocking = false)
+    this
+  }
+
+  /**
+    * @group extended
+    */
+  def persistIndex(indexName: String, fileName: String): this.type = {
+    sqlContext.indexManager.persistIndex(this.sqlContext, indexName, fileName)
+    this
+  }
+
+  /**
+    * @group extended
+    */
+  def loadIndex(indexName: String, fileName: String): this.type = {
+    sqlContext.indexManager.loadIndex(this.sqlContext, indexName, fileName)
+    this
+  }
 
   /////////////////////////////////////////////////////////////////////////////
   // I/O
@@ -1667,6 +1901,7 @@ class DataFrame private[sql](
    * Represents the content of the [[DataFrame]] as an [[RDD]] of [[Row]]s. Note that the RDD is
    * memoized. Once called, it won't change even if you change any query planning related Spark SQL
    * configurations (e.g. `spark.sql.shuffle.partitions`).
+ *
    * @group rdd
    * @since 1.3.0
    */
@@ -1681,6 +1916,7 @@ class DataFrame private[sql](
 
   /**
    * Returns the content of the [[DataFrame]] as a [[JavaRDD]] of [[Row]]s.
+ *
    * @group rdd
    * @since 1.3.0
    */
@@ -1688,6 +1924,7 @@ class DataFrame private[sql](
 
   /**
    * Returns the content of the [[DataFrame]] as a [[JavaRDD]] of [[Row]]s.
+ *
    * @group rdd
    * @since 1.3.0
    */
@@ -1716,6 +1953,7 @@ class DataFrame private[sql](
 
   /**
    * Returns the content of the [[DataFrame]] as a RDD of JSON strings.
+ *
    * @group rdd
    * @since 1.3.0
    */
@@ -1797,6 +2035,7 @@ class DataFrame private[sql](
    * If you pass `true` for `allowExisting`, it will drop any table with the
    * given name; if you pass `false`, it will throw if the table already
    * exists.
+ *
    * @group output
    * @deprecated As of 1.340, replaced by `write().jdbc()`. This will be removed in Spark 2.0.
    */
@@ -1816,6 +2055,7 @@ class DataFrame private[sql](
    * that is compatible with the schema of this RDD; inserting the rows of
    * the RDD in order via the simple statement
    * `INSERT INTO table VALUES (?, ?, ..., ?)` should not fail.
+ *
    * @group output
    * @deprecated As of 1.4.0, replaced by `write().jdbc()`. This will be removed in Spark 2.0.
    */
@@ -1829,6 +2069,7 @@ class DataFrame private[sql](
    * Saves the contents of this [[DataFrame]] as a parquet file, preserving the schema.
    * Files that are written out using this method can be read back in as a [[DataFrame]]
    * using the `parquetFile` function in [[SQLContext]].
+ *
    * @group output
    * @deprecated As of 1.4.0, replaced by `write().parquet()`. This will be removed in Spark 2.0.
    */
@@ -2004,6 +2245,7 @@ class DataFrame private[sql](
    * Saves the contents of this DataFrame to the given path,
    * using the default data source configured by spark.sql.sources.default and
    * [[SaveMode.ErrorIfExists]] as the save mode.
+ *
    * @group output
    * @deprecated As of 1.4.0, replaced by `write().save(path)`. This will be removed in Spark 2.0.
    */
@@ -2015,7 +2257,8 @@ class DataFrame private[sql](
   /**
    * Saves the contents of this DataFrame to the given path and [[SaveMode]] specified by mode,
    * using the default data source configured by spark.sql.sources.default.
-   * @group output
+ *
+    * @group output
    * @deprecated As of 1.4.0, replaced by `write().mode(mode).save(path)`.
    *             This will be removed in Spark 2.0.
    */
@@ -2027,6 +2270,7 @@ class DataFrame private[sql](
   /**
    * Saves the contents of this DataFrame to the given path based on the given data source,
    * using [[SaveMode.ErrorIfExists]] as the save mode.
+ *
    * @group output
    * @deprecated As of 1.4.0, replaced by `write().format(source).save(path)`.
    *             This will be removed in Spark 2.0.
@@ -2039,6 +2283,7 @@ class DataFrame private[sql](
   /**
    * Saves the contents of this DataFrame to the given path based on the given data source and
    * [[SaveMode]] specified by mode.
+ *
    * @group output
    * @deprecated As of 1.4.0, replaced by `write().format(source).mode(mode).save(path)`.
    *             This will be removed in Spark 2.0.
@@ -2052,6 +2297,7 @@ class DataFrame private[sql](
   /**
    * Saves the contents of this DataFrame based on the given data source,
    * [[SaveMode]] specified by mode, and a set of options.
+ *
    * @group output
    * @deprecated As of 1.4.0, replaced by
    *            `write().format(source).mode(mode).options(options).save(path)`.
@@ -2070,6 +2316,7 @@ class DataFrame private[sql](
    * (Scala-specific)
    * Saves the contents of this DataFrame based on the given data source,
    * [[SaveMode]] specified by mode, and a set of options
+ *
    * @group output
    * @deprecated As of 1.4.0, replaced by
    *            `write().format(source).mode(mode).options(options).save(path)`.
@@ -2086,6 +2333,7 @@ class DataFrame private[sql](
 
   /**
    * Adds the rows from this RDD to the specified table, optionally overwriting the existing data.
+ *
    * @group output
    * @deprecated As of 1.4.0, replaced by
    *            `write().mode(SaveMode.Append|SaveMode.Overwrite).saveAsTable(tableName)`.
@@ -2100,6 +2348,7 @@ class DataFrame private[sql](
   /**
    * Adds the rows from this RDD to the specified table.
    * Throws an exception if the table already exists.
+ *
    * @group output
    * @deprecated As of 1.4.0, replaced by
    *            `write().mode(SaveMode.Append).saveAsTable(tableName)`.

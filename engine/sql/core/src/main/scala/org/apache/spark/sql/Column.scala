@@ -17,18 +17,17 @@
 
 package org.apache.spark.sql
 
-import org.apache.spark.sql.execution.aggregate.TypedAggregateExpression
-
-import scala.language.implicitConversions
-
-import org.apache.spark.annotation.Experimental
 import org.apache.spark.Logging
-import org.apache.spark.sql.functions.lit
+import org.apache.spark.annotation.Experimental
 import org.apache.spark.sql.catalyst.analysis._
 import org.apache.spark.sql.catalyst.encoders.{ExpressionEncoder, encoderFor}
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.util.DataTypeParser
+import org.apache.spark.sql.execution.aggregate.TypedAggregateExpression
+import org.apache.spark.sql.functions.lit
 import org.apache.spark.sql.types._
+
+import scala.language.implicitConversions
 
 
 private[sql] object Column {
@@ -1165,4 +1164,13 @@ class ColumnName(name: String) extends Column(name) {
    * @since 1.3.0
    */
   def struct(structType: StructType): StructField = StructField(name, structType)
+}
+
+case class PointFromColumn(cols: Seq[Column])
+
+case class PointFromCoords(coords: Seq[Double])
+
+object Point {
+  def apply(cols: Column*): PointFromColumn = PointFromColumn(cols)
+  def apply(coords: Double*): PointFromCoords = PointFromCoords(coords)
 }

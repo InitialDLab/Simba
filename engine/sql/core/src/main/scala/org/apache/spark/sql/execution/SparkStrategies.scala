@@ -26,11 +26,51 @@ import org.apache.spark.sql.catalyst.plans.logical.{BroadcastHint, LogicalPlan}
 import org.apache.spark.sql.catalyst.plans.physical._
 import org.apache.spark.sql.execution.columnar.{InMemoryColumnarTableScan, InMemoryRelation}
 import org.apache.spark.sql.execution.datasources.{CreateTableUsing, CreateTempTableUsing, DescribeCommand => LogicalDescribeCommand, _}
+import org.apache.spark.sql.execution.joins._
 import org.apache.spark.sql.execution.{DescribeCommand => RunnableDescribeCommand}
-import org.apache.spark.sql.{Strategy, execution}
+import org.apache.spark.sql.index.{IndexedRelation, IndexedRelationScan, RTreeType, TreeMapType}
+import org.apache.spark.sql.{IndexInfo, Strategy, execution}
 
 private[sql] abstract class SparkStrategies extends QueryPlanner[SparkPlan] {
   self: SparkPlanner =>
+
+  object SpatialJoinExtractor extends Strategy with PredicateHelper{
+    def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
+      case ExtractSpatialJoinKeys(leftKeys, rightKeys, k, KNNJoin, left, right) =>
+        sqlContext.conf.knnJoinMethod match {
+          case "RTreeKNNJoin" =>
+            RTreeKNNJoin(leftKeys, rightKeys, k, planLater(left), planLater(right)) :: Nil
+          case "CartesianKNNJoin" =>
+            CartesianKNNJoin(leftKeys, rightKeys, k, planLater(left), planLater(right)) :: Nil
+          case "VoronoiKNNJoin" =>
+            VoronoiKNNJoin(leftKeys, rightKeys, k, planLater(left), planLater(right)) :: Nil
+          case "NestedLoopKNNJoin" =>
+            NestedLoopKNNJoin(leftKeys, rightKeys, k, planLater(left), planLater(right)) :: Nil
+          case "NLRTreeKNNJoin" =>
+            NLRTreeKNNJoin(leftKeys, rightKeys, k, planLater(left), planLater(right)) :: Nil
+          case _ =>
+            RTreeKNNJoin(leftKeys, rightKeys, k, planLater(left), planLater(right)) :: Nil
+        }
+      case ExtractSpatialJoinKeys(leftKeys, rightKeys, k, ZKNNJoin, left, right) =>
+        zKNNJoin(leftKeys, rightKeys, k, planLater(left), planLater(right)) :: Nil
+      case ExtractSpatialJoinKeys(leftKeys, rightKeys, r, DistanceJoin, left, right) =>
+        sqlContext.conf.distanceJoinMethod match {
+          case "RTreeDistanceJoin" =>
+            RTreeDistanceJoin(leftKeys, rightKeys, r, planLater(left), planLater(right)) :: Nil
+          case "SJMRDistanceJoin" =>
+            SJMRDistanceJoin(leftKeys, rightKeys, r, planLater(left), planLater(right)) :: Nil
+          case "CartesianDistanceJoin" =>
+            CartesianDistanceJoin(leftKeys, rightKeys, r, planLater(left), planLater(right)) :: Nil
+          case "NestedLoopDistanceJoin" =>
+            NestedLoopDistanceJoin(leftKeys, rightKeys, r, planLater(left), planLater(right)) :: Nil
+          case "NLRTreeDistanceJoin" =>
+            NLRTreeDistanceJoin(leftKeys, rightKeys, r, planLater(left), planLater(right)) :: Nil
+          case _ =>
+            RTreeDistanceJoin(leftKeys, rightKeys, r, planLater(left), planLater(right)) :: Nil
+        }
+      case _ => Nil
+    }
+  }
 
   object LeftSemiJoin extends Strategy with PredicateHelper {
     def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
@@ -282,6 +322,109 @@ private[sql] abstract class SparkStrategies extends QueryPlanner[SparkPlan] {
              IntegerLiteral(limit),
              logical.Project(projectList, logical.Sort(order, true, child))) =>
         execution.TakeOrderedAndProject(limit, order, Some(projectList), planLater(child)) :: Nil
+      case _ => Nil
+    }
+  }
+
+  object IndexRelationScans extends Strategy with PredicateHelper{
+    import org.apache.spark.sql.catalyst.expressions._
+    val indexInfos = sqlContext.indexManager.getIndexInfo
+    // lookup
+    def lookupIndexInfo(attributes: Seq[Attribute]): IndexInfo = {
+      var result: IndexInfo = null
+      indexInfos.foreach(item => {
+        if (item.indexType == RTreeType){
+          val temp = item.attributes
+          var found : Boolean = true
+          if (temp.length != attributes.length) found = false
+          else {
+            for (i <- attributes.indices) {
+              if (temp(i) != attributes(i)) {
+                found = false
+              }
+            }
+          }
+          if (found) result = item
+        } else if (item.indexType == TreeMapType) {
+          if (attributes.length == 1 && item.attributes.head == attributes.head){
+            result = item
+          }
+        }
+      })
+      result
+    }
+
+    def leafNodeCanBeIndexed(expression: Expression): Boolean = {
+      val indexInfo = expression match {
+        case l @ LessThan(left: NamedExpression, right: Literal) =>
+          lookupIndexInfo(Array(left.toAttribute))
+        case EqualTo(left: NamedExpression, right: Literal) =>
+          lookupIndexInfo(Array(left.toAttribute))
+        case LessThanOrEqual(left: NamedExpression, right: Literal) =>
+          lookupIndexInfo(Array(left.toAttribute))
+        case GreaterThan(left: NamedExpression, right: Literal) =>
+          lookupIndexInfo(Array(left.toAttribute))
+        case GreaterThanOrEqual(left: NamedExpression, right: Literal) =>
+          lookupIndexInfo(Array(left.toAttribute))
+
+        case InRange(point: Seq[NamedExpression], boundL, boundR) =>
+          lookupIndexInfo(point.map(x => x.toAttribute))
+        case InKNN(point: Seq[NamedExpression], target: Seq[Expression], k: Literal) =>
+          lookupIndexInfo(point.map(x => x.toAttribute))
+        case InCircleRange(point: Seq[NamedExpression], target: Seq[Expression], r: Literal) =>
+          lookupIndexInfo(point.map(x => x.toAttribute))
+        case _ =>
+          null
+      }
+      indexInfo != null
+    }
+
+    def extractIndexOperation(expression: Expression): Seq[Expression] = {
+      expression match {
+        case And(l1 @ And(l2, r2), r1) =>
+          extractIndexOperation(And(l2, And(r2, r1)))
+        case And(l1, r1 @ And(l2, r2)) =>
+          val temp = extractIndexOperation(r1)
+          if (leafNodeCanBeIndexed(l1)) temp :+ l1
+          else temp
+        case And(left, right) =>
+          var ans = Seq[Expression]()
+          if (leafNodeCanBeIndexed(left)) ans = ans :+ left
+          if (leafNodeCanBeIndexed(right)) ans = ans :+ right
+          ans
+        case other =>
+          if (!leafNodeCanBeIndexed(other)) Seq[Expression]()
+          else Seq[Expression](other)
+      }
+    }
+
+    def selectFilter(predicates: Seq[Expression]): Seq[Expression] = {
+      val originalPredicate = predicates.reduceLeftOption(And).getOrElse(Literal(true))
+      val dnf_clauses = splitDNFPredicates(originalPredicate)
+      var indexedOperations = Seq[Expression]()
+      dnf_clauses.foreach(dnf => {
+        val tempIndexedOperations = extractIndexOperation(dnf)
+        if (tempIndexedOperations.nonEmpty){
+          indexedOperations = indexedOperations :+ tempIndexedOperations.reduce{
+            (a, b) => {
+              if (a == null) b
+              else if (b == null) a
+              else And(a, b)
+            }
+          }
+        }
+      })
+      indexedOperations
+    }
+
+    def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
+      case PhysicalOperation(projectList, filters, indexed: IndexedRelation) =>
+        val predicatesCanBeIndexed = selectFilter(filters)
+        pruneFilterProject(
+          projectList,
+          filters,   // the parent Filter node of IndexRelationSca
+          identity[Seq[Expression]],
+          IndexedRelationScan(_, predicatesCanBeIndexed, indexed)) :: Nil
       case _ => Nil
     }
   }
