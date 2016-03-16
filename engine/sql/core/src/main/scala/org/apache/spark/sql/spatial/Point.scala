@@ -21,8 +21,24 @@ package org.apache.spark.sql.spatial
  * Created by dong on 1/15/16.
  * Multi-Dimensional Point
  */
-final case class Point(coord: Array[Double]) extends Serializable {
+final case class Point(coord: Array[Double]) extends Shape {
   def this() = this(Array())
+
+  override def isIntersect(other: Shape): Boolean = {
+    other match {
+      case p @ Point(_) => p == this
+      case mbr @ MBR(_, _) => mbr.contains(this)
+      case cir @ Circle(_, _) => cir.contains(this)
+    }
+  }
+
+  override def minDist(other: Shape): Double = {
+    other match {
+      case p @ Point(_) => minDist(p)
+      case mbr @ MBR(_, _) => minDist(mbr)
+      case cir @ Circle(_, _) => minDist(cir)
+    }
+  }
 
   def minDist(other: Point): Double = {
     require(coord.length == other.coord.length)
@@ -33,6 +49,8 @@ final case class Point(coord: Array[Double]) extends Serializable {
   }
 
   def minDist(other: MBR): Double = other.minDist(this)
+
+  def minDist(other: Circle): Double = other.minDist(this)
 
   def ==(other: Point): Boolean = other match {
     case p: Point =>
@@ -50,6 +68,8 @@ final case class Point(coord: Array[Double]) extends Serializable {
       if (coord(i) > other.coord(i)) return false
     true
   }
+
+  def shift(d: Double): Point = Point(coord.map(x => x + d))
 
   def toMBR: MBR = new MBR(this, this)
 

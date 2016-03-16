@@ -26,20 +26,34 @@ import scala.util.control.Breaks
  * Created by dong on 1/15/16.
  * Static Multi-Dimensional R-Tree Index
  */
-case class RTreeEntry(region: MBR, node: RTreeNode, m_data: Int, node_size: Int)
+abstract class RTreeEntry {
+  def minDist(x: Shape): Double
+
+  def isIntersect(x: Shape): Boolean
+}
+
+case class RTreePointEntry(point: Point, m_data: Int) extends RTreeEntry {
+  override def minDist(x: Shape): Double = point.minDist(x)
+  override def isIntersect(x: Shape): Boolean = x.isIntersect(point)
+}
+
+case class RTreeMBREntry(mbr: MBR, node: RTreeNode, m_data: Int, size: Int) extends RTreeEntry {
+  override def minDist(x: Shape): Double = mbr.minDist(x)
+  override def isIntersect(x: Shape): Boolean = x.isIntersect(mbr)
+}
 
 case class RTreeNode(m_mbr: MBR, m_child: Array[RTreeEntry], isLeaf: Boolean) {
   def this(m_mbr: MBR, children: Array[(MBR, RTreeNode)]) = {
-    this(m_mbr, children.map(x => new RTreeEntry(x._1, x._2, -1, -1)), false)
+    this(m_mbr, children.map(x => new RTreeMBREntry(x._1, x._2, -1, -1)), false)
   }
 
   // XX Interesting Trick! Overriding same function
   def this(m_mbr: MBR, children: => Array[(Point, Int)]) = {
-    this(m_mbr, children.map(x => new RTreeEntry(x._1.toMBR, null, x._2, 1)), true)
+    this(m_mbr, children.map(x => new RTreePointEntry(x._1, x._2)), true)
   }
 
   def this(m_mbr: MBR, children: Array[(MBR, Int, Int)]) = {
-    this(m_mbr, children.map(x => new RTreeEntry(x._1, null, x._2, x._3)), true)
+    this(m_mbr, children.map(x => new RTreeMBREntry(x._1, null, x._2, x._3)), true)
   }
 }
 
@@ -48,78 +62,82 @@ class NNOrdering() extends Ordering[(_, Double)] {
 }
 
 case class RTree(root: RTreeNode) extends Index with Serializable {
-  def range(query: MBR): Array[(MBR, Int)] = {
-    val ans = mutable.ArrayBuffer[(MBR, Int)]()
+  def range(query: MBR): Array[(Shape, Int)] = {
+    val ans = mutable.ArrayBuffer[(Shape, Int)]()
     val st = new mutable.Stack[RTreeNode]()
     if (root.m_mbr.isIntersect(query) && root.m_child.nonEmpty) st.push(root)
     while (st.nonEmpty) {
       val now = st.pop()
       if (!now.isLeaf) {
-        now.m_child.foreach(entry => if (query.isIntersect(entry.region)) st.push(entry.node))
+        now.m_child.foreach {
+          case RTreeMBREntry(mbr, node, _, _) =>
+            if (query.isIntersect(mbr)) st.push(node)
+        }
       } else {
-        now.m_child.foreach { entry =>
-          if (query.isIntersect(entry.region)) ans += ((entry.region, entry.m_data))
+        now.m_child.foreach {
+          case RTreePointEntry(p, m_data) =>
+            if (query.contains(p)) ans += ((p, m_data))
+          case RTreeMBREntry(mbr, _, m_data, _) =>
+            if (query.isIntersect(mbr)) ans += ((mbr, m_data))
         }
       }
     }
     ans.toArray
   }
 
-  def circleRange(origin: Point, r: Double): Array[(MBR, Int)] = {
-    val ans = mutable.ArrayBuffer[(MBR, Int)]()
+  def circleRange(origin: Shape, r: Double): Array[(Shape, Int)] = {
+    val ans = mutable.ArrayBuffer[(Shape, Int)]()
     val st = new mutable.Stack[RTreeNode]()
     if (root.m_mbr.minDist(origin) <= r && root.m_child.nonEmpty) st.push(root)
     while (st.nonEmpty) {
       val now = st.pop()
       if (!now.isLeaf) {
-        now.m_child.foreach(entry => if (origin.minDist(entry.region) <= r) st.push(entry.node))
+        now.m_child.foreach{
+          case RTreeMBREntry(mbr, node, _, _) =>
+            if (origin.minDist(mbr) <= r) st.push(node)
+        }
       } else {
-        now.m_child.foreach { entry =>
-          if (origin.minDist(entry.region) <= r) ans += ((entry.region, entry.m_data))
+        now.m_child.foreach {
+          case RTreePointEntry(p, m_data) =>
+            if (origin.minDist(p) <= r) ans += ((p, m_data))
+          case RTreeMBREntry(mbr, _, m_data, _) =>
+            if (origin.minDist(mbr) <= r) ans += ((mbr, m_data))
         }
       }
     }
     ans.toArray
   }
 
-  def circleRange(origin: MBR, r: Double): Array[(MBR, Int)] = {
-    val ans = mutable.ArrayBuffer[(MBR, Int)]()
-    val st = new mutable.Stack[RTreeNode]()
-    if (root.m_mbr.minDist(origin) <= r && root.m_child.nonEmpty) st.push(root)
-    while (st.nonEmpty) {
-      val now = st.pop()
-      if (!now.isLeaf) {
-        now.m_child.foreach(entry => if (origin.minDist(entry.region) <= r) st.push(entry.node))
-      } else now.m_child.foreach { entry =>
-        if (origin.minDist(entry.region) <= r) ans += ((entry.region, entry.m_data))
-      }
-    }
-    ans.toArray
-  }
-
-  def circleRangeConj(queries: Array[(Point, Double)]): Array[(MBR, Int)] = {
-    val ans = mutable.ArrayBuffer[(MBR, Int)]()
+  def circleRangeConj(queries: Array[(Point, Double)]): Array[(Shape, Int)] = {
+    val ans = mutable.ArrayBuffer[(Shape, Int)]()
     val st = new mutable.Stack[RTreeNode]()
 
-    def checkMBR(mbr: MBR) : Boolean = {
+    def check(now: Shape) : Boolean = {
       for (i <- queries.indices)
-        if (mbr.minDist(queries(i)._1) > queries(i)._2) return false
+        if (now.minDist(queries(i)._1) > queries(i)._2) return false
       true
     }
 
-    if (checkMBR(root.m_mbr) && root.m_child.nonEmpty) st.push(root)
+    if (check(root.m_mbr) && root.m_child.nonEmpty) st.push(root)
     while (st.nonEmpty) {
       val now = st.pop()
-      if (!now.isLeaf) now.m_child.foreach(entry => if (checkMBR(entry.region)) st.push(entry.node))
-      else now.m_child.foreach { entry =>
-        if (checkMBR(entry.region)) ans += ((entry.region, entry.m_data))
+      if (!now.isLeaf) now.m_child.foreach {
+        case RTreeMBREntry(mbr, node, _, _) =>
+          if (check(mbr)) st.push(node)
+      } else {
+        now.m_child.foreach {
+          case RTreePointEntry(p, m_data) =>
+            if (check(p)) ans += ((p, m_data))
+          case RTreeMBREntry(mbr, _, m_data, _) =>
+            if (check(mbr)) ans += ((mbr, m_data))
+        }
       }
     }
     ans.toArray
   }
 
-  def kNN(query: Point, k: Int, keepSame: Boolean = false): Array[(MBR, Int)] = {
-    val ans = mutable.ArrayBuffer[(MBR, Int)]()
+  def kNN(query: Point, k: Int, keepSame: Boolean = false): Array[(Shape, Int)] = {
+    val ans = mutable.ArrayBuffer[(Shape, Int)]()
     val pq = new mutable.PriorityQueue[(_, Double)]()(new NNOrdering())
     var cnt = 0
     var kNN_dis = 0.0
@@ -133,15 +151,19 @@ case class RTree(root: RTreeNode) extends Index with Serializable {
         if (cnt >= k && (!keepSame || now._2 > kNN_dis)) break()
 
         now._1 match {
-          case node: RTreeNode =>
-            node.m_child.foreach(entry =>
-              if (node.isLeaf) pq.enqueue((entry, entry.region.minDist(query)))
-              else pq.enqueue((entry.node, entry.region.minDist(query)))
+          case RTreeNode(_, m_child, isLeaf) =>
+            m_child.foreach(entry =>
+              if (isLeaf) pq.enqueue((entry, entry.minDist(query)))
+              else pq.enqueue((entry.asInstanceOf[RTreeMBREntry].node, entry.minDist(query)))
             )
-          case entry: RTreeEntry =>
+          case RTreePointEntry(p, m_data) =>
             cnt += 1
             kNN_dis = now._2
-            ans += ((entry.region, entry.m_data))
+            ans += ((p, m_data))
+          case RTreeMBREntry(mbr, _, m_data, _) =>
+            cnt += 1
+            kNN_dis = now._2
+            ans += ((mbr, m_data))
         }
       }
     }
@@ -165,15 +187,16 @@ case class RTree(root: RTreeNode) extends Index with Serializable {
         if (cnt >= k && (!keepSame || now._2 > kNN_dis)) break()
 
         now._1 match {
-          case node: RTreeNode =>
-            node.m_child.foreach(entry =>
-              if (node.isLeaf) pq.enqueue((entry, distFunc(query, entry.region)))
-              else pq.enqueue((entry.node, distFunc(query, entry.region)))
-            )
-          case entry: RTreeEntry =>
-            cnt += entry.node_size
+          case RTreeNode(_, m_child, isLeaf) =>
+            m_child.foreach {
+              case entry @ RTreeMBREntry(mbr, node, _, _) =>
+                if (isLeaf) pq.enqueue((entry, distFunc(query, mbr)))
+                else pq.enqueue((node, distFunc(query, mbr)))
+            }
+          case RTreeMBREntry(mbr, _, m_data, size) =>
+            cnt += size
             kNN_dis = now._2
-            ans += ((entry.region, entry.m_data))
+            ans += ((mbr, m_data))
         }
       }
     }
@@ -197,15 +220,16 @@ case class RTree(root: RTreeNode) extends Index with Serializable {
         if (cnt >= k && (!keepSame || now._2 > kNN_dis)) break()
 
         now._1 match {
-          case node: RTreeNode =>
-            node.m_child.foreach(entry =>
-              if (node.isLeaf) pq.enqueue((entry, distFunc(query, entry.region)))
-              else pq.enqueue((entry.node, distFunc(query, entry.region)))
-            )
-          case entry: RTreeEntry =>
-            cnt += entry.node_size
+          case RTreeNode(_, m_child, isLeaf) =>
+            m_child.foreach {
+              case entry @ RTreeMBREntry(mbr, node, _, _) =>
+                if (isLeaf) pq.enqueue((entry, distFunc(query, mbr)))
+                else pq.enqueue((node, distFunc(query, mbr)))
+            }
+          case RTreeMBREntry(mbr, _, m_data, size) =>
+            cnt += size
             kNN_dis = now._2
-            ans += ((entry.region, entry.m_data))
+            ans += ((mbr, m_data))
         }
       }
     }

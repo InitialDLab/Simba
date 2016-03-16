@@ -21,11 +21,19 @@ package org.apache.spark.sql.spatial
  * Created by dong on 1/15/16.
  * Multi-Dimensional Minimum Bounding Box
  */
-case class MBR(low: Point, high: Point) {
+case class MBR(low: Point, high: Point) extends Shape {
   require(low.coord.length == high.coord.length)
   require(low <= high)
 
   val centroid = new Point(low.coord.zip(high.coord).map(x => x._1 + x._2 / 2.0))
+
+  override def isIntersect(other: Shape): Boolean = {
+    other match {
+      case p @ Point(_) => contains(p)
+      case mbr @ MBR(_, _) => isIntersect(mbr)
+      case cir @ Circle(_, _) => cir.isIntersect(this)
+    }
+  }
 
   def isIntersect(other: MBR): Boolean = {
     require(low.coord.length == other.low.coord.length)
@@ -45,6 +53,14 @@ case class MBR(low: Point, high: Point) {
     true
   }
 
+  override def minDist(other: Shape): Double = {
+    other match {
+      case p @ Point(_) => minDist(p)
+      case mbr @ MBR(_, _) => minDist(mbr)
+      case cir @ Circle(_, _) => minDist(cir)
+    }
+  }
+
   def minDist(p: Point): Double = {
     require(low.coord.length == p.coord.length)
     var ans = 0.0
@@ -57,6 +73,8 @@ case class MBR(low: Point, high: Point) {
     }
     Math.sqrt(ans)
   }
+
+  def minDist(other: Circle): Double = other.minDist(this)
 
   def minDist(other: MBR): Double = {
     require(low.coord.length == other.low.coord.length)

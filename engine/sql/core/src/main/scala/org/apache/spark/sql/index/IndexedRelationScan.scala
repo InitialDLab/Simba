@@ -207,7 +207,7 @@ private[sql] case class IndexedRelationScan(
                 tmp_set ++= mbr_ans.map(_._2)
                 val tmp_pruned = new PartitionPruningRDD(rtree._indexedRDD, tmp_set.contains)
                 val tmp_ans = tmp_pruned.flatMap { packed =>
-                  var tmp_ans = Array[(MBR, Int)]()
+                  var tmp_ans = Array[(Shape, Int)]()
                   if (packed.index.asInstanceOf[RTree] != null) {
                     tmp_ans = packed.index.asInstanceOf[RTree].kNN(query_point, k, keepSame = false)
                   }
@@ -222,7 +222,7 @@ private[sql] case class IndexedRelationScan(
                 else {
                   val pruned = new PartitionPruningRDD(rtree._indexedRDD, set.contains)
                   pruned.flatMap { packed =>
-                    var tmp_ans = Array[(MBR, Int)]()
+                    var tmp_ans = Array[(Shape, Int)]()
                     if (packed.index.asInstanceOf[RTree] != null) {
                       tmp_ans = packed.index.asInstanceOf[RTree]
                         .kNN(query_point, k, keepSame = false)
