@@ -24,19 +24,21 @@ package org.apache.spark.sql.spatial
 final case class Point(coord: Array[Double]) extends Shape {
   def this() = this(Array())
 
-  override def isIntersect(other: Shape): Boolean = {
+  override def intersects(other: Shape): Boolean = {
     other match {
-      case p @ Point(_) => p == this
-      case mbr @ MBR(_, _) => mbr.contains(this)
-      case cir @ Circle(_, _) => cir.contains(this)
+      case p: Point => p == this
+      case mbr: MBR => mbr.contains(this)
+      case cir: MBR => cir.contains(this)
+      case poly: Polygon => poly.contains(this)
     }
   }
 
   override def minDist(other: Shape): Double = {
     other match {
-      case p @ Point(_) => minDist(p)
-      case mbr @ MBR(_, _) => minDist(mbr)
-      case cir @ Circle(_, _) => minDist(cir)
+      case p: Point => minDist(p)
+      case mbr: MBR => mbr.minDist(this)
+      case cir: Circle => cir.minDist(this)
+      case poly: Polygon => poly.minDist(this)
     }
   }
 
@@ -47,10 +49,6 @@ final case class Point(coord: Array[Double]) extends Shape {
       ans += (coord(i) - other.coord(i)) * (coord(i) - other.coord(i))
     Math.sqrt(ans)
   }
-
-  def minDist(other: MBR): Double = other.minDist(this)
-
-  def minDist(other: Circle): Double = other.minDist(this)
 
   def ==(other: Point): Boolean = other match {
     case p: Point =>
@@ -70,8 +68,6 @@ final case class Point(coord: Array[Double]) extends Shape {
   }
 
   def shift(d: Double): Point = Point(coord.map(x => x + d))
-
-  def toMBR: MBR = new MBR(this, this)
 
   override def toString: String = {
     var s = "POINT("

@@ -23,9 +23,10 @@ package org.apache.spark.sql.spatial
 case class Circle(center: Point, radius: Double) extends Shape {
   override def minDist(other: Shape): Double = {
     other match {
-      case p @ Point(_) => minDist(p)
-      case mbr @ MBR(_, _) => minDist(mbr)
-      case cir @ Circle(_, _) => minDist(cir)
+      case p: Point => minDist(p)
+      case mbr: MBR => minDist(mbr)
+      case cir: Circle => minDist(cir)
+      case poly: Polygon => poly.minDist(this)
     }
   }
 
@@ -37,30 +38,31 @@ case class Circle(center: Point, radius: Double) extends Shape {
 
   def minDist(other: MBR): Double = {
     require(center.coord.length == other.low.coord.length)
-    if (isIntersect(other)) 0.0
+    if (intersects(other)) 0.0
     else center.minDist(other) - radius
   }
 
   def minDist(other: Circle): Double = {
     require(center.coord.length == other.center.coord.length)
-    if (isIntersect(other)) 0.0
+    if (intersects(other)) 0.0
     else center.minDist(other.center) - radius - other.radius
   }
 
 
-  override def isIntersect(other: Shape): Boolean = {
+  override def intersects(other: Shape): Boolean = {
     other match {
-      case p @ Point(_) => contains(p)
-      case mbr @ MBR(_, _) => isIntersect(mbr)
-      case cir @ Circle(_, _) => isIntersect(cir)
+      case p: Point => contains(p)
+      case mbr: MBR => intersects(mbr)
+      case cir: Circle => intersects(cir)
+      case poly: Polygon => poly.intersects(this)
     }
   }
 
   def contains(p: Point): Boolean = p.minDist(center) <= radius
 
-  def isIntersect(other: MBR): Boolean = center.minDist(other) <= radius
+  def intersects(other: MBR): Boolean = center.minDist(other) <= radius
 
-  def isIntersect(other: Circle): Boolean = other.center.minDist(center) <= other.radius + radius
+  def intersects(other: Circle): Boolean = other.center.minDist(center) <= other.radius + radius
 
   def getMBR: MBR = new MBR(center.shift(-radius), center.shift(radius))
 

@@ -23,5 +23,5 @@ package org.apache.spark.sql.spatial
 abstract class Shape extends Serializable {
   def minDist(other: Shape): Double
 
-  def isIntersect(other: Shape): Boolean
+  def intersects(other: Shape): Boolean
 }

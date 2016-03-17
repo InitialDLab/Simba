@@ -60,10 +60,12 @@ trait PredicateHelper {
         tmp_left match {
           case Or(l, r) =>
             ans = Or(And(l, tmp_right), And(r, tmp_right))
+          case _ =>
         }
         tmp_right match {
           case Or(l, r) =>
             if (ans == null) ans = Or(And(tmp_left, l), And(tmp_left, r))
+          case _ =>
         }
         if (ans == null) And(tmp_left, tmp_right)
         else toDNF(ans)
@@ -82,10 +84,12 @@ trait PredicateHelper {
         tmp_left match {
           case And(l, r) =>
             ans = And(Or(l, tmp_right), Or(r, tmp_right))
+          case _ =>
         }
         tmp_right match {
           case And(l, r) =>
             if (ans == null) ans = And(Or(tmp_left, l), Or(tmp_left, r))
+          case _ =>
         }
         if (ans == null) Or(tmp_left, tmp_right)
         else toCNF(ans)
