@@ -17,16 +17,17 @@
 
 package org.apache.spark.sql.catalyst.expressions;
 
-import java.math.BigDecimal;
-import java.math.BigInteger;
-import java.nio.ByteBuffer;
-
 import org.apache.spark.sql.catalyst.util.ArrayData;
+import org.apache.spark.sql.spatial.Shape;
 import org.apache.spark.sql.types.*;
 import org.apache.spark.unsafe.Platform;
 import org.apache.spark.unsafe.array.ByteArrayMethods;
 import org.apache.spark.unsafe.types.CalendarInterval;
 import org.apache.spark.unsafe.types.UTF8String;
+
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.nio.ByteBuffer;
 
 /**
  * An Unsafe implementation of Array which is backed by raw memory instead of Java objects.
@@ -252,6 +253,17 @@ public class UnsafeArrayData extends ArrayData {
     final byte[] bytes = new byte[size];
     Platform.copyMemory(baseObject, baseOffset + offset, bytes, Platform.BYTE_ARRAY_OFFSET, size);
     return bytes;
+  }
+
+  @Override
+  public Shape getShape(int ordinal) {
+    assertIndexIsValid(ordinal);
+    final int offset = getElementOffset(ordinal);
+    if (offset < 0) return null;
+    final int size = getElementSize(offset, ordinal);
+    final byte[] bytes = new byte[size];
+    Platform.copyMemory(baseObject, baseOffset + offset, bytes, Platform.BYTE_ARRAY_OFFSET, size);
+    return KryoShapeSerializer.deserialize(bytes);
   }
 
   @Override

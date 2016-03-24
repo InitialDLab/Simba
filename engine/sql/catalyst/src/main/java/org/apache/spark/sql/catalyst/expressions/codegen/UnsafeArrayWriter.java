@@ -17,6 +17,8 @@
 
 package org.apache.spark.sql.catalyst.expressions.codegen;
 
+import org.apache.spark.sql.catalyst.expressions.KryoShapeSerializer;
+import org.apache.spark.sql.spatial.Shape;
 import org.apache.spark.sql.types.Decimal;
 import org.apache.spark.unsafe.Platform;
 import org.apache.spark.unsafe.types.CalendarInterval;
@@ -156,6 +158,22 @@ public class UnsafeArrayWriter {
     // Write the bytes to the variable length portion.
     Platform.copyMemory(
       input, Platform.BYTE_ARRAY_OFFSET, holder.buffer, holder.cursor, input.length);
+
+    setOffset(ordinal);
+
+    // move the cursor forward.
+    holder.cursor += input.length;
+  }
+
+  public void write(int ordinal, Shape shape) {
+    // grow the global buffer before writing data.
+    byte[] input = KryoShapeSerializer.serialize(shape);
+
+    holder.grow(input.length);
+
+    // Write the bytes to the variable length portion.
+    Platform.copyMemory(
+            input, Platform.BYTE_ARRAY_OFFSET, holder.buffer, holder.cursor, input.length);
 
     setOffset(ordinal);
 

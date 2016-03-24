@@ -23,13 +23,14 @@ import java.sql.{Date, Timestamp}
 import java.util.{Map => JavaMap}
 import javax.annotation.Nullable
 
-import scala.language.existentials
-
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.util._
+import org.apache.spark.sql.spatial.Shape
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.types.UTF8String
+
+import scala.language.existentials
 
 /**
  * Functions to convert Scala types to Catalyst types and vice versa.
@@ -48,6 +49,7 @@ object CatalystTypeConverters {
       case LongType => true
       case FloatType => true
       case DoubleType => true
+      case ShapeType => true
       case _ => false
     }
   }
@@ -69,6 +71,7 @@ object CatalystTypeConverters {
       case LongType => LongConverter
       case FloatType => FloatConverter
       case DoubleType => DoubleConverter
+      case ShapeType => ShapeConverter
       case dataType: DataType => IdentityConverter(dataType)
     }
     converter.asInstanceOf[CatalystTypeConverter[Any, Any, Any]]
@@ -375,6 +378,10 @@ object CatalystTypeConverters {
     override def toScalaImpl(row: InternalRow, column: Int): Double = row.getDouble(column)
   }
 
+  private object ShapeConverter extends PrimitiveConverter[Shape] {
+    override def toScalaImpl(row: InternalRow, column: Int): Shape = row.getShape(column)
+  }
+
   /**
    * Creates a converter function that will convert Scala objects to the specified Catalyst type.
    * Typical use case would be converting a collection of rows that have the same schema. You will
@@ -426,6 +433,7 @@ object CatalystTypeConverters {
     case s: String => StringConverter.toCatalyst(s)
     case d: Date => DateConverter.toCatalyst(d)
     case t: Timestamp => TimestampConverter.toCatalyst(t)
+    case s: Shape => ShapeConverter.toCatalyst(s)
     case d: BigDecimal => new DecimalConverter(DecimalType(d.precision, d.scale)).toCatalyst(d)
     case d: JavaBigDecimal => new DecimalConverter(DecimalType(d.precision, d.scale)).toCatalyst(d)
     case seq: Seq[Any] => new GenericArrayData(seq.map(convertToCatalyst).toArray)

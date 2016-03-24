@@ -19,9 +19,10 @@ package org.apache.spark.sql.catalyst.expressions
 
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.analysis.TypeCheckResult
-import org.apache.spark.sql.catalyst.expressions.codegen.{CodeGenContext, GeneratedExpressionCode}
+import org.apache.spark.sql.catalyst.expressions.codegen.{CodeGenContext, CodegenFallback, GeneratedExpressionCode}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.catalyst.util.{NumberConverter, TypeUtils}
+import org.apache.spark.sql.spatial.Shape
 import org.apache.spark.sql.types._
 import org.apache.spark.util.Utils
 
@@ -254,7 +255,7 @@ case class In(value: Expression, list: Seq[Expression]) extends Predicate
 
 case class InRange(point: Seq[Expression],
                    point_low: Seq[Expression],
-                   point_high: Seq[Expression]) extends Predicate {
+                   point_high: Seq[Expression]) extends Predicate with CodegenFallback {
   require(point.length == point_low.length && point.length == point_high.length)
   override def hasSpatial: Boolean = true
 
@@ -263,9 +264,6 @@ case class InRange(point: Seq[Expression],
   override def nullable: Boolean = false
 
   override def toString: String = s" **($point) IN Rectangle ($point_low) - ($point_high)**  "
-
-  // TODO code_gen for range query
-  override def genCode(ctx: CodeGenContext, ev: GeneratedExpressionCode): String = ""
 
   /** Returns the result of evaluating this expression on a given input Row */
   override def eval(input: InternalRow): Any = {
@@ -282,7 +280,7 @@ case class InRange(point: Seq[Expression],
 
 case class InCircleRange(point: Seq[Expression],
                          target: Seq[Expression],
-                         r: Literal) extends Predicate {
+                         r: Literal) extends Predicate with CodegenFallback {
   require(point.length == target.length)
   override def hasSpatial: Boolean = true
 
@@ -291,9 +289,6 @@ case class InCircleRange(point: Seq[Expression],
   override def nullable: Boolean = false
 
   override def toString: String = s" **($point) IN CIRCLERANGE ($target) within  ($r)**  "
-
-  // TODO code_gen for circle range query
-  override def genCode(ctx: CodeGenContext, ev: GeneratedExpressionCode): String = ""
 
   /** Returns the result of evaluating this expression on a given input Row */
   override def eval(input: InternalRow): Any = {
@@ -307,7 +302,9 @@ case class InCircleRange(point: Seq[Expression],
   }
 }
 
-case class InKNN(point: Seq[Expression], target: Seq[Expression], k: Literal) extends Predicate {
+case class InKNN(point: Seq[Expression],
+                 target: Seq[Expression],
+                 k: Literal) extends Predicate with CodegenFallback {
   override def hasSpatial: Boolean = true
 
   override def children: Seq[Expression] = point ++ target ++ Seq(k)
@@ -316,12 +313,26 @@ case class InKNN(point: Seq[Expression], target: Seq[Expression], k: Literal) ex
 
   override def toString: String = s" **($point) IN KNN ($target) within ($k)"
 
-  // TODO code_gen for knn query (maybe impossible)
-  override def genCode(ctx: CodeGenContext, ev: GeneratedExpressionCode): String = ""
-
   // XX Tricky hack
   /** Returns the result of evaluating this expression on a given input Row */
   override def eval(input: InternalRow): Any = true
+}
+
+case class Intersects(left: Expression, right: Expression)
+    extends BinaryExpression with Predicate with CodegenFallback {
+  override def toString: String = s"**($left) INTERSECTS ($right)"
+
+  override def nullable: Boolean = left.nullable || right.nullable
+
+  override def eval(input: InternalRow): Boolean = {
+    val leftEval = left.eval(input)
+    if (leftEval == null) false
+    else {
+      val rightEval = right.eval(input)
+      if (rightEval == null) false
+      else leftEval.asInstanceOf[Shape].intersects(rightEval.asInstanceOf[Shape])
+    }
+  }
 }
 
 

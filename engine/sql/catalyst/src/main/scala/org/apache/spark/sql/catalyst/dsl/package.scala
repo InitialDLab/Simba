@@ -19,14 +19,15 @@ package org.apache.spark.sql.catalyst
 
 import java.sql.{Date, Timestamp}
 
-import scala.language.implicitConversions
-
-import org.apache.spark.sql.catalyst.analysis.{EliminateSubQueries, UnresolvedExtractValue, UnresolvedAttribute}
+import org.apache.spark.sql.catalyst.analysis.{EliminateSubQueries, UnresolvedAttribute, UnresolvedExtractValue}
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.aggregate._
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.catalyst.plans.{Inner, JoinType}
+import org.apache.spark.sql.spatial.Shape
 import org.apache.spark.sql.types._
+
+import scala.language.implicitConversions
 
 /**
  * A collection of implicit conversions that create a DSL for constructing catalyst data structures.
@@ -111,6 +112,9 @@ package object dsl {
 
     def as(alias: String): NamedExpression = Alias(expr, alias)()
     def as(alias: Symbol): NamedExpression = Alias(expr, alias.name)()
+
+    def intersects(other: Shape): Predicate = Intersects(expr, Literal(other))
+    def intersects(other: Expression): Predicate = Intersects(expr, other)
   }
 
   trait ExpressionConversions {
@@ -132,6 +136,7 @@ package object dsl {
     implicit def decimalToLiteral(d: Decimal): Literal = Literal(d)
     implicit def timestampToLiteral(t: Timestamp): Literal = Literal(t)
     implicit def binaryToLiteral(a: Array[Byte]): Literal = Literal(a)
+    implicit def ShapeToLiteral(s: Shape): Literal = Literal(s)
 
     implicit def symbolToUnresolvedAttribute(s: Symbol): analysis.UnresolvedAttribute =
       analysis.UnresolvedAttribute(s.name)
@@ -214,6 +219,9 @@ package object dsl {
 
       /** Creates a new AttributeReference of type binary */
       def binary: AttributeReference = AttributeReference(s, BinaryType, nullable = true)()
+
+      /** Creates a new AttributeReference of type shape */
+      def shape: AttributeReference = AttributeReference(s, ShapeType, nullable = true)()
 
       /** Creates a new AttributeReference of type array */
       def array(dataType: DataType): AttributeReference =

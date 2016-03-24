@@ -25,6 +25,10 @@ case class MBR(low: Point, high: Point) extends Shape {
   require(low.coord.length == high.coord.length)
   require(low <= high)
 
+  def this(low_x: Double, low_y: Double, high_x: Double, high_y: Double) {
+    this(Point(Array(low_x, low_y)), Point(Array(high_x, high_y)))
+  }
+
   val centroid = new Point(low.coord.zip(high.coord).map(x => x._1 + x._2 / 2.0))
 
   override def intersects(other: Shape): Boolean = {

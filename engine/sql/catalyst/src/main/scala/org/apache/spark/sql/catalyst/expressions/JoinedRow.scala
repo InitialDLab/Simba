@@ -18,7 +18,8 @@
 package org.apache.spark.sql.catalyst.expressions
 
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.util.{MapData, ArrayData}
+import org.apache.spark.sql.catalyst.util.{ArrayData, MapData}
+import org.apache.spark.sql.spatial.Shape
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.types.{CalendarInterval, UTF8String}
 
@@ -98,6 +99,9 @@ class JoinedRow extends InternalRow {
       row2.getDecimal(i - row1.numFields, precision, scale)
     }
   }
+
+  override def getShape(i: Int): Shape =
+    if (i < row1.numFields) row1.getShape(i) else row2.getShape(i - row1.numFields)
 
   override def getUTF8String(i: Int): UTF8String =
     if (i < row1.numFields) row1.getUTF8String(i) else row2.getUTF8String(i - row1.numFields)

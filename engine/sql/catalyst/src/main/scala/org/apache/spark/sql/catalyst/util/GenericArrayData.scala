@@ -17,11 +17,12 @@
 
 package org.apache.spark.sql.catalyst.util
 
-import scala.collection.JavaConverters._
-
 import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.spatial.Shape
 import org.apache.spark.sql.types.{DataType, Decimal}
 import org.apache.spark.unsafe.types.{CalendarInterval, UTF8String}
+
+import scala.collection.JavaConverters._
 
 class GenericArrayData(val array: Array[Any]) extends ArrayData {
 
@@ -58,6 +59,7 @@ class GenericArrayData(val array: Array[Any]) extends ArrayData {
   override def getStruct(ordinal: Int, numFields: Int): InternalRow = getAs(ordinal)
   override def getArray(ordinal: Int): ArrayData = getAs(ordinal)
   override def getMap(ordinal: Int): MapData = getAs(ordinal)
+  override def getShape(ordinal: Int): Shape = getAs(ordinal)
 
   override def toString(): String = array.mkString("[", ",", "]")
 

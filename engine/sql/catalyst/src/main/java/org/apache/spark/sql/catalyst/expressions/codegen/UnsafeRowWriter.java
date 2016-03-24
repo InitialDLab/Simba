@@ -17,7 +17,9 @@
 
 package org.apache.spark.sql.catalyst.expressions.codegen;
 
+import org.apache.spark.sql.catalyst.expressions.KryoShapeSerializer;
 import org.apache.spark.sql.catalyst.expressions.UnsafeRow;
+import org.apache.spark.sql.spatial.Shape;
 import org.apache.spark.sql.types.Decimal;
 import org.apache.spark.unsafe.Platform;
 import org.apache.spark.unsafe.array.ByteArrayMethods;
@@ -207,6 +209,11 @@ public class UnsafeRowWriter {
   }
 
   public void write(int ordinal, byte[] input) {
+    write(ordinal, input, 0, input.length);
+  }
+
+  public void write(int ordinal, Shape shape) {
+    byte[] input = KryoShapeSerializer.serialize(shape);
     write(ordinal, input, 0, input.length);
   }
 

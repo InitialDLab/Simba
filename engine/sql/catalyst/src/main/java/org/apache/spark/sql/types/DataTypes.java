@@ -17,7 +17,9 @@
 
 package org.apache.spark.sql.types;
 
-import java.util.*;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 /**
  * To get/create specific data type, users should use singleton objects and factory methods
@@ -83,6 +85,11 @@ public class DataTypes {
    * Gets the ShortType object.
    */
   public static final DataType ShortType = ShortType$.MODULE$;
+
+  /**
+   * Gets the ShapeType object.
+   */
+  public static final ShapeType ShapeType = ShapeType$.MODULE$;
 
   /**
    * Gets the NullType object.

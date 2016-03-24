@@ -19,9 +19,10 @@ package org.apache.spark.sql.catalyst.expressions;
 
 import org.apache.spark.sql.catalyst.InternalRow;
 import org.apache.spark.sql.catalyst.util.ArrayData;
+import org.apache.spark.sql.catalyst.util.MapData;
+import org.apache.spark.sql.spatial.Shape;
 import org.apache.spark.sql.types.DataType;
 import org.apache.spark.sql.types.Decimal;
-import org.apache.spark.sql.catalyst.util.MapData;
 import org.apache.spark.unsafe.types.CalendarInterval;
 import org.apache.spark.unsafe.types.UTF8String;
 
@@ -42,6 +43,8 @@ public interface SpecializedGetters {
   float getFloat(int ordinal);
 
   double getDouble(int ordinal);
+
+  Shape getShape(int ordinal);
 
   Decimal getDecimal(int ordinal, int precision, int scale);
 
