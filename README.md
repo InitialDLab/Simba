@@ -15,19 +15,19 @@ Build Simba and Run Unit Test
 -----------------------------
 Simba now comes packaged with a self-contained Maven installation to ease building and deployment of Simba from source located under the build/ directory. This script will automatically download and setup all necessary build requirements (Maven, Scala, and Zinc) locally within the `build` directory itself. It honors any mvn binary if present already, however, will pull down its own copy of Scala and Zinc regardless to ensure proper version requirements are met. build/mvn execution acts as a pass through to the mvn call allowing easy transition from previous build methods. As an example, one can build a version of Simba as follows:
 ```
-    build/mvn -Pyarn -Phadoop-2.6 -Dhadoop.version=2.6.2 -DskipTests clean package
+build/mvn -Pyarn -Phadoop-2.6 -Dhadoop.version=2.6.2 -DskipTests clean package
 ```
 You will need to configure Maven to use more memory than usual by setting MAVEN_OPTS. We recommend the following settings:
 ```
-    export MAVEN_OPTS="-Xmx2g -XX:MaxPermSize=512M -XX:ReservedCodeCacheSize=512m"
+export MAVEN_OPTS="-Xmx2g -XX:MaxPermSize=512M -XX:ReservedCodeCacheSize=512m"
 ```
 If you don't run this, you may see errors like the following:
 ```
-    [INFO] Compiling 203 Scala sources and 9 Java sources to /path/to/simba/core/target/scala-2.10/classes...
-    [ERROR] PermGen space -> [Help 1]
+[INFO] Compiling 203 Scala sources and 9 Java sources to /path/to/simba/core/target/scala-2.10/classes...
+[ERROR] PermGen space -> [Help 1]
 
-    [INFO] Compiling 203 Scala sources and 9 Java sources to /path/to/simba/core/target/scala-2.10/classes...
-    [ERROR] Java heap space -> [Help 1]
+[INFO] Compiling 203 Scala sources and 9 Java sources to /path/to/simba/core/target/scala-2.10/classes...
+[ERROR] Java heap space -> [Help 1]
 ```
 You can fix this by setting the MAVEN_OPTS variable as discussed before.
 
@@ -36,12 +36,12 @@ You can fix this by setting the MAVEN_OPTS variable as discussed before.
 Tests are run by default via the ScalaTest Maven plugin.
 Some of the tests require Simba to be packaged first, so always run `mvn package` with `-DskipTests` the first time. The following is an example of a correct (build, test) sequence:
 ```
-    mvn -Pyarn -Phadoop-2.6 -DskipTests -Phive -Phive-thriftserver clean package
-    mvn -Pyarn -Phadoop-2.6 -Phive -Phive-thriftserver test
+mvn -Pyarn -Phadoop-2.6 -DskipTests -Phive -Phive-thriftserver clean package
+mvn -Pyarn -Phadoop-2.6 -Phive -Phive-thriftserver test
 ```
 The ScalaTest plugin also supports running only a specific test suite as follows:
 ```
-    mvn -Dhadoop.version=... -DwildcardSuites=org.apache.spark.repl.ReplSuite test
+mvn -Dhadoop.version=... -DwildcardSuites=org.apache.spark.repl.ReplSuite test
 ```
 Importing Simba into IntelliJ IDEA
 ----------------------------------
@@ -60,12 +60,12 @@ Build Simba Release
 -------------------
 - Setting up Maven's Memory Usage
 ```
-    export MAVEN_OPTS="-Xmx2g -XX:MaxPermSize=512M -XX:ReservedCodeCacheSize=512m"
+export MAVEN_OPTS="-Xmx2g -XX:MaxPermSize=512M -XX:ReservedCodeCacheSize=512m"
 ```
 - Build Simba project
 ```
-    cd /path/to/simba/
-    ./make-distribution.sh --skip-java-test --tgz --mvn mvn -Phadoop-2.4 -Pyarn -Dhadoop.verison=2.4.1 -DskipTests
+cd /path/to/simba/
+./make-distribution.sh --skip-java-test --tgz --mvn mvn -Phadoop-2.4 -Pyarn -Dhadoop.verison=2.4.1 -DskipTests
 ```
 * The output distribution of Simba is in the directory `/path/to/simba/dist/`.
 
@@ -75,30 +75,30 @@ Simba Environment Setup
 
 - Edit `/path/to/simba/conf/slaves`, add the hostnames of slaves to this file:
 ```
-    Slave1
-    Slave2
+Slave1
+Slave2
 ```
 - Edit `/path/to/simba/conf/spark-env.sh`, add the necessary environment variables to the file (you can refer to `/path/to/simba/conf/spark-env.sh.template`):
 ```
-    export SCALA_HOME=/env/scala-2.10.6
-    export HADOOP_HOME=/env/hadoop-2.6.2/
-    export JAVA_HOME=/env/jdk1.7.0_79
-    export HADOOP_CONF_DIR=${HADOOP_HOME}/etc/hadoop
-    export SPARK_MASTER_IP=Master   # your master node IP address or hostname
-    export SPARK_WORKER_CORES=8
-    export SPARK_WORKER_MEMORY=5g
+export SCALA_HOME=/env/scala-2.10.6
+export HADOOP_HOME=/env/hadoop-2.6.2/
+export JAVA_HOME=/env/jdk1.7.0_79
+export HADOOP_CONF_DIR=${HADOOP_HOME}/etc/hadoop
+export SPARK_MASTER_IP=Master   # your master node IP address or hostname
+export SPARK_WORKER_CORES=8
+export SPARK_WORKER_MEMORY=5g
 ```
 - Add the necessary environment variables to your `~/.bashrc`:
 ```
-    export SIMBA_HOME=/path/to/simba
-    export PATH=$PATH:$SIMBA_HOME/bin
+export SIMBA_HOME=/path/to/simba
+export PATH=$PATH:$SIMBA_HOME/bin
 ```
 - Use `scp` to distribute Simba binary with all above configurations to all other nodes in the cluster.
 
 - Run the following command on your master node to start daemon of Simba:
 ```
-    cd /path/to/simba/
-    ./sbin/start-all.sh
+cd /path/to/simba/
+./sbin/start-all.sh
 ```
 ###**Developer Notes**
 
