@@ -100,8 +100,8 @@ export PATH=$PATH:$SIMBA_HOME/bin
 cd /path/to/simba/
 ./sbin/start-all.sh
 ```
-###**Developer Notes**
-
+Developer Notes
+---------------
 1. Checkout your own branch for your development, **DO NOT** push your draft version to the master branch
 2. You build your own application in `org.apache.spark.examples` package for testing or debugging.
 3. If you want to merge your feature branch to the main develop branch, please create a pull request from your local branch to develop branch (**not the master branch**).
