@@ -100,6 +100,19 @@ export PATH=$PATH:$SIMBA_HOME/bin
 cd /path/to/simba/
 ./sbin/start-all.sh
 ```
+
+
+Features
+--------------
++ distributed **partition** strategy & distributed **index**
++ efficient spatial **theta-join** operation
++ efficient **spatial query** operation
++ zepplin: **visualization** & **interactive** tool
++ basic Cost-Base Optimization(**CBO**)
++ **temporal** data and **textual** data analysis (developing)
++ **polygon** data storage & processing (developing)
++ **persistance** of indexed data (developing)
+
 Developer Notes
 ---------------
 1. Checkout your own branch for your development, **DO NOT** push your draft version to the master branch
