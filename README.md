@@ -7,11 +7,11 @@ Features
 + Expressive **SQL and DataFrame query interface** fully *compatible with original Spark SQL operators*.
 + Native distributed **indexing** support over RDDs.
 + Efficient **spatial operators**: *high-throughput* & *low-latency*.
-  * Box range query: `IN RANGE`
-  * Circle range query: `IN CIRCLERANGE`
-  * *k* nearest neighbor query: `IN KNN`
-  * Distance join: `DISTANCE JOIN`
-  * kNN join: `KNN JOIN`
+    - Box range query: `IN RANGE`
+    - Circle range query: `IN CIRCLERANGE`
+    - *k* nearest neighbor query: `IN KNN`
+    - Distance join: `DISTANCE JOIN`
+    - kNN join: `KNN JOIN`
 + Modified Zeppelin: **interactive visualization** for Simba.
 + Spatial-aware **optimizations**: *logical* & *cost-based*.
 + **Spatio-Temporal** and **spatio-textual** data analysis (developing)
