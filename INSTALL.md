@@ -1,11 +1,5 @@
 Simba Installation and Developing Guide
 =================
-#### Table of Content
-[Build and Test Simba](#build_and_test)
-[Deployment](#deploy)
-[Develop Simba with Intellij Idea](#develop)
-
-<a name="build_and_test"/>
 Build Simba and Run Unit Test
 -----------------------------
 #### Dependency
@@ -41,7 +35,6 @@ The ScalaTest plugin also supports running only a specific test suite as follows
 mvn -Dhadoop.version=... -DwildcardSuites=org.apache.spark.repl.ReplSuite test
 ```
 
-<a name="deploy" />
 Simba Environment Setup
 -----------------------
 
@@ -83,7 +76,6 @@ cd /path/to/simba/
 ./sbin/start-all.sh
 ```
 
-<a name="develop" />
 Importing Simba into IntelliJ IDEA
 ----------------------------------
 While many of the Simba developers use SBT or Maven on the command line, the most common IDE we use is IntelliJ IDEA. You can get the community edition for free (Apache committers can get free IntelliJ Ultimate Edition licenses) and install the JetBrains Scala plugin from File > Settings > Plugins.
@@ -96,5 +88,3 @@ To create a Simba project for IntelliJ IDEA:
 4.  Go to View > Tool Windows > Maven Projects and add `hadoop-2.6`, `hive-provided`, `hive-thriftserver`, `yarn` in `Profiles`. Then, reimport all maven projects (press the first button on upper-left corner) and generate sources and update folders for all projects (press the second button on upper-left corner).
 5.  Go to File > Project Structure > Project Settings > Modules. Find `spark-streaming-flume-sink`, mark `target/scala-2.10/src_managed/main/compiled_avro` as source. (Click on the Sources on the top to mark)
 6.  Go to Build > Rebuild Project to start building the project.
-
-
