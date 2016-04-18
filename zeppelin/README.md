@@ -46,6 +46,8 @@ _Notes:_
  - Ensure maven is running version 3.1.x or higher with `mvn -version`
 
 ### Build
+**For this customized version Zeppelin:** *You need to replace the maven artifact of Spark SQL and Spark Catalyst in your local Maven repo to the specific version that Simba extends to make Zeppelin work with Simba.* We know this is a **bad hack**, and we will fix this ASAP!
+
 If you want to build Zeppelin from the source, please first clone this repository, then:
 
 ```

@@ -1,5 +1,7 @@
 Simba Installation and Developing Guide
 =================
+This is a fast tutorial to build and set up Simba engine, which resides in the `engine` folder. For installation of our customized version of Zeppelin, please refer to [zeppelin/README.md](./zeppelin/README.md) and (./zeppelin/DEPLOY.md).
+
 Build Simba and Run Unit Test
 -----------------------------
 #### Dependency
@@ -18,7 +20,7 @@ export MAVEN_OPTS="-Xmx2g -XX:MaxPermSize=512M -XX:ReservedCodeCacheSize=512m"
 ```
 - Build Simba project
 ```
-cd /path/to/simba/
+cd /path/to/simba/engine/
 ./make-distribution.sh --skip-java-test --tgz --mvn mvn -Phadoop-2.4 -Pyarn -Dhadoop.verison=2.4.1 -DskipTests
 ```
 * The output distribution of Simba is in the directory `/path/to/simba/dist/`.
