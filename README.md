@@ -14,8 +14,11 @@ Features
     - kNN join: `KNN JOIN`
 + Modified Zeppelin: **interactive visualization** for Simba.
 + Spatial-aware **optimizations**: *logical* & *cost-based*.
++ Native thread-pool for multi-threading.
 + **Spatio-Temporal** and **spatio-textual** data analysis (developing)
 + **Geometric objects** support (developing)
+
+**Notes:** *We are still cleaning source codes for some of our features, which will be released to the master and develop branch later.*
 
 Developer Notes
 ---------------
