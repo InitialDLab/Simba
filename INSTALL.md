@@ -1,6 +1,6 @@
 Simba Installation and Developing Guide
 =================
-This is a fast tutorial to build and set up Simba engine, which resides in the `engine` folder. For installation of our customized version of Zeppelin, please refer to [zeppelin/README.md](./zeppelin/README.md) and (./zeppelin/DEPLOY.md).
+This is a fast tutorial to build and set up Simba engine, which resides in the `engine` folder. For installation of our customized version of Zeppelin, please refer to [zeppelin/README.md](./zeppelin/README.md) and [zeppelin/DEPLOY.md](./zeppelin/DEPLOY.md).
 
 Build Simba and Run Unit Test
 -----------------------------
