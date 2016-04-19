@@ -38,6 +38,7 @@ Contributors
 - Dong Xie: dongx [at] cs [dot] utah [dot] edu
 - Gefei Li: oizz01 [at] sjtu [dot] edu [dot] cn
 - Liang Zhou: nichozl [at] sjtu [dot] edu [dot] cn
+- Zhongpu Chen: chenzhongpu [at] sjtu [dot] edu [dot] cn
 - Feifei Li: lifeifei [at] cs [dot] utah [dot] edu
 - Bin Yao: yaobin [at] cs [dot] sjtu [dot] edu [dot] cn
 - Minyi Guo: guo-my [at] cs [dot] sjtu [dot] edu [dot] cn
