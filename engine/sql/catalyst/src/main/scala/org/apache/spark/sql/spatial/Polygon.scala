@@ -92,5 +92,6 @@ object Polygon {
     val gf = new GeometryFactory()
     Polygon(gf.createPolygon(points.map(x => new Coordinate(x.coord(0), x.coord(1)))))
   }
+  def fromJTSPolygon(polygon: JTSPolygon) = new Polygon(polygon)
   def fromWKB(bytes: Array[Byte]) = new Polygon(new WKBReader().read(bytes).asInstanceOf[JTSPolygon])
 }

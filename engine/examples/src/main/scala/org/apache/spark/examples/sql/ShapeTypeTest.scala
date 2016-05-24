@@ -44,15 +44,14 @@ object ShapeTypeTest {
 
     val gf = new GeometryFactory()
     val rdd = sc.parallelize(shapefile.Parser(shapefilePath)(gf)).map(r => (r.id, r.g))
+    val df = rdd.toDF()
+    df.show(5)
 
     val schema = new StructType(Array(new StructField("id", IntegerType, nullable = false),
                                       new StructField("shape", ShapeType, nullable = true)))
     val transferedRdd = rdd.map(org.apache.spark.sql.Row.fromTuple)
-    val df = sqlContext.createDataFrame(transferedRdd, schema)
-    df.show(5)
-
-//    df.registerTempTable("hello")
-//    sqlContext.sql("SELECT * FROM hello").collect().foreach(println)
+    val df2 = sqlContext.createDataFrame(transferedRdd, schema)
+    df2.show(5)
 
     println("Finished.")
   }

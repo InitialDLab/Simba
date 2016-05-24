@@ -30,7 +30,7 @@ import org.apache.spark.sql.spatial.{Shape, Polygon}
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.types.UTF8String
 
-import com.vividsolutions.jts.geom.{Polygon => JTSPolygon}
+import com.vividsolutions.jts.geom.{Polygon => JTSPolygon, Geometry}
 
 import scala.language.existentials
 
@@ -51,7 +51,7 @@ object CatalystTypeConverters {
       case LongType => true
       case FloatType => true
       case DoubleType => true
-      case ShapeType => true
+//      case ShapeType => true
       case _ => false
     }
   }
@@ -317,7 +317,11 @@ object CatalystTypeConverters {
 
   private object ShapeConverter extends CatalystTypeConverter[JTSPolygon, Shape, Any] {
     override def toCatalystImpl(scalaValue: JTSPolygon): Array[Byte] = new WKBWriter().write(scalaValue)
-    override def toScala(catalystValue: Any): Shape = Polygon.fromWKB(catalystValue.asInstanceOf[Array[Byte]])
+    override def toScala(catalystValue: Any): Shape = catalystValue match {
+      case t: Array[Byte] => Polygon.fromWKB(catalystValue.asInstanceOf[Array[Byte]])
+      case g: JTSPolygon => Polygon.fromJTSPolygon(g)
+      case _ => null
+    }
     override def toScalaImpl(row: InternalRow, column: Int): Shape = Polygon.fromWKB(row.getBinary(column))
   }
 

@@ -16,6 +16,7 @@
 
 package org.apache.spark.sql.catalyst.expressions
 
+import com.vividsolutions.jts.geom.Geometry
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.util.{ArrayData, MapData}
