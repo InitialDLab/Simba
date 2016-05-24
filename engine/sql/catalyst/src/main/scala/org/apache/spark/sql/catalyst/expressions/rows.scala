@@ -48,7 +48,10 @@ trait BaseGenericInternalRow extends InternalRow {
   override def getArray(ordinal: Int): ArrayData = getAs(ordinal)
   override def getInterval(ordinal: Int): CalendarInterval = getAs(ordinal)
   override def getMap(ordinal: Int): MapData = getAs(ordinal)
-  override def getShape(ordinal: Int): Shape = getAs(ordinal)
+  override def getShape(ordinal: Int): Shape = {
+    val temp = getBinary(ordinal)
+    org.apache.spark.sql.spatial.Polygon.fromWKB(temp)
+  }
   override def getStruct(ordinal: Int, numFields: Int): InternalRow = getAs(ordinal)
 
   override def anyNull: Boolean = {
@@ -175,6 +178,7 @@ abstract class MutableRow extends InternalRow {
   def setLong(i: Int, value: Long): Unit = { update(i, value) }
   def setFloat(i: Int, value: Float): Unit = { update(i, value) }
   def setDouble(i: Int, value: Double): Unit = { update(i, value) }
+  def setShape(i: Int, value: Shape): Unit = {update(i, value)}
 
   /**
    * Update the decimal column at `i`.

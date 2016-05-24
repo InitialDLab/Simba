@@ -21,6 +21,7 @@ import org.apache.spark.Logging
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.codegen.{UnsafeRowWriter, CodeFormatter, CodeGenerator}
+import org.apache.spark.sql.spatial.Shape
 import org.apache.spark.sql.types._
 
 /**
@@ -48,6 +49,7 @@ class MutableUnsafeRow(val writer: UnsafeRowWriter) extends GenericMutableRow(nu
   override def setLong(i: Int, v: Long): Unit = writer.write(i, v)
   override def setFloat(i: Int, v: Float): Unit = writer.write(i, v)
   override def setDouble(i: Int, v: Double): Unit = writer.write(i, v)
+  override def setShape(i: Int, v: Shape): Unit = writer.write(i,v)
 
   // the writer will be used directly to avoid creating wrapper objects
   override def setDecimal(i: Int, v: Decimal, precision: Int): Unit =
