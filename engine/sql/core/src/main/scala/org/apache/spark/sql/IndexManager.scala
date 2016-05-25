@@ -120,7 +120,7 @@ private[sql] class IndexManager extends Logging {
                              fileName: String): Unit = {
     val info = sqlContext.sparkContext.objectFile[IndexInfo](fileName + "/indexInfo").collect().head
     val plan = sqlContext.sparkContext.objectFile[LogicalPlan](fileName + "/plan").collect().head
-    val rdd = sqlContext.sparkContext.objectFile[PackedPartitionWithIndex](fileName + "/rdd")
+    val rdd = sqlContext.sparkContext.objectFile[IPartition](fileName + "/rdd")
     if (info.indexType == RTreeType){
       val rtreeRelation = sqlContext.sparkContext
         .objectFile[RTreeIndexedRelation](fileName + "/rtreeRelation").collect().head

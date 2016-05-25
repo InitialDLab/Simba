@@ -17,6 +17,7 @@
 package org.apache.spark.sql.index
 
 import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.IndexRDD
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.analysis.MultiInstanceRelation
 import org.apache.spark.sql.catalyst.expressions.{Attribute, BindReferences}
@@ -31,7 +32,8 @@ import org.apache.spark.storage.StorageLevel
  * Created by dong on 1/15/16.
  * Indexed Relation Structures for Simba
  */
-private[sql] case class PackedPartitionWithIndex(data: Array[InternalRow], index: Index)
+
+private[sql] case class IPartition(data: Array[InternalRow], index: Index)
 
 private[sql] object IndexedRelation {
   def apply(child: SparkPlan, table_name: Option[String], index_type: IndexType,
@@ -50,8 +52,8 @@ private[sql] object IndexedRelation {
 
 private[sql] abstract class IndexedRelation extends LogicalPlan {
   self: Product =>
-  var _indexedRDD: RDD[PackedPartitionWithIndex]
-  def indexedRDD: RDD[PackedPartitionWithIndex] = _indexedRDD
+  var _indexedRDD: IndexRDD
+  def indexedRDD: IndexRDD = _indexedRDD
 
   override def children: Seq[LogicalPlan] = Nil
   def output: Seq[Attribute]
@@ -64,7 +66,7 @@ private[sql] case class HashMapIndexedRelation(
   child: SparkPlan,
   table_name: Option[String],
   column_keys: List[Attribute],
-  index_name: String)(var _indexedRDD: RDD[PackedPartitionWithIndex] = null)
+  index_name: String)(var _indexedRDD: IndexRDD = null)
   extends IndexedRelation with MultiInstanceRelation {
   require(column_keys.length == 1)
   val numShufflePartitions = child.sqlContext.conf.numShufflePartitions
@@ -86,7 +88,7 @@ private[sql] case class HashMapIndexedRelation(
     val indexed = partitionedRDD.mapPartitions(iter => {
       val data = iter.toArray
       val index = HashMapIndex(data)
-      Array(PackedPartitionWithIndex(data.map(_._2), index)).iterator
+      Array(IPartition(data.map(_._2), index)).iterator
     }).persist(StorageLevel.MEMORY_AND_DISK_SER)
 
     indexed.setName(table_name.map(n => s"$n $index_name").getOrElse(child.toString))
@@ -114,7 +116,7 @@ private[sql] case class TreeMapIndexedRelation(
   child: SparkPlan,
   table_name: Option[String],
   column_keys: List[Attribute],
-  index_name: String)(var _indexedRDD: RDD[PackedPartitionWithIndex] = null,
+  index_name: String)(var _indexedRDD: IndexRDD = null,
                       var range_bounds: Array[Double] = null)
   extends IndexedRelation with MultiInstanceRelation {
   require(column_keys.length == 1)
@@ -139,7 +141,7 @@ private[sql] case class TreeMapIndexedRelation(
     val indexed = partitionedRDD.mapPartitions(iter => {
       val data = iter.toArray
       val index = TreeMapIndex(data)
-      Array(PackedPartitionWithIndex(data.map(_._2), index)).iterator
+      Array(IPartition(data.map(_._2), index)).iterator
     }).persist(StorageLevel.MEMORY_AND_DISK_SER)
 
     indexed.setName(table_name.map(n => s"$n $index_name").getOrElse(child.toString))
@@ -169,7 +171,7 @@ private[sql] case class RTreeIndexedRelation(
   child: SparkPlan,
   table_name: Option[String],
   column_keys: List[Attribute],
-  index_name: String)(var _indexedRDD: RDD[PackedPartitionWithIndex] = null,
+  index_name: String)(var _indexedRDD: IndexRDD = null,
                       var global_rtree: RTree = null)
   extends IndexedRelation with MultiInstanceRelation {
   private def checkKeys: Boolean = {
@@ -209,7 +211,7 @@ private[sql] case class RTreeIndexedRelation(
       val data = iter.toArray
       var index: RTree = null
       if (data.length > 0) index = RTree(data.map(_._1).zipWithIndex, max_entries_per_node)
-      Array(PackedPartitionWithIndex(data.map(_._2), index)).iterator
+      Array(IPartition(data.map(_._2), index)).iterator
     }.persist(StorageLevel.MEMORY_AND_DISK_SER)
 
     val partitionSize = indexed.mapPartitions(iter => iter.map(_.data.length)).collect()

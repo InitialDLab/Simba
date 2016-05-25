@@ -48,4 +48,10 @@ package object sql {
    */
   @deprecated("use DataFrame", "1.3.0")
   type SchemaRDD = DataFrame
+
+  /**
+    * Type alias for [[org.apache.spark.sql.index.IPartition]]. This is designed for spatial
+    * indexing for RDD in Simba.
+    */
+  type IndexRDD = org.apache.spark.rdd.RDD[org.apache.spark.sql.index.IPartition]
 }
