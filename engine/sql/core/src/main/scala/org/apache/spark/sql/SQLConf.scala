@@ -477,7 +477,8 @@ private[spark] object SQLConf {
 
   val SAMPLE_RATE = doubleConf("spark.sql.sampleRate", defaultValue = Some(0.01))
 
-  val TRANSFER_THRESHOLD = longConf("spark.sql.transferThreshold", defaultValue = Some(800 * 1024 * 1024))
+  val TRANSFER_THRESHOLD = longConf("spark.sql.transferThreshold", defaultValue =
+    Some(800 * 1024 * 1024))
 
   // Threshold determine where rtree index using local index or brute force filter
   val INDEX_SIZE_THRESHOLD = intConf("spark.sql.index.threshold", defaultValue = Some(1000))
