@@ -460,17 +460,17 @@ private[spark] object SQLConf {
         "used to benchmark the performance impact of using DistinctAggregationRewriter to " +
         "plan aggregation queries with a single distinct column.")
 
-  //Join Parameters
-  val DISTANCE_JOIN_METHOD = stringConf("spark.sql.joins.distanceJoinMethod", defaultValue = Some("SJMRDistanceJoin"))
-  val KNN_JOIN_METHOD = stringConf("spark.sql.joins.knnJoinMethod", defaultValue = Some("RTreeKNNJoin"))
+  // Join Parameters
+  val DJ_Spark = stringConf("spark.sql.joins.DJSpark", defaultValue = Some("SJMRDJSpark"))
+  val KJ_SPARK = stringConf("spark.sql.joins.KJSpark", defaultValue = Some("RKJSpark"))
 
-  //RTree Parameters
+  // RTree Parameters
   val MAX_ENTRIES_PER_NODE = intConf("spark.sql.spatial.rtree.maxEntriesPerNode", defaultValue = Some(25))
 
-  //zKNN Join Parameters
+  // zKNN Join Parameters
   val ZKNN_SHIFT_TIMES = intConf("spark.sql.joins.zknn.shiftTimes", defaultValue = Some(2))
 
-  //Voronoi KNN Join Parameters
+  // Voronoi KNN Join Parameters
   val VORONOI_PIVOTSET_SIZE = intConf("spark.sql.joins.voronoi.pivotSetSize", defaultValue = Some(10))
 
   val THETA_BOOST = intConf("spark.sql.joins.thetaBoost", defaultValue = Some(16))
@@ -479,7 +479,7 @@ private[spark] object SQLConf {
 
   val TRANSFER_THRESHOLD = longConf("spark.sql.transferThreshold", defaultValue = Some(800 * 1024 * 1024))
 
-  //Threshold determine where rtree index using local index or brute force filter
+  // Threshold determine where rtree index using local index or brute force filter
   val INDEX_SIZE_THRESHOLD = intConf("spark.sql.index.threshold", defaultValue = Some(1000))
 
   object Deprecated {
@@ -603,9 +603,9 @@ private[sql] class SQLConf extends Serializable with CatalystConf {
   protected[spark] override def specializeSingleDistinctAggPlanning: Boolean =
     getConf(SPECIALIZE_SINGLE_DISTINCT_AGG_PLANNING)
 
-  private[spark] def distanceJoinMethod: String = getConf(DISTANCE_JOIN_METHOD)
+  private[spark] def DJSpark: String = getConf(DJ_Spark)
 
-  private[spark] def knnJoinMethod: String = getConf(KNN_JOIN_METHOD)
+  private[spark] def kJSpark: String = getConf(KJ_SPARK)
 
   private[spark] def maxEntriesPerNode: Int = getConf(MAX_ENTRIES_PER_NODE)
 

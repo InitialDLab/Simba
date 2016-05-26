@@ -30,7 +30,7 @@ import scala.util.Random
   * Created by dong on 1/20/16.
   * Approximate kNN Join based on Z-Value
   */
-case class zKNNJoin(left_keys: Seq[Expression],
+case class ZKJSpark(left_keys: Seq[Expression],
                     right_keys: Seq[Expression],
                     kNN: Literal,
                     left: SparkPlan,
