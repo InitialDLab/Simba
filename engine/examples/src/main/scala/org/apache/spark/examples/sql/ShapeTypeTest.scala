@@ -18,10 +18,10 @@
 package org.apache.spark.examples.sql
 
 import com.vividsolutions.jts.geom.{Geometry, GeometryFactory}
-import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.types._
 import org.apache.spark.{SparkConf, SparkContext}
+import org.apache.spark.sql.spatial._
 
 /**
   * Created by dong on 1/20/16.
@@ -29,8 +29,8 @@ import org.apache.spark.{SparkConf, SparkContext}
 object ShapeTypeTest {
 //  case class Point(name: String, x: Double, y: Double)
 
-  case class Point(name: Int, date: String, id: Int)
   case class ShapeRecord(id: Int, shape: Geometry)
+  case class Record(id: Int, shape: Shape)
 
   def main(args: Array[String]): Unit = {
     val sparkConf = new SparkConf().setAppName("RDDRangeQuery").setMaster("local[2]")
@@ -39,19 +39,26 @@ object ShapeTypeTest {
     sqlContext.setConf("spark.sql.shuffle.partitions", 4.toString)
 
     import sqlContext.implicits._
+    val schema = new StructType(Array(new StructField("id", IntegerType, nullable = false),
+      new StructField("shape", ShapeType, nullable = true)))
 
+    // Polygon test
     val shapefilePath = "/home/gefei/Downloads/gis/tl_2015_04_elsd/tl_2015_04_elsd.shp"
-
     val gf = new GeometryFactory()
     val rdd = sc.parallelize(shapefile.Parser(shapefilePath)(gf)).map(r => (r.id, r.g))
-    val df = rdd.toDF()
-    df.show(5)
+    val df = rdd.toDF().show(5)    // toDF
 
-    val schema = new StructType(Array(new StructField("id", IntegerType, nullable = false),
-                                      new StructField("shape", ShapeType, nullable = true)))
-    val transferedRdd = rdd.map(org.apache.spark.sql.Row.fromTuple)
-    val df2 = sqlContext.createDataFrame(transferedRdd, schema)
-    df2.show(5)
+    val df2 = sqlContext.createDataFrame(rdd.map(org.apache.spark.sql.Row.fromTuple), schema).show(5)
+
+    rdd.toDF.registerTempTable("polygons")
+    sqlContext.sql("SELECT * FROM polygons").show(5) //sql test
+
+
+    val rdd2 = sc.parallelize(1 to 10 map(i => Record(i, Point(Array(i, i, i)))))
+    rdd2.toDF.show(5) // implicit convert
+    sqlContext.createDataFrame(rdd2.map(org.apache.spark.sql.Row.fromTuple), schema).show(5) //explicit covert
+    rdd2.toDF.registerTempTable("points")
+    sqlContext.sql("SELECT * FROM points").show(5) //sql
 
     println("Finished.")
   }

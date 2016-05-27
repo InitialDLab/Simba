@@ -30,7 +30,7 @@ import org.apache.spark.sql.spatial.{Shape, Polygon}
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.types.UTF8String
 
-import com.vividsolutions.jts.geom.{Polygon => JTSPolygon, Geometry}
+import com.vividsolutions.jts.geom.{Polygon => JTSPolygon}
 
 import scala.language.existentials
 
@@ -51,7 +51,6 @@ object CatalystTypeConverters {
       case LongType => true
       case FloatType => true
       case DoubleType => true
-//      case ShapeType => true
       case _ => false
     }
   }
@@ -315,10 +314,18 @@ object CatalystTypeConverters {
       DateTimeUtils.toJavaDate(row.getInt(column))
   }
 
-  private object ShapeConverter extends CatalystTypeConverter[JTSPolygon, Shape, Any] {
-    override def toCatalystImpl(scalaValue: JTSPolygon): Array[Byte] = new WKBWriter().write(scalaValue)
-    override def toScala(catalystValue: Any): Shape = Polygon.fromWKB(catalystValue.asInstanceOf[Array[Byte]])
-    override def toScalaImpl(row: InternalRow, column: Int): Shape = Polygon.fromWKB(row.getBinary(column))
+  private object ShapeConverter extends CatalystTypeConverter[Any, Shape, Any] {
+    override def toCatalystImpl(scalaValue: Any): Any = scalaValue match{
+      case polygon:JTSPolygon => new WKBWriter().write(polygon)
+      case shape: Shape => shape
+      case _ => null
+    }
+    override def toScala(catalystValue: Any): Shape = catalystValue match {
+      case bytes:Array[Byte] => Polygon.fromWKB(bytes)
+      case shape:Shape => shape
+      case _ => null
+    }
+    override def toScalaImpl(row: InternalRow, column: Int): Shape = {row.getShape(column)}
   }
 
   private object TimestampConverter extends CatalystTypeConverter[Timestamp, Timestamp, Any] {

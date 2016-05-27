@@ -19,10 +19,11 @@ package org.apache.spark.sql.catalyst.expressions;
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.io.Input;
 import com.esotericsoftware.kryo.io.Output;
+import com.sun.xml.internal.messaging.saaj.util.ByteInputStream;
+import com.sun.xml.internal.messaging.saaj.util.ByteOutputStream;
 import org.apache.spark.sql.spatial.*;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
+import java.io.*;
 
 /**
  * Created by dong on 3/24/16.
@@ -38,17 +39,37 @@ public class KryoShapeSerializer {
         kryo.register(Circle.class);
     }
 
+    //TODO Find all kryo classes needed to be registered, change the code to a kryo serilized version
     public static Shape deserialize(byte[] data) {
-        ByteArrayInputStream in = new ByteArrayInputStream(data);
-        Input input = new Input(in);
-        return kryo.readObject(input, Shape.class);
+        if (data == null) return null;
+        try{
+            ByteArrayInputStream bis = new ByteArrayInputStream(data);
+            ObjectInput in = new ObjectInputStream(bis);
+            Object o = in.readObject();
+            return (Shape) o;
+        }catch (Exception e){
+            e.printStackTrace();
+        }
+        return null;
+//        ByteArrayInputStream in = new ByteArrayInputStream(data);
+//        Input input = new Input(in);
+//        return kryo.readObject(input, Shape.class);
     }
 
     public static byte[] serialize(Shape o) {
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
-        Output output = new Output(out);
-        kryo.writeObject(output, o);
-        output.flush();
-        return out.toByteArray();
+        try{
+            ByteOutputStream bos = new ByteOutputStream();
+            ObjectOutputStream out = new ObjectOutputStream(bos);
+            out.writeObject(o);
+            return bos.toByteArray();
+        } catch (IOException ioe){
+            ioe.printStackTrace();
+        }
+        return null;
+//        ByteArrayOutputStream out = new ByteArrayOutputStream();
+//        Output output = new Output(out);
+//        kryo.writeObject(output, o);
+//        output.flush();
+//        return out.toByteArray();
     }
 }

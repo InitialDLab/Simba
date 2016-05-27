@@ -19,7 +19,7 @@ package org.apache.spark.sql.catalyst.expressions
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.util.{ArrayData, MapData}
-import org.apache.spark.sql.spatial.Shape
+import org.apache.spark.sql.spatial.{Polygon, Shape}
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.types.{CalendarInterval, UTF8String}
 
@@ -49,8 +49,12 @@ trait BaseGenericInternalRow extends InternalRow {
   override def getInterval(ordinal: Int): CalendarInterval = getAs(ordinal)
   override def getMap(ordinal: Int): MapData = getAs(ordinal)
   override def getShape(ordinal: Int): Shape = {
-    val temp = getBinary(ordinal)
-    org.apache.spark.sql.spatial.Polygon.fromWKB(temp)
+    val temp = get(ordinal, ShapeType)
+    temp match {
+      case bytes : Array[Byte] => Polygon.fromWKB(bytes)
+      case shape : Shape => shape
+      case _ => null
+    }
   }
   override def getStruct(ordinal: Int, numFields: Int): InternalRow = getAs(ordinal)
 
