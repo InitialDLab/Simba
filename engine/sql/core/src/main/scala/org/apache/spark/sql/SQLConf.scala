@@ -461,8 +461,8 @@ private[spark] object SQLConf {
         "plan aggregation queries with a single distinct column.")
 
   // Join Parameters
-  val DJ_Spark = stringConf("spark.sql.joins.DJSpark", defaultValue = Some("SJMRDJSpark"))
-  val KJ_SPARK = stringConf("spark.sql.joins.KJSpark", defaultValue = Some("RKJSpark"))
+  val DISTANCE_JION = stringConf("spark.sql.joins.distanceJoin", defaultValue = Some("DJSpark"))
+  val KNN_JOIN = stringConf("spark.sql.joins.knnJoin", defaultValue = Some("RKJSpark"))
 
   // RTree Parameters
   val MAX_ENTRIES_PER_NODE = intConf("spark.sql.spatial.rtree.maxEntriesPerNode", defaultValue = Some(25))
@@ -604,9 +604,9 @@ private[sql] class SQLConf extends Serializable with CatalystConf {
   protected[spark] override def specializeSingleDistinctAggPlanning: Boolean =
     getConf(SPECIALIZE_SINGLE_DISTINCT_AGG_PLANNING)
 
-  private[spark] def DJSpark: String = getConf(DJ_Spark)
+  private[spark] def distanceJoin: String = getConf(DISTANCE_JION)
 
-  private[spark] def kJSpark: String = getConf(KJ_SPARK)
+  private[spark] def knnJoin: String = getConf(KNN_JOIN)
 
   private[spark] def maxEntriesPerNode: Int = getConf(MAX_ENTRIES_PER_NODE)
 

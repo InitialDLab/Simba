@@ -33,7 +33,7 @@ object DistanceJoinExample {
     val sqlContext = new SQLContext(sc)
     sqlContext.setConf("spark.sql.shuffle.partitions", 16.toString)
     sqlContext.setConf("spark.sql.sampleRate", 1.toString)
-    sqlContext.setConf("spark.sql.joins.DJSpark", "SJMRDJSpark")
+    sqlContext.setConf("spark.sql.joins.distanceJoin", "DJSpark")
 
     import sqlContext.implicits._
 

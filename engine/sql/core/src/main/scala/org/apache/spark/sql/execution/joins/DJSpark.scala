@@ -31,11 +31,11 @@ import scala.collection.mutable
   * Created by dong on 1/20/16.
   * Distance Join based on SJMR(Spatial Join MapReduce)
   */
-case class SJMRDJSpark(left_keys: Seq[Expression],
-                       right_keys: Seq[Expression],
-                       l: Literal,
-                       left: SparkPlan,
-                       right: SparkPlan) extends BinaryNode {
+case class DJSpark(left_keys: Seq[Expression],
+                   right_keys: Seq[Expression],
+                   l: Literal,
+                   left: SparkPlan,
+                   right: SparkPlan) extends BinaryNode {
   override def output: Seq[Attribute] = left.output ++ right.output
 
   final val num_partitions = sqlContext.conf.numShufflePartitions

@@ -36,34 +36,34 @@ private[sql] abstract class SparkStrategies extends QueryPlanner[SparkPlan] {
   object SpatialJoinExtractor extends Strategy with PredicateHelper{
     def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
       case ExtractSpatialJoinKeys(leftKeys, rightKeys, k, KNNJoin, left, right) =>
-        sqlContext.conf.kJSpark match {
+        sqlContext.conf.knnJoin match {
           case "RKJSpark" =>
             RKJSpark(leftKeys, rightKeys, k, planLater(left), planLater(right)) :: Nil
           case "CKJSpark" =>
             CKJSpark(leftKeys, rightKeys, k, planLater(left), planLater(right)) :: Nil
           case "VKJSpark" =>
             VKJSpark(leftKeys, rightKeys, k, planLater(left), planLater(right)) :: Nil
-          case "NLKJSpark" =>
-            NLKJSpark(leftKeys, rightKeys, k, planLater(left), planLater(right)) :: Nil
-          case "NLRKJSpark" =>
-            NLRKJSpark(leftKeys, rightKeys, k, planLater(left), planLater(right)) :: Nil
+          case "BKJSpark" =>
+            BKJSpark(leftKeys, rightKeys, k, planLater(left), planLater(right)) :: Nil
+          case "BKJSpark-R" =>
+            BKJSparkR(leftKeys, rightKeys, k, planLater(left), planLater(right)) :: Nil
           case _ =>
             RKJSpark(leftKeys, rightKeys, k, planLater(left), planLater(right)) :: Nil
         }
       case ExtractSpatialJoinKeys(leftKeys, rightKeys, k, ZKNNJoin, left, right) =>
         ZKJSpark(leftKeys, rightKeys, k, planLater(left), planLater(right)) :: Nil
       case ExtractSpatialJoinKeys(leftKeys, rightKeys, r, DistanceJoin, left, right) =>
-        sqlContext.conf.DJSpark match {
+        sqlContext.conf.distanceJoin match {
           case "RDJSpark" =>
             RDJSpark(leftKeys, rightKeys, r, planLater(left), planLater(right)) :: Nil
-          case "SJMRDJSpark" =>
-            SJMRDJSpark(leftKeys, rightKeys, r, planLater(left), planLater(right)) :: Nil
+          case "DJSpark" =>
+            DJSpark(leftKeys, rightKeys, r, planLater(left), planLater(right)) :: Nil
           case "CDJSpark" =>
             CDJSpark(leftKeys, rightKeys, r, planLater(left), planLater(right)) :: Nil
-          case "NLDJSpark" =>
-            NLDJSpark(leftKeys, rightKeys, r, planLater(left), planLater(right)) :: Nil
-          case "NLRDJSpark" =>
-            NLRDJSpark(leftKeys, rightKeys, r, planLater(left), planLater(right)) :: Nil
+          case "BDJSpark" =>
+            BDJSpark(leftKeys, rightKeys, r, planLater(left), planLater(right)) :: Nil
+          case "BDJSpark-R" =>
+            BDJSparkR(leftKeys, rightKeys, r, planLater(left), planLater(right)) :: Nil
           case _ =>
             RDJSpark(leftKeys, rightKeys, r, planLater(left), planLater(right)) :: Nil
         }
