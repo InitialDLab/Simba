@@ -71,7 +71,7 @@ class SparkSQLParser(fallback: String => LogicalPlan) extends AbstractSparkSQLPa
   protected val ON = Keyword("ON")
   protected val USE = Keyword("USE")
   protected val INDEX = Keyword("INDEX")
-  protected val DEINDEX = Keyword("DEINDEX")
+  protected val DROP = Keyword("DROP")
   protected val HASHMAP = Keyword("HASHMAP")
   protected val TREEMAP = Keyword("TREEMAP")
   protected val RTREE = Keyword("RTREE")
@@ -79,7 +79,7 @@ class SparkSQLParser(fallback: String => LogicalPlan) extends AbstractSparkSQLPa
   protected val PERSIST = Keyword("PERSIST")
 
   override protected lazy val start: Parser[LogicalPlan] =
-    index | deindex | persistIndex | loadIndex | cache | uncache | set | show | desc | others
+    index | dropIndex | persistIndex | loadIndex | cache | uncache | set | show | desc | others
 
   private lazy val index: Parser[LogicalPlan] =
     (CREATE ~> INDEX ~> ident) ~ (ON ~> ident ~ ("(" ~> repsep(ident, ",") <~ ")")) ~
@@ -94,12 +94,12 @@ class SparkSQLParser(fallback: String => LogicalPlan) extends AbstractSparkSQLPa
       | HASHMAP       ^^^ HashMapType
       )
 
-  private lazy val deindex: Parser[LogicalPlan] = (
-    DEINDEX ~> ident ~ (ON ~> ident) ^^ {
-      case indexName ~ tableName => DeindexTableByNameCommand(tableName, indexName)
+  private lazy val dropIndex: Parser[LogicalPlan] = (
+    DROP ~> INDEX ~> ident ~ (ON ~> ident) ^^ {
+      case indexName ~ tableName => DropTableIndexByNameCommand(tableName, indexName)
     }
-      | CLEAR ~> INDEX ~> (ON ~> ident) ^^ {
-      case tableName => DeindexTableCommand(tableName)
+      | DROP ~> INDEX ~> (ON ~> ident) ^^ {
+      case tableName => DropTableIndexCommand(tableName)
     }
       | CLEAR ~> INDEX ^^^ ClearIndexCommand
     )
