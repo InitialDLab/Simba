@@ -36,36 +36,36 @@ private[sql] abstract class SparkStrategies extends QueryPlanner[SparkPlan] {
   object SpatialJoinExtractor extends Strategy with PredicateHelper{
     def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
       case ExtractSpatialJoinKeys(leftKeys, rightKeys, k, KNNJoin, left, right) =>
-        sqlContext.conf.knnJoinMethod match {
-          case "RTreeKNNJoin" =>
-            RTreeKNNJoin(leftKeys, rightKeys, k, planLater(left), planLater(right)) :: Nil
-          case "CartesianKNNJoin" =>
-            CartesianKNNJoin(leftKeys, rightKeys, k, planLater(left), planLater(right)) :: Nil
-          case "VoronoiKNNJoin" =>
-            VoronoiKNNJoin(leftKeys, rightKeys, k, planLater(left), planLater(right)) :: Nil
-          case "NestedLoopKNNJoin" =>
-            NestedLoopKNNJoin(leftKeys, rightKeys, k, planLater(left), planLater(right)) :: Nil
-          case "NLRTreeKNNJoin" =>
-            NLRTreeKNNJoin(leftKeys, rightKeys, k, planLater(left), planLater(right)) :: Nil
+        sqlContext.conf.knnJoin match {
+          case "RKJSpark" =>
+            RKJSpark(leftKeys, rightKeys, k, planLater(left), planLater(right)) :: Nil
+          case "CKJSpark" =>
+            CKJSpark(leftKeys, rightKeys, k, planLater(left), planLater(right)) :: Nil
+          case "VKJSpark" =>
+            VKJSpark(leftKeys, rightKeys, k, planLater(left), planLater(right)) :: Nil
+          case "BKJSpark" =>
+            BKJSpark(leftKeys, rightKeys, k, planLater(left), planLater(right)) :: Nil
+          case "BKJSpark-R" =>
+            BKJSparkR(leftKeys, rightKeys, k, planLater(left), planLater(right)) :: Nil
           case _ =>
-            RTreeKNNJoin(leftKeys, rightKeys, k, planLater(left), planLater(right)) :: Nil
+            RKJSpark(leftKeys, rightKeys, k, planLater(left), planLater(right)) :: Nil
         }
       case ExtractSpatialJoinKeys(leftKeys, rightKeys, k, ZKNNJoin, left, right) =>
-        zKNNJoin(leftKeys, rightKeys, k, planLater(left), planLater(right)) :: Nil
+        ZKJSpark(leftKeys, rightKeys, k, planLater(left), planLater(right)) :: Nil
       case ExtractSpatialJoinKeys(leftKeys, rightKeys, r, DistanceJoin, left, right) =>
-        sqlContext.conf.distanceJoinMethod match {
-          case "RTreeDistanceJoin" =>
-            RTreeDistanceJoin(leftKeys, rightKeys, r, planLater(left), planLater(right)) :: Nil
-          case "SJMRDistanceJoin" =>
-            SJMRDistanceJoin(leftKeys, rightKeys, r, planLater(left), planLater(right)) :: Nil
-          case "CartesianDistanceJoin" =>
-            CartesianDistanceJoin(leftKeys, rightKeys, r, planLater(left), planLater(right)) :: Nil
-          case "NestedLoopDistanceJoin" =>
-            NestedLoopDistanceJoin(leftKeys, rightKeys, r, planLater(left), planLater(right)) :: Nil
-          case "NLRTreeDistanceJoin" =>
-            NLRTreeDistanceJoin(leftKeys, rightKeys, r, planLater(left), planLater(right)) :: Nil
+        sqlContext.conf.distanceJoin match {
+          case "RDJSpark" =>
+            RDJSpark(leftKeys, rightKeys, r, planLater(left), planLater(right)) :: Nil
+          case "DJSpark" =>
+            DJSpark(leftKeys, rightKeys, r, planLater(left), planLater(right)) :: Nil
+          case "CDJSpark" =>
+            CDJSpark(leftKeys, rightKeys, r, planLater(left), planLater(right)) :: Nil
+          case "BDJSpark" =>
+            BDJSpark(leftKeys, rightKeys, r, planLater(left), planLater(right)) :: Nil
+          case "BDJSpark-R" =>
+            BDJSparkR(leftKeys, rightKeys, r, planLater(left), planLater(right)) :: Nil
           case _ =>
-            RTreeDistanceJoin(leftKeys, rightKeys, r, planLater(left), planLater(right)) :: Nil
+            RDJSpark(leftKeys, rightKeys, r, planLater(left), planLater(right)) :: Nil
         }
       case _ => Nil
     }
