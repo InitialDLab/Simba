@@ -25,6 +25,10 @@ import com.vividsolutions.jts.io.{WKBWriter, WKBReader, WKTWriter}
   * Note: Only support up to 2 dimension
   */
 case class Polygon(content: JTSPolygon) extends Shape {
+  def this() = {
+    this(null)
+  }
+
   val gf = new GeometryFactory()
 
   override def minDist(other: Shape): Double = {
@@ -92,6 +96,7 @@ object Polygon {
     val gf = new GeometryFactory()
     Polygon(gf.createPolygon(points.map(x => new Coordinate(x.coord(0), x.coord(1)))))
   }
-  def fromJTSPolygon(polygon: JTSPolygon) = new Polygon(polygon)
-  def fromWKB(bytes: Array[Byte]) = new Polygon(new WKBReader().read(bytes).asInstanceOf[JTSPolygon])
+  def fromJTSPolygon(polygon: JTSPolygon): Polygon = new Polygon(polygon)
+  def fromWKB(bytes: Array[Byte]): Polygon =
+    new Polygon(new WKBReader().read(bytes).asInstanceOf[JTSPolygon])
 }
