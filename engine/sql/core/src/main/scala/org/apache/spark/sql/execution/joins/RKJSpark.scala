@@ -30,11 +30,11 @@ import scala.collection.mutable
   * Created by dong on 1/20/16.
   * KNN Join based on Two-Level R-Tree Structure
   */
-case class RTreeKNNJoin(left_keys: Seq[Expression],
-                        right_keys: Seq[Expression],
-                        l: Literal,
-                        left: SparkPlan,
-                        right: SparkPlan) extends BinaryNode {
+case class RKJSpark(left_keys: Seq[Expression],
+                    right_keys: Seq[Expression],
+                    l: Literal,
+                    left: SparkPlan,
+                    right: SparkPlan) extends BinaryNode {
   override def output: Seq[Attribute] = left.output ++ right.output
 
   final val num_partitions = sqlContext.conf.numShufflePartitions

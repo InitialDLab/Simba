@@ -28,11 +28,11 @@ import org.apache.spark.sql.spatial._
   * Created by dong on 1/20/16.
   * Distance Join based on Cartesian Product
   */
-case class CartesianDistanceJoin(left_keys: Seq[Expression],
-                                 right_keys: Seq[Expression],
-                                 l: Literal,
-                                 left: SparkPlan,
-                                 right: SparkPlan) extends BinaryNode {
+case class CDJSpark(left_keys: Seq[Expression],
+                    right_keys: Seq[Expression],
+                    l: Literal,
+                    left: SparkPlan,
+                    right: SparkPlan) extends BinaryNode {
   override def outputPartitioning: Partitioning = left.outputPartitioning
 
   override def output: Seq[Attribute] = left.output ++ right.output

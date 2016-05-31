@@ -342,17 +342,17 @@ case class ShowIndexCommand(tableName: String) extends RunnableCommand {
   }
 }
 
-case class DeindexTableCommand(tableName: String) extends RunnableCommand {
+case class DropTableIndexCommand(tableName: String) extends RunnableCommand {
   override def run(sqlContext: SQLContext): Seq[Row] = {
-    sqlContext.table(tableName).deindex(blocking = false)
+    sqlContext.table(tableName).dropIndex(blocking = false)
     Seq.empty[Row]
   }
   override def output: Seq[Attribute] = Seq.empty
 }
-case class DeindexTableByNameCommand(tableName: String, indexName : String)
+case class DropTableIndexByNameCommand(tableName: String, indexName : String)
   extends RunnableCommand {
   override def run(sqlContext: SQLContext): Seq[Row] = {
-    sqlContext.table(tableName).deindexByName(indexName)
+    sqlContext.table(tableName).dropIndexByName(indexName)
     Seq.empty[Row]
   }
   override def output: Seq[Attribute] = Seq.empty

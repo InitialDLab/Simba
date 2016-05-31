@@ -32,11 +32,11 @@ import scala.util.control.Breaks
   * Created by dong on 1/20/16.
   * KNN Join based on Voronoi Partitioning
   */
-case class VoronoiKNNJoin(left_keys: Seq[Expression],
-                          right_keys: Seq[Expression],
-                          kNN: Literal,
-                          left: SparkPlan,
-                          right: SparkPlan)
+case class VKJSpark(left_keys: Seq[Expression],
+                    right_keys: Seq[Expression],
+                    kNN: Literal,
+                    left: SparkPlan,
+                    right: SparkPlan)
   extends BinaryNode{
   override def output: Seq[Attribute] = left.output ++ right.output
 

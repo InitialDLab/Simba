@@ -31,13 +31,14 @@ Developer Notes
 
 Branch Information
 ------------------
-The `master` branch provides the latest stable version, while the `develop` branch is the main development branch where new features will be merged before ready to release. For legacy reasons, we also keeps branches which archives old versions of Simba, which is developed based on former Spark versions, in the branches named `simba-spark-x.x`. Note that we will only integrate latest features into `master` and `develop` branches. Please make sure you checkout the correct branch before start using it.
+The `master` branch provides the latest stable version, while the `develop` branch is the main development branch where new features will be merged before ready to release. For legacy reasons, we also keep branches which archives old versions of Simba, which is developed based on former Spark versions, in the branches named `simba-spark-x.x`. Note that we will only integrate latest features into `master` and `develop` branches. Please make sure you checkout the correct branch before start using it.
 
 Contributors
 ------------
 - Dong Xie: dongx [at] cs [dot] utah [dot] edu
 - Gefei Li: oizz01 [at] sjtu [dot] edu [dot] cn
 - Liang Zhou: nichozl [at] sjtu [dot] edu [dot] cn
+- Zhongpu Chen: chenzhongpu [at] sjtu [dot] edu [dot] cn
 - Feifei Li: lifeifei [at] cs [dot] utah [dot] edu
 - Bin Yao: yaobin [at] cs [dot] sjtu [dot] edu [dot] cn
 - Minyi Guo: guo-my [at] cs [dot] sjtu [dot] edu [dot] cn

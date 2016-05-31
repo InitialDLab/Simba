@@ -20,26 +20,25 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.execution.{BinaryNode, SparkPlan}
-import org.apache.spark.sql.index.RTree
 import org.apache.spark.sql.partitioner.MapDPartition
-import org.apache.spark.sql.spatial.Point
+import org.apache.spark.sql.spatial._
+import org.apache.spark.util.BoundedPriorityQueue
 
 import scala.collection.mutable
 import scala.util.Random
 
 /**
   * Created by dong on 1/20/16.
-  * KNN Join based on Nested Loop + Local R-Tree
+  * KNN Join based on Block Nested Loop Approach
   */
-case class NLRTreeKNNJoin(left_keys: Seq[Expression],
-                          right_keys: Seq[Expression],
-                          l: Literal,
-                          left: SparkPlan,
-                          right: SparkPlan) extends BinaryNode {
+case class BKJSpark(left_keys: Seq[Expression],
+                    right_keys: Seq[Expression],
+                    l: Literal,
+                    left: SparkPlan,
+                    right: SparkPlan) extends BinaryNode {
   override def output: Seq[Attribute] = left.output ++ right.output
 
   final val num_partitions = sqlContext.conf.numShufflePartitions
-  final val max_entries_per_node = sqlContext.conf.maxEntriesPerNode
   final val k = l.value.asInstanceOf[Number].intValue()
 
   private class DisOrdering extends Ordering[(InternalRow, Double)] {
@@ -72,28 +71,29 @@ case class NLRTreeKNNJoin(left_keys: Seq[Expression],
       while (iter.hasNext) {
         val data = iter.next()
         if (data._2._1 == 0) {
-          val tmp = new Point(left_keys.map(x => BindReferences.bindReference(x, left.output)
-            .eval(data._2._2).asInstanceOf[Number].doubleValue()).toArray)
-          left_data += ((tmp, data._2._2))
+          val tmp_point = new Point (left_keys.map(x =>
+            BindReferences.bindReference(x, left.output).eval(data._2._2)
+            .asInstanceOf[Number].doubleValue()).toArray)
+          left_data += ((tmp_point, data._2._2))
         } else {
-          val tmp = new Point(right_keys.map(x => BindReferences.bindReference(x, right.output)
-            .eval(data._2._2).asInstanceOf[Number].doubleValue()).toArray)
-          right_data += ((tmp, data._2._2))
+          val tmp_point = new Point (right_keys.map(x =>
+            BindReferences.bindReference(x, right.output).eval(data._2._2)
+            .asInstanceOf[Number].doubleValue()).toArray)
+          right_data += ((tmp_point, data._2._2))
         }
       }
 
       val joined_ans = mutable.ListBuffer[(InternalRow, Array[(InternalRow, Double)])]()
 
-      if (right_data.nonEmpty) {
-        val right_rtree = RTree(right_data.map(_._1).zipWithIndex.toArray, max_entries_per_node)
-        left_data.foreach(left =>
-          joined_ans += ((left._2, right_rtree.kNN(left._1, k, keepSame = false)
-            .map(x => (right_data(x._2)._2, x._1.minDist(left._1)))))
-        )
-      }
-
+      left_data.foreach(left => {
+        var pq = new BoundedPriorityQueue[(InternalRow, Double)](k)(new DisOrdering)
+        right_data.foreach(right => pq += ((right._2, right._1.minDist(left._1))))
+        joined_ans += ((left._2, pq.toArray))
+      })
       joined_ans.iterator
     }.reduceByKey((left, right) => (left ++ right).sortWith(_._2 < _._2).take(k), num_partitions)
-      .flatMap { now => now._2.map(x => new JoinedRow(now._1, x._1)) }
+    .flatMap {
+      now => now._2.map(x => new JoinedRow(now._1, x._1))
+    }
   }
 }
