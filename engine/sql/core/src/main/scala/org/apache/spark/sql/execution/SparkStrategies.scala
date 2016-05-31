@@ -327,7 +327,7 @@ private[sql] abstract class SparkStrategies extends QueryPlanner[SparkPlan] {
 
   object IndexRelationScans extends Strategy with PredicateHelper{
     import org.apache.spark.sql.catalyst.expressions._
-    val indexInfos = sqlContext.indexManager.getIndexInfo
+    lazy val indexInfos = sqlContext.indexManager.getIndexInfo
     // lookup
     def lookupIndexInfo(attributes: Seq[Attribute]): IndexInfo = {
       var result: IndexInfo = null
