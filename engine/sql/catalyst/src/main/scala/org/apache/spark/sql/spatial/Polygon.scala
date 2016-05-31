@@ -16,8 +16,8 @@
 
 package org.apache.spark.sql.spatial
 
-import com.vividsolutions.jts.geom.{Coordinate, Envelope, GeometryFactory, Polygon => JTSPolygon}
-import com.vividsolutions.jts.io.WKTWriter
+import com.vividsolutions.jts.geom.{Polygon => JTSPolygon, Geometry, Coordinate, Envelope, GeometryFactory}
+import com.vividsolutions.jts.io.{WKBWriter, WKBReader, WKTWriter}
 
 /**
   * Created by Dong Xie on 3/16/2016.
@@ -78,6 +78,7 @@ case class Polygon(content: JTSPolygon) extends Shape {
   def minDist(poly: Polygon): Double = content.distance(poly.content)
 
   override def toString: String = new WKTWriter().write(content)
+  def toWKB: Array[Byte] = new WKBWriter().write(content)
 
   def getMBR: MBR = {
     val envelope = content.getEnvelopeInternal
@@ -91,4 +92,6 @@ object Polygon {
     val gf = new GeometryFactory()
     Polygon(gf.createPolygon(points.map(x => new Coordinate(x.coord(0), x.coord(1)))))
   }
+  def fromJTSPolygon(polygon: JTSPolygon) = new Polygon(polygon)
+  def fromWKB(bytes: Array[Byte]) = new Polygon(new WKBReader().read(bytes).asInstanceOf[JTSPolygon])
 }

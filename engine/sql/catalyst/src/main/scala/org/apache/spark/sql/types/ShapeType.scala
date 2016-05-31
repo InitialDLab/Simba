@@ -28,7 +28,7 @@ class ShapeType private() extends DataType{
 
   override def defaultSize: Int = 4096
 
-  override def simpleString: String = "shape"
+  override def simpleString: String = "Shape"
 }
 
 case object ShapeType extends ShapeType

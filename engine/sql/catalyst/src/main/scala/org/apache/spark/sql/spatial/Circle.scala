@@ -16,6 +16,7 @@
 
 package org.apache.spark.sql.spatial
 
+
 /**
   * Created by dong on 3/16/16.
   */
@@ -63,7 +64,7 @@ case class Circle(center: Point, radius: Double) extends Shape {
 
   def intersects(other: Circle): Boolean = other.center.minDist(center) <= other.radius + radius
 
-  def getMBR: MBR = new MBR(center.shift(-radius), center.shift(radius))
+  def getMBR: MBR = new MBR(center.shift(-math.sqrt(2) * radius), center.shift(math.sqrt(2) * radius))
 
   override def toString: String = "CIRCLE(" + center.toString + "," + radius + ")"
 }

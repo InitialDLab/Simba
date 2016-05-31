@@ -20,6 +20,8 @@ package org.apache.spark.sql.execution.datasources.parquet
 import java.math.{BigDecimal, BigInteger}
 import java.nio.ByteOrder
 
+import org.apache.spark.sql.spatial.Shape
+
 import scala.collection.JavaConverters._
 import scala.collection.mutable.ArrayBuffer
 
@@ -57,6 +59,7 @@ private[parquet] trait ParentContainerUpdater {
   def setLong(value: Long): Unit = set(value)
   def setFloat(value: Float): Unit = set(value)
   def setDouble(value: Double): Unit = set(value)
+  def setShape(value: Shape): Unit = set(value)
 }
 
 /** A no-op updater used for root converter (who doesn't have a parent). */
@@ -161,6 +164,7 @@ private[parquet] class CatalystRowConverter(
     override def setLong(value: Long): Unit = row.setLong(ordinal, value)
     override def setDouble(value: Double): Unit = row.setDouble(ordinal, value)
     override def setFloat(value: Float): Unit = row.setFloat(ordinal, value)
+    override def setShape(value: Shape): Unit = row.setShape(ordinal, value)
   }
 
   private val currentRow = new SpecificMutableRow(catalystType.map(_.dataType))
