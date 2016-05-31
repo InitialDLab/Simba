@@ -27,7 +27,7 @@ final case class Point(coord: Array[Double]) extends Shape {
     other match {
       case p: Point => p == this
       case mbr: MBR => mbr.contains(this)
-      case cir: MBR => cir.contains(this)
+      case cir: Circle => cir.contains(this)
       case poly: Polygon => poly.contains(this)
     }
   }
