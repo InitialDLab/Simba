@@ -17,6 +17,7 @@
 package org.apache.spark.sql.index
 
 import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.analysis.MultiInstanceRelation
 import org.apache.spark.sql.catalyst.expressions.{Attribute, BindReferences}
@@ -115,13 +116,14 @@ private[sql] case class TreeMapIndexedRelation(
   table_name: Option[String],
   column_keys: List[Attribute],
   index_name: String)(var _indexedRDD: RDD[PackedPartitionWithIndex] = null,
-                      var range_bounds: Array[Double] = null)
+                      var range_bounds: Array[Double] = null, val sqlContext: SQLContext = null)
   extends IndexedRelation with MultiInstanceRelation {
   require(column_keys.length == 1)
-  val numShufflePartitions = child.sqlContext.conf.numShufflePartitions
-  val maxEntriesPerNode = child.sqlContext.conf.maxEntriesPerNode
-  val sampleRate = child.sqlContext.conf.sampleRate
-  val transferThreshold = child.sqlContext.conf.transferThreshold
+  val _sqlContext = if (sqlContext == null) child.sqlContext else sqlContext
+  val numShufflePartitions = _sqlContext.conf.numShufflePartitions
+  val maxEntriesPerNode = _sqlContext.conf.maxEntriesPerNode
+  val sampleRate = _sqlContext.conf.sampleRate
+  val transferThreshold = _sqlContext.conf.transferThreshold
 
   if (_indexedRDD == null) {
     buildIndex()
@@ -160,7 +162,7 @@ private[sql] case class TreeMapIndexedRelation(
   @transient override lazy val statistics = Statistics(
     // TODO: Instead of returning a default value here, find a way to return a meaningful size
     // estimate for RDDs. See PR 1238 for more discussions.
-    sizeInBytes = BigInt(child.sqlContext.conf.defaultSizeInBytes)
+    sizeInBytes = BigInt(_sqlContext.conf.defaultSizeInBytes)
   )
 }
 
@@ -170,7 +172,7 @@ private[sql] case class RTreeIndexedRelation(
   table_name: Option[String],
   column_keys: List[Attribute],
   index_name: String)(var _indexedRDD: RDD[PackedPartitionWithIndex] = null,
-                      var global_rtree: RTree = null)
+                      var global_rtree: RTree = null, val sqlContext: SQLContext = null)
   extends IndexedRelation with MultiInstanceRelation {
   private def checkKeys: Boolean = {
     for (i <- column_keys.indices)
@@ -182,10 +184,11 @@ private[sql] case class RTreeIndexedRelation(
   }
   require(checkKeys)
 
-  val numShufflePartitions = child.sqlContext.conf.numShufflePartitions
-  val maxEntriesPerNode = child.sqlContext.conf.maxEntriesPerNode
-  val sampleRate = child.sqlContext.conf.sampleRate
-  val transferThreshold = child.sqlContext.conf.transferThreshold
+  val _sqlContext = if (sqlContext != null) sqlContext else child.sqlContext
+  val numShufflePartitions = _sqlContext.conf.numShufflePartitions
+  val maxEntriesPerNode = _sqlContext.conf.maxEntriesPerNode
+  val sampleRate = _sqlContext.conf.sampleRate
+  val transferThreshold = _sqlContext.conf.transferThreshold
 
   if (_indexedRDD == null) {
     buildIndex()
@@ -233,6 +236,6 @@ private[sql] case class RTreeIndexedRelation(
   @transient override lazy val statistics = Statistics(
     // TODO: Instead of returning a default value here, find a way to return a meaningful size
     // estimate for RDDs. See PR 1238 for more discussions.
-    sizeInBytes = BigInt(child.sqlContext.conf.defaultSizeInBytes)
+    sizeInBytes = BigInt(_sqlContext.conf.defaultSizeInBytes)
   )
 }

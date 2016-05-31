@@ -127,7 +127,7 @@ private[sql] class IndexManager extends Logging {
       indexedData += IndexedData(indexName, plan,
         RTreeIndexedRelation(rtreeRelation.output, rtreeRelation.child,
           rtreeRelation.table_name, rtreeRelation.column_keys,
-          rtreeRelation.index_name)(rdd, rtreeRelation.global_rtree))
+          rtreeRelation.index_name)(rdd, rtreeRelation.global_rtree, sqlContext))
     } else {
       val treeMapRelation = sqlContext.sparkContext
         .objectFile[TreeMapIndexedRelation](fileName + "/treeMapRelation").collect().head

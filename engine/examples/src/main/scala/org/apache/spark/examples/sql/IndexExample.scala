@@ -40,7 +40,7 @@ object IndexExample {
     var leftData = ListBuffer[PointData]()
     var rightData = ListBuffer[PointData]()
 
-    for (i <- 1 to 1000){
+    for (i <- 1 to 1000000){
       leftData += PointData( i + 0.0, i + 0.0, i + 0.0, "a = " + i)
       rightData += PointData(i + 0.0, i + 0.0, i + 0.0, "a = " + (i + 1))
     }
@@ -56,15 +56,22 @@ object IndexExample {
     sqlContext.sql("SHOW INDEX ON point1")
 
     println("----------------------------")
+    val sqlQuery = "SELECT x FROM point1 WHERE POINT(point1.x, point1.y, point1.z) " +
+      "IN KNN(POINT(10000, 10000, 10000), 5001) ORDER BY x"
 
-    val sqlQuery = "SELECT * FROM point1 " +
-      "WHERE POINT(point1.x, point1.y, point1.z) " +
-      "IN RANGE( POINT(100, 222, 222), POINT(300, 333, 333))" +
-      "ORDER BY x"
+    sqlContext.persistIndex("pointIndex", "index_persist")
+    println("-------------before---------")
+    sqlContext.sql("SHOW INDEX ON point1")
+    sqlContext.clearIndex()
+    println("------------after-----------")
+    sqlContext.sql("SHOW INDEX ON point1")
+
+    sqlContext.loadIndex("pointIndex", "index_persist")
+    println("-------------loading------------")
     val df = sqlContext.sql(sqlQuery)
-    println(df.queryExecution)
 
-    df.collect().foreach(println)
+    sqlContext.sql("SHOW INDEX ON point1")
+    df.collect().foreach(println)  // 7500 - 12500
     sc.stop()
   }
 }
