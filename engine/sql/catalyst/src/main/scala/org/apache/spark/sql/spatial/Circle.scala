@@ -21,12 +21,23 @@ package org.apache.spark.sql.spatial
   * Created by dong on 3/16/16.
   */
 case class Circle(center: Point, radius: Double) extends Shape {
+  override def intersects(other: Shape): Boolean = {
+    other match {
+      case p: Point => contains(p)
+      case mbr: MBR => intersects(mbr)
+      case cir: Circle => intersects(cir)
+      case poly: Polygon => poly.intersects(this)
+      case seg: LineSegment => seg.intersects(this)
+    }
+  }
+
   override def minDist(other: Shape): Double = {
     other match {
       case p: Point => minDist(p)
       case mbr: MBR => minDist(mbr)
       case cir: Circle => minDist(cir)
       case poly: Polygon => poly.minDist(this)
+      case seg: LineSegment => seg.minDist(this)
     }
   }
 
@@ -48,23 +59,14 @@ case class Circle(center: Point, radius: Double) extends Shape {
     else center.minDist(other.center) - radius - other.radius
   }
 
-
-  override def intersects(other: Shape): Boolean = {
-    other match {
-      case p: Point => contains(p)
-      case mbr: MBR => intersects(mbr)
-      case cir: Circle => intersects(cir)
-      case poly: Polygon => poly.intersects(this)
-    }
-  }
-
   def contains(p: Point): Boolean = p.minDist(center) <= radius
 
   def intersects(other: MBR): Boolean = center.minDist(other) <= radius
 
   def intersects(other: Circle): Boolean = other.center.minDist(center) <= other.radius + radius
 
-  def getMBR: MBR = new MBR(center.shift(-math.sqrt(2) * radius), center.shift(math.sqrt(2) * radius))
+  def getMBR: MBR = new MBR(center.shift(-math.sqrt(2) * radius),
+                            center.shift(math.sqrt(2) * radius))
 
   override def toString: String = "CIRCLE(" + center.toString + "," + radius + ")"
 }

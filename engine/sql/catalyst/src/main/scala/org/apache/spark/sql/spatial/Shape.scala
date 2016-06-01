@@ -27,10 +27,11 @@ abstract class Shape extends Serializable {
   def intersects(other: Shape): Boolean
 
   def getMBR: MBR
+}
 
-  final def apply(g: Geometry) = g match {
+object Shape {
+  final def apply(g: Geometry): Shape = g match {
     case jtsPolygon : JTSPolygon => new Polygon(jtsPolygon)
-    case _  => null
+    case _ => null
   }
-
 }
