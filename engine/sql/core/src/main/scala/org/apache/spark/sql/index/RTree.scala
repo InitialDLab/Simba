@@ -184,8 +184,7 @@ case class RTree(root: RTreeNode) extends Index with Serializable {
           case RTreeNode(_, m_child, isLeaf) =>
             m_child.foreach {
               case entry @ RTreeInternalEntry(mbr, node) =>
-                if (isLeaf) pq.enqueue((entry, distFunc(query, mbr)))
-                else pq.enqueue((node, distFunc(query, mbr)))
+                pq.enqueue((node, distFunc(query, mbr)))
               case entry @ RTreeLeafEntry(mbr, m_data, size) =>
                 require(mbr.isInstanceOf[MBR])
                 pq.enqueue((entry, distFunc(query, mbr.asInstanceOf[MBR])))
@@ -220,8 +219,10 @@ case class RTree(root: RTreeNode) extends Index with Serializable {
           case RTreeNode(_, m_child, isLeaf) =>
             m_child.foreach {
               case entry @ RTreeInternalEntry(mbr, node) =>
-                if (isLeaf) pq.enqueue((entry, distFunc(query, mbr)))
-                else pq.enqueue((node, distFunc(query, mbr)))
+                pq.enqueue((node, distFunc(query, mbr)))
+              case entry @ RTreeLeafEntry(mbr, m_data, size) =>
+                require(mbr.isInstanceOf[MBR])
+                pq.enqueue((entry, distFunc(query, mbr.asInstanceOf[MBR])))
             }
           case RTreeLeafEntry(mbr, m_data, size) =>
             cnt += size
