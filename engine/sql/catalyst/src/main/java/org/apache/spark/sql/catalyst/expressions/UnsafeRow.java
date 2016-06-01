@@ -454,7 +454,7 @@ public final class UnsafeRow extends MutableRow implements Externalizable, KryoS
               Platform.BYTE_ARRAY_OFFSET,
               size
       );
-      return KryoShapeSerializer.deserialize(bytes);
+      return ShapeSerializer.deserialize(bytes);
     }
   }
 

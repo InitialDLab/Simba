@@ -179,7 +179,7 @@ case class RTree(root: RTreeNode) extends Index with Serializable {
       while (pq.nonEmpty) {
         val now = pq.dequeue()
         if (cnt >= k && (!keepSame || now._2 > kNN_dis)) break()
-        
+
         now._1 match {
           case RTreeNode(_, m_child, isLeaf) =>
             m_child.foreach {

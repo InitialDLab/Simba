@@ -16,8 +16,9 @@
 
 package org.apache.spark.sql.spatial
 
-import com.vividsolutions.jts.geom.{Coordinate, Envelope, GeometryFactory, Polygon => JTSPolygon}
-import com.vividsolutions.jts.io.WKTWriter
+import com.vividsolutions.jts.geom.{Polygon => JTSPolygon, LineSegment => JTSLineSegment}
+import com.vividsolutions.jts.geom.{Coordinate, Envelope, GeometryFactory}
+import com.vividsolutions.jts.io.{WKBWriter, WKBReader, WKTWriter}
 
 /**
   * Created by Dong Xie on 3/16/2016.
@@ -25,6 +26,10 @@ import com.vividsolutions.jts.io.WKTWriter
   * Note: Only support up to 2 dimension
   */
 case class Polygon(content: JTSPolygon) extends Shape {
+  def this() = {
+    this(null)
+  }
+
   val gf = new GeometryFactory()
 
   override def minDist(other: Shape): Double = {
@@ -61,6 +66,12 @@ case class Polygon(content: JTSPolygon) extends Shape {
 
   def intersects(poly: Polygon): Boolean = content.intersects(poly.content)
 
+  def intersects(seg: LineSegment): Boolean = {
+    val start = new Coordinate(seg.start.coord(0), seg.start.coord(1))
+    val end = new Coordinate(seg.end.coord(0), seg.end.coord(1))
+    content.intersects(gf.createLineString(Array(start, end)))
+  }
+
   def minDist(p: Point): Double = {
     require(p.coord.length == 2)
     content.distance(gf.createPoint(new Coordinate(p.coord(0), p.coord(1))))
@@ -77,7 +88,14 @@ case class Polygon(content: JTSPolygon) extends Shape {
 
   def minDist(poly: Polygon): Double = content.distance(poly.content)
 
+  def minDist(seg: LineSegment): Double = {
+    val start = new Coordinate(seg.start.coord(0), seg.start.coord(1))
+    val end = new Coordinate(seg.end.coord(0), seg.end.coord(1))
+    content.distance(gf.createLineString(Array(start, end)))
+  }
+
   override def toString: String = new WKTWriter().write(content)
+  def toWKB: Array[Byte] = new WKBWriter().write(content)
 
   def getMBR: MBR = {
     val envelope = content.getEnvelopeInternal
@@ -91,4 +109,7 @@ object Polygon {
     val gf = new GeometryFactory()
     Polygon(gf.createPolygon(points.map(x => new Coordinate(x.coord(0), x.coord(1)))))
   }
+  def fromJTSPolygon(polygon: JTSPolygon): Polygon = new Polygon(polygon)
+  def fromWKB(bytes: Array[Byte]): Polygon =
+    new Polygon(new WKBReader().read(bytes).asInstanceOf[JTSPolygon])
 }

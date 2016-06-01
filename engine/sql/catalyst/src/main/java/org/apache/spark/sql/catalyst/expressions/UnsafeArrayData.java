@@ -262,7 +262,7 @@ public class UnsafeArrayData extends ArrayData {
     final int size = getElementSize(offset, ordinal);
     final byte[] bytes = new byte[size];
     Platform.copyMemory(baseObject, baseOffset + offset, bytes, Platform.BYTE_ARRAY_OFFSET, size);
-    return KryoShapeSerializer.deserialize(bytes);
+    return ShapeSerializer.deserialize(bytes);
   }
 
   @Override

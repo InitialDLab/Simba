@@ -149,6 +149,7 @@ class CodeGenContext {
       case t: StructType => s"$input.getStruct($ordinal, ${t.size})"
       case _: ArrayType => s"$input.getArray($ordinal)"
       case _: MapType => s"$input.getMap($ordinal)"
+      case _: ShapeType => s"$input.getShape($ordinal)"
       case NullType => "null"
       case udt: UserDefinedType[_] => getValue(input, udt.sqlType, ordinal)
       case _ => s"($jt)$input.get($ordinal, null)"
@@ -198,6 +199,7 @@ class CodeGenContext {
     case _: StructType => "InternalRow"
     case _: ArrayType => "ArrayData"
     case _: MapType => "MapData"
+    case _: ShapeType => "org.apache.spark.sql.spatial.Shape" // [Gefei Add here]
     case udt: UserDefinedType[_] => javaType(udt.sqlType)
     case ObjectType(cls) if cls.isArray => s"${javaType(ObjectType(cls.getComponentType))}[]"
     case ObjectType(cls) => cls.getName
@@ -534,7 +536,8 @@ abstract class CodeGenerator[InType <: AnyRef, OutType <: AnyRef] extends Loggin
       classOf[UnsafeArrayData].getName,
       classOf[MapData].getName,
       classOf[UnsafeMapData].getName,
-      classOf[MutableRow].getName
+      classOf[MutableRow].getName,
+      classOf[ShapeType].getName
     ))
     evaluator.setExtendedClass(classOf[GeneratedClass])
 

@@ -26,20 +26,31 @@ case class MBR(low: Point, high: Point) extends Shape {
   require(low.coord.length == high.coord.length)
   require(low <= high)
 
-  def this(low_x: Double, low_y: Double, high_x: Double, high_y: Double) {
-    this(Point(Array(low_x, low_y)), Point(Array(high_x, high_y)))
-  }
-
-  val centroid = new Point(low.coord.zip(high.coord).map(x => x._1 + x._2 / 2.0))
-
   override def intersects(other: Shape): Boolean = {
     other match {
       case p: Point => contains(p)
       case mbr: MBR => intersects(mbr)
       case cir: Circle => cir.intersects(this)
       case poly: Polygon => poly.intersects(this)
+      case seg: LineSegment => seg.intersects(this)
     }
   }
+
+  override def minDist(other: Shape): Double = {
+    other match {
+      case p: Point => minDist(p)
+      case mbr: MBR => minDist(mbr)
+      case cir: Circle => cir.minDist(this)
+      case poly: Polygon => poly.minDist(this)
+      case seg: LineSegment => seg.minDist(this)
+    }
+  }
+
+  def this(low_x: Double, low_y: Double, high_x: Double, high_y: Double) {
+    this(Point(Array(low_x, low_y)), Point(Array(high_x, high_y)))
+  }
+
+  val centroid = new Point(low.coord.zip(high.coord).map(x => x._1 + x._2 / 2.0))
 
   def intersects(other: MBR): Boolean = {
     require(low.coord.length == other.low.coord.length)
@@ -57,15 +68,6 @@ case class MBR(low: Point, high: Point) extends Shape {
         return false
       }
     true
-  }
-
-  override def minDist(other: Shape): Double = {
-    other match {
-      case p: Point => minDist(p)
-      case mbr: MBR => minDist(mbr)
-      case cir: Circle => cir.minDist(this)
-      case poly: Polygon => poly.minDist(this)
-    }
   }
 
   def minDist(p: Point): Double = {
@@ -119,3 +121,4 @@ case class MBR(low: Point, high: Point) extends Shape {
 
   override def toString: String = "(" + low.toString + "," + high.toString + ")"
 }
+

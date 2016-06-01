@@ -295,9 +295,9 @@ object GenerateUnsafeProjection extends CodeGenerator[Seq[Expression], UnsafePro
         $bufferHolder.reset();
         $subexprReset
         ${writeExpressionsToBuffer(ctx, ctx.INPUT_ROW, exprEvals, exprTypes, bufferHolder)}
-
         $result.pointTo($bufferHolder.buffer, ${expressions.length}, $bufferHolder.totalSize());
       """
+
     GeneratedExpressionCode(code, "false", result)
   }
 
