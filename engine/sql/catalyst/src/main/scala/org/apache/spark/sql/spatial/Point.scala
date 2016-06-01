@@ -29,6 +29,7 @@ final case class Point(coord: Array[Double]) extends Shape {
       case mbr: MBR => mbr.contains(this)
       case cir: Circle => cir.contains(this)
       case poly: Polygon => poly.contains(this)
+      case seg: LineSegment => seg.contains(this)
     }
   }
 
@@ -38,6 +39,7 @@ final case class Point(coord: Array[Double]) extends Shape {
       case mbr: MBR => mbr.minDist(this)
       case cir: Circle => cir.minDist(this)
       case poly: Polygon => poly.minDist(this)
+      case seg: LineSegment => seg.minDist(this)
     }
   }
 
@@ -75,5 +77,5 @@ final case class Point(coord: Array[Double]) extends Shape {
     s + ")"
   }
 
-  def getMBR = new MBR(this, this)
+  def getMBR: MBR = new MBR(this, this)
 }

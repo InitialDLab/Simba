@@ -25,6 +25,7 @@ import java.io.*;
 
 /**
  * Created by dong on 3/24/16.
+ * This is a customized serializer for our Shape objects.
  */
 public class ShapeSerializer {
     static private Kryo kryo = new Kryo();
@@ -35,6 +36,7 @@ public class ShapeSerializer {
         kryo.register(MBR.class, new KryoShapeSerializer());
         kryo.register(Polygon.class, new KryoShapeSerializer());
         kryo.register(Circle.class, new KryoShapeSerializer());
+        kryo.register(LineSegment.class, new KryoShapeSerializer());
     }
 
     public static Shape deserialize(byte[] data) {
@@ -49,7 +51,6 @@ public class ShapeSerializer {
         Output output = new Output(out);
         kryo.writeObject(output, o);
         output.flush();
-        System.out.println("size: " + out.toByteArray().length);
         return out.toByteArray();
     }
 }

@@ -50,16 +50,18 @@ object ShapeTypeTest {
 
     val df2 = sqlContext.createDataFrame(rdd.map(org.apache.spark.sql.Row.fromTuple),
       schema).show(5)
-    rdd.toDF.registerTempTable("polygons")
+    rdd.toDF().registerTempTable("polygons")
     sqlContext.sql("SELECT * FROM polygons").show(5) // sql test
 
 
-    val rdd2 = sc.parallelize(1 to 10 map(i => Record(i, Point(Array(i, i, i)))))
-    rdd2.toDF.show(5) // implicit convert
+    val rdd2 = sc.parallelize(1 to 10 map {i =>
+      Record(i, LineSegment(Point(Array(i, i)), Point(Array(i, i - 1))))
+    })
+    rdd2.toDF().show(5) // implicit convert
     sqlContext.createDataFrame(rdd2.map(org.apache.spark.sql.Row.fromTuple),
       schema).show(5) // explicit covert
-    rdd2.toDF.registerTempTable("points")
-    sqlContext.sql("SELECT * FROM points").show(5) // sql
+    rdd2.toDF().registerTempTable("segs")
+    sqlContext.sql("SELECT * FROM segs").show(5) // sql
 
     println("Finished.")
   }
