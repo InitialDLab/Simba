@@ -480,6 +480,11 @@ private[spark] object SQLConf {
   val TRANSFER_THRESHOLD = longConf("spark.sql.transferThreshold", defaultValue =
     Some(800 * 1024 * 1024))
 
+  // Selectivity threshold to determine whether full sanning,
+  // rather than leveraging indexes
+  val INDEX_SELECTIVITY_THRESHOLD =
+    doubleConf("spark.sql.index.selectivityThreshold", defaultValue = Some(0.8))
+
   // Threshold determine where rtree index using local index or brute force filter
   val INDEX_SIZE_THRESHOLD = intConf("spark.sql.index.threshold", defaultValue = Some(1000))
 
@@ -617,6 +622,8 @@ private[sql] class SQLConf extends Serializable with CatalystConf {
   private[spark] def thetaBoost: Int = getConf(THETA_BOOST)
 
   private[spark] def sampleRate: Double = getConf(SAMPLE_RATE)
+
+  private[spark] def indexSelectivityThreshold : Double = getConf(INDEX_SELECTIVITY_THRESHOLD)
 
   private[spark] def indexSizeThreshold: Int = getConf(INDEX_SIZE_THRESHOLD)
 
