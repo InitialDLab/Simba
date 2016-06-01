@@ -181,7 +181,7 @@ case class RTree(root: RTreeNode) extends Index with Serializable {
         if (cnt >= k && (!keepSame || now._2 > kNN_dis)) break()
 
         now._1 match {
-          case RTreeNode(_, m_child, isLeaf) =>
+          case RTreeNode(_, m_child, _) =>
             m_child.foreach {
               case entry @ RTreeInternalEntry(mbr, node) =>
                 pq.enqueue((node, distFunc(query, mbr)))
@@ -216,7 +216,7 @@ case class RTree(root: RTreeNode) extends Index with Serializable {
         if (cnt >= k && (!keepSame || now._2 > kNN_dis)) break()
 
         now._1 match {
-          case RTreeNode(_, m_child, isLeaf) =>
+          case RTreeNode(_, m_child, _) =>
             m_child.foreach {
               case entry @ RTreeInternalEntry(mbr, node) =>
                 pq.enqueue((node, distFunc(query, mbr)))
