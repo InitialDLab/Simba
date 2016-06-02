@@ -244,7 +244,9 @@ private[sql] case class IndexedRelationScan(
               hash_set ++= rtree.global_rtree.circleRangeConj(cir_ranges).map(_._2)
               val pruned = new PartitionPruningRDD(rtree._indexedRDD, hash_set.contains)
 
-              val selectivityThreshold = sqlContext.conf.indexSelectivityThreshold
+              val selectivity_enable = sqlContext.conf.indexSelectivityEnable
+              val selectivity_threshold = sqlContext.conf.indexSelectivityThreshold
+              val selectivity_level = sqlContext.conf.indexSelectivityLevel
 
               val tmp_rdd = pruned.flatMap {packed =>
                 val index = packed.index.asInstanceOf[RTree]
@@ -254,22 +256,20 @@ private[sql] case class IndexedRelationScan(
                     queryMBR.contains(root_mbr.high) &&
                     cir_ranges.forall(x => Dist.furthest(x._1, root_mbr) <= x._2)
                   if (!perfect_cover) {
-                    val selectivity_range = index.root.m_mbr.intersectRadio(queryMBR)
-                    if (selectivity_range > selectivityThreshold) {
-                      if (selectivity_range == 1.0) {
-                        // queryMBR is large enough: queryMBR covers tree completely or no queryMBR
-                        index.circleRangeConj(cir_ranges).map(x => packed.data(x._2))
-                      } else {
-                        packed.data.filter { row =>
-                          val tmp_point = new Point(
-                            column_keys.map(x => BindReferences.bindReference(x, relation.output)
-                              .eval(row).asInstanceOf[Number].doubleValue()).toArray
-                          )
-                          queryMBR.contains(tmp_point)
-                        }.intersect(index.circleRangeConj(cir_ranges).map(x => packed.data(x._2)))
-                      }
+                    val range_res = index.limitedLevelRange(queryMBR,
+                      selectivity_threshold,
+                      selectivity_level,
+                      selectivity_enable)
+                    if (range_res.isEmpty) {
+                      packed.data.filter { row =>
+                        val tmp_point = new Point(
+                          column_keys.map(x => BindReferences.bindReference(x, relation.output)
+                            .eval(row).asInstanceOf[Number].doubleValue()).toArray
+                        )
+                        queryMBR.contains(tmp_point)
+                      }.intersect(index.circleRangeConj(cir_ranges).map(x => packed.data(x._2)))
                     } else {
-                      index.range(queryMBR).map(x => packed.data(x._2))
+                      range_res.get.map(x => packed.data(x._2))
                         .intersect(index.circleRangeConj(cir_ranges).map(x => packed.data(x._2)))
                     }
                   } else packed.data

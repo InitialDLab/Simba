@@ -16,8 +16,6 @@
 
 package org.apache.spark.sql.spatial
 
-import scala.collection.mutable.ListBuffer
-
 /**
  * Created by dong on 1/15/16.
  * Multi-Dimensional Minimum Bounding Box
@@ -100,22 +98,17 @@ case class MBR(low: Point, high: Point) extends Shape {
 
   def intersectRadio(other: MBR) : Double = {
     require(low.coord.length == other.low.coord.length)
+
     if (!intersects(other)) {
       0.0
     } else if (other.contains(low) && other.contains(high)){
       1.0
     } else {
-      var interset_edges = new ListBuffer[Double]()
-      for (i <- low.coord.indices) {
-        val i_length = high.coord{i} - low.coord{i}
-        val left_length = 0.0 max (other.low.coord{i} - low.coord{i})
-        val right_length = 0.0 max (high.coord{i} - other.high.coord{i})
-        interset_edges += (i_length - left_length - right_length)
-      }
-      val interset_area = interset_edges.fold(1.0)((a: Double, b: Double) => a * b)
+      val intersect_low = low.coord.zip(other.low.coord).map(m => m._1 max m._2)
+      val intersect_high = high.coord.zip(other.high.coord).map(m => m._1 min m._2)
+      val intersect_area = intersect_high.zip(intersect_low).map(m => m._1 - m._2).product
       val this_area = high.coord.toList.zip(low.coord.toList).map(m => m._1 - m._2).product
-
-      interset_area / this_area
+      intersect_area / this_area
     }
   }
 
@@ -123,4 +116,3 @@ case class MBR(low: Point, high: Point) extends Shape {
 
   def getMBR: MBR = this.copy()
 }
-

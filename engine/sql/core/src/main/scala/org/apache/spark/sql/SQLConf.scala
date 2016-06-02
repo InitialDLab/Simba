@@ -480,10 +480,28 @@ private[spark] object SQLConf {
   val TRANSFER_THRESHOLD = longConf("spark.sql.transferThreshold", defaultValue =
     Some(800 * 1024 * 1024))
 
-  // Selectivity threshold to determine whether full sanning,
-  // rather than leveraging indexes
+  val INDEX_SELECTIVITY_ENABLE =
+    booleanConf("spark.sql.index.selectivityEnable",
+      defaultValue = Some(false),
+      doc = "When true, If the selectivity of the predicate is higher than a " +
+        "user-defined threshold, Simba will choose to scan the partition " +
+        "rather than leveraging local (RTree) indexes for Range query. " +
+        "The default value is false.")
+
   val INDEX_SELECTIVITY_THRESHOLD =
-    doubleConf("spark.sql.index.selectivityThreshold", defaultValue = Some(0.8))
+    doubleConf("spark.sql.index.selectivityThreshold",
+      defaultValue = Some(0.8),
+      doc = "This only works when INDEX_SELECTIVITY_ENABLE is true. " +
+        "The user-defined local (RTree) index selectivity threshold is between 0.0 to 1.0. " +
+        "The default value is 0.8.")
+
+  val INDEX_SELECTIVITY_LEVEL =
+    intConf("spark.sql.index.selectivityLevel",
+      defaultValue = Some(0),
+      doc = "This only works when INDEX_SELECTIVITY_ENABLE is true." +
+        "Simab consider predicates selectivity from level 0 " +
+        "(root level, include) to the specified level (also incldue) " +
+        "in local RTree index. The default value is 0.")
 
   // Threshold determine where rtree index using local index or brute force filter
   val INDEX_SIZE_THRESHOLD = intConf("spark.sql.index.threshold", defaultValue = Some(1000))
@@ -623,7 +641,11 @@ private[sql] class SQLConf extends Serializable with CatalystConf {
 
   private[spark] def sampleRate: Double = getConf(SAMPLE_RATE)
 
+  private[spark] def indexSelectivityEnable : Boolean = getConf(INDEX_SELECTIVITY_ENABLE)
+
   private[spark] def indexSelectivityThreshold : Double = getConf(INDEX_SELECTIVITY_THRESHOLD)
+
+  private[spark] def indexSelectivityLevel : Int = getConf(INDEX_SELECTIVITY_LEVEL)
 
   private[spark] def indexSizeThreshold: Int = getConf(INDEX_SIZE_THRESHOLD)
 
