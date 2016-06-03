@@ -96,22 +96,6 @@ case class MBR(low: Point, high: Point) extends Shape {
     Math.sqrt(ans)
   }
 
-  def intersectRadio(other: MBR) : Double = {
-    require(low.coord.length == other.low.coord.length)
-
-    if (!intersects(other)) {
-      0.0
-    } else if (other.contains(low) && other.contains(high)){
-      1.0
-    } else {
-      val intersect_low = low.coord.zip(other.low.coord).map(m => m._1 max m._2)
-      val intersect_high = high.coord.zip(other.high.coord).map(m => m._1 min m._2)
-      val intersect_area = intersect_high.zip(intersect_low).map(m => m._1 - m._2).product
-      val this_area = high.coord.toList.zip(low.coord.toList).map(m => m._1 - m._2).product
-      intersect_area / this_area
-    }
-  }
-
   override def toString: String = "(" + low.toString + "," + high.toString + ")"
 
   def getMBR: MBR = this.copy()

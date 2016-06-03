@@ -738,12 +738,13 @@ object PushPredicateThroughJoin extends Rule[LogicalPlan] with PredicateHelper {
       val (leftFilterConditions, rightFilterConditions, commonFilterCondition) =
         split(splitConjunctivePredicates(filterCondition), left, right)
       joinType match {
-        case _ @ (Inner | KNNJoin | DistanceJoin) =>
+        case _ @ (Inner | KNNJoin | DistanceJoin | ZKNNJoin) =>
           // push down the single side `where` condition into respective sides
           val newLeft = leftFilterConditions.
             reduceLeftOption(And).map(Filter(_, left)).getOrElse(left)
           val newRight = rightFilterConditions.
             reduceLeftOption(And).map(Filter(_, right)).getOrElse(right)
+
           val newJoinCond = (commonFilterCondition ++ joinCondition).reduceLeftOption(And)
 
           Join(newLeft, newRight, joinType, newJoinCond)
@@ -776,7 +777,7 @@ object PushPredicateThroughJoin extends Rule[LogicalPlan] with PredicateHelper {
       val (leftJoinConditions, rightJoinConditions, commonJoinCondition) =
         split(joinCondition.map(splitConjunctivePredicates).getOrElse(Nil), left, right)
       joinType match {
-        case _ @ (Inner | LeftSemi | KNNJoin | DistanceJoin) =>
+        case _ @ (Inner | LeftSemi | KNNJoin | DistanceJoin | ZKNNJoin) =>
           // push down the single side only join filter for both sides sub queries
           val newLeft = leftJoinConditions.
             reduceLeftOption(And).map(Filter(_, left)).getOrElse(left)

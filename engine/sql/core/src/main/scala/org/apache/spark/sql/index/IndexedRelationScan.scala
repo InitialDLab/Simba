@@ -1,17 +1,17 @@
 /*
- *  Copyright 2016 by Simba Project                                   
- *                                                                            
- *  Licensed under the Apache License, Version 2.0 (the "License");           
- *  you may not use this file except in compliance with the License.          
- *  You may obtain a copy of the License at                                   
- *                                                                            
- *    http://www.apache.org/licenses/LICENSE-2.0                              
- *                                                                            
- *  Unless required by applicable law or agreed to in writing, software       
- *  distributed under the License is distributed on an "AS IS" BASIS,         
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  
- *  See the License for the specific language governing permissions and       
- *  limitations under the License.                                            
+ *  Copyright 2016 by Simba Project
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
  */
 
 package org.apache.spark.sql.index
@@ -244,10 +244,6 @@ private[sql] case class IndexedRelationScan(
               hash_set ++= rtree.global_rtree.circleRangeConj(cir_ranges).map(_._2)
               val pruned = new PartitionPruningRDD(rtree._indexedRDD, hash_set.contains)
 
-              val selectivity_enable = sqlContext.conf.indexSelectivityEnable
-              val selectivity_threshold = sqlContext.conf.indexSelectivityThreshold
-              val selectivity_level = sqlContext.conf.indexSelectivityLevel
-
               val tmp_rdd = pruned.flatMap {packed =>
                 val index = packed.index.asInstanceOf[RTree]
                 if (index != null) {
@@ -255,23 +251,10 @@ private[sql] case class IndexedRelationScan(
                   val perfect_cover = queryMBR.contains(root_mbr.low) &&
                     queryMBR.contains(root_mbr.high) &&
                     cir_ranges.forall(x => Dist.furthest(x._1, root_mbr) <= x._2)
+
                   if (!perfect_cover) {
-                    val range_res = index.limitedLevelRange(queryMBR,
-                      selectivity_threshold,
-                      selectivity_level,
-                      selectivity_enable)
-                    if (range_res.isEmpty) {
-                      packed.data.filter { row =>
-                        val tmp_point = new Point(
-                          column_keys.map(x => BindReferences.bindReference(x, relation.output)
-                            .eval(row).asInstanceOf[Number].doubleValue()).toArray
-                        )
-                        queryMBR.contains(tmp_point)
-                      }.intersect(index.circleRangeConj(cir_ranges).map(x => packed.data(x._2)))
-                    } else {
-                      range_res.get.map(x => packed.data(x._2))
-                        .intersect(index.circleRangeConj(cir_ranges).map(x => packed.data(x._2)))
-                    }
+                    index.range(queryMBR).map(x => packed.data(x._2))
+                      .intersect(index.circleRangeConj(cir_ranges).map(x => packed.data(x._2)))
                   } else packed.data
                 } else Array[InternalRow]()
               }

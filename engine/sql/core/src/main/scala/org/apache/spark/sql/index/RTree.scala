@@ -87,39 +87,6 @@ case class RTree(root: RTreeNode) extends Index with Serializable {
     ans.toArray
   }
 
-  def limitedLevelRange(query: MBR, selectivity: Double, level: Int, enable: Boolean = false)
-      : Option[Array[(Shape, Int)]] = {
-    if (!enable) {
-      Some(range(query))
-    } else {
-      require(level >= 0)
-      val ans = mutable.ArrayBuffer[(Shape, Int)]()
-      val st = new mutable.Stack[RTreeNode]()
-      var current_level = 0
-      if (root.m_mbr.intersects(query) && root.m_child.nonEmpty) st.push(root)
-      while (st.nonEmpty) {
-        val now = st.pop()
-        if (current_level <= level && now.m_mbr.intersectRadio(query) > selectivity) {
-          return None
-        }
-        current_level += 1
-        if (!now.isLeaf) {
-          now.m_child.foreach {
-            case RTreeInternalEntry(mbr, node) =>
-              if (query.intersects(mbr)) st.push(node)
-          }
-        } else {
-          now.m_child.foreach {
-            case RTreeLeafEntry(shape, m_data, _) =>
-              if (query.intersects(shape)) ans += ((shape, m_data))
-          }
-        }
-      }
-      Some(ans.toArray)
-    }
-
-  }
-
   def circleRange(origin: Shape, r: Double): Array[(Shape, Int)] = {
     val ans = mutable.ArrayBuffer[(Shape, Int)]()
     val st = new mutable.Stack[RTreeNode]()
