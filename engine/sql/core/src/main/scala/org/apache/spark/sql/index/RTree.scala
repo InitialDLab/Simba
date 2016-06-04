@@ -181,11 +181,13 @@ case class RTree(root: RTreeNode) extends Index with Serializable {
         if (cnt >= k && (!keepSame || now._2 > kNN_dis)) break()
 
         now._1 match {
-          case RTreeNode(_, m_child, isLeaf) =>
+          case RTreeNode(_, m_child, _) =>
             m_child.foreach {
               case entry @ RTreeInternalEntry(mbr, node) =>
-                if (isLeaf) pq.enqueue((entry, distFunc(query, mbr)))
-                else pq.enqueue((node, distFunc(query, mbr)))
+                pq.enqueue((node, distFunc(query, mbr)))
+              case entry @ RTreeLeafEntry(mbr, m_data, size) =>
+                require(mbr.isInstanceOf[MBR])
+                pq.enqueue((entry, distFunc(query, mbr.asInstanceOf[MBR])))
             }
           case RTreeLeafEntry(mbr, m_data, size) =>
             cnt += size
@@ -214,11 +216,13 @@ case class RTree(root: RTreeNode) extends Index with Serializable {
         if (cnt >= k && (!keepSame || now._2 > kNN_dis)) break()
 
         now._1 match {
-          case RTreeNode(_, m_child, isLeaf) =>
+          case RTreeNode(_, m_child, _) =>
             m_child.foreach {
               case entry @ RTreeInternalEntry(mbr, node) =>
-                if (isLeaf) pq.enqueue((entry, distFunc(query, mbr)))
-                else pq.enqueue((node, distFunc(query, mbr)))
+                pq.enqueue((node, distFunc(query, mbr)))
+              case entry @ RTreeLeafEntry(mbr, m_data, size) =>
+                require(mbr.isInstanceOf[MBR])
+                pq.enqueue((entry, distFunc(query, mbr.asInstanceOf[MBR])))
             }
           case RTreeLeafEntry(mbr, m_data, size) =>
             cnt += size

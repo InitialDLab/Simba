@@ -96,7 +96,7 @@ case class MBR(low: Point, high: Point) extends Shape {
     Math.sqrt(ans)
   }
 
-  override def toString: String = "MBR(" + low.toString + "," + high.toString + ")"
+  override def toString: String = "(" + low.toString + "," + high.toString + ")"
 
   def getMBR: MBR = this.copy()
 }
