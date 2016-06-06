@@ -173,7 +173,7 @@ private[sql] case class IndexedRelationScan(
                 if (interval.max._2) tmp_res += index.get(interval.max._1)
               }
             }
-            tmp_res.distinct.map(t => packed.data(t))
+            tmp_res.toArray.distinct.map(t => packed.data(t))
           }}
         } else {
           treemap._indexedRDD.flatMap(_.data)
