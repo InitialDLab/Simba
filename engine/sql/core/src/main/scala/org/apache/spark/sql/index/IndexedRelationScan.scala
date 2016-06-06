@@ -55,11 +55,16 @@ private[sql] class Interval(var min: (Double, Boolean),
     (if (min._2) "[" else "(") + min._1 + ", " + max._1 + (if (max._2) "]" else ")")
 }
 
-private[sql] case class IndexedRelationScan(
-                                             attributes: Seq[Attribute],
-                                             predicates: Seq[Expression],
-                                             relation: IndexedRelation)
+private[sql] case class IndexedRelationScan(attributes: Seq[Attribute],
+                                            predicates: Seq[Expression],
+                                            relation: IndexedRelation)
   extends LeafNode with PredicateHelper {
+
+  private def selectivity_enabled = sqlContext.conf.indexSelectivityEnable
+  private def s_level_limit = sqlContext.conf.indexSelectivityLevel
+  private def s_threshold = sqlContext.conf.indexSelectivityThreshold
+  private def index_threshold = sqlContext.conf.indexSizeThreshold
+
   def getLeafInterval(x: Expression): (Interval, Attribute) = {
     x match {
       case EqualTo(left: NamedExpression, right: Literal) =>
@@ -238,7 +243,7 @@ private[sql] case class IndexedRelationScan(
                 cir_ranges = cir_ranges :+ (query_point, r)
             }
 
-            if (knn_res == null || knn_res.length > sqlContext.conf.indexSizeThreshold) {
+            if (knn_res == null || knn_res.length > index_threshold) {
               val hash_set = new mutable.HashSet[Int]()
               hash_set ++= rtree.global_rtree.range(queryMBR).map(_._2)
               hash_set ++= rtree.global_rtree.circleRangeConj(cir_ranges).map(_._2)
@@ -252,10 +257,25 @@ private[sql] case class IndexedRelationScan(
                     queryMBR.contains(root_mbr.high) &&
                     cir_ranges.forall(x => Dist.furthest(x._1, root_mbr) <= x._2)
 
-                  if (!perfect_cover) {
+                  if (perfect_cover) packed.data
+                  else if (selectivity_enabled) {
+                    val res = index.range(queryMBR, s_level_limit, s_threshold)
+                    if (res.isEmpty) {
+                      packed.data.filter { row =>
+                        val tmp_point = new Point(
+                          column_keys.map(x => BindReferences.bindReference(x, relation.output)
+                            .eval(row).asInstanceOf[Number].doubleValue()).toArray
+                        )
+                        queryMBR.intersects(tmp_point)
+                      }
+                    } else {
+                      res.get.map(x => packed.data(x._2))
+                        .intersect(index.circleRangeConj(cir_ranges).map(x => packed.data(x._2)))
+                    }
+                  } else {
                     index.range(queryMBR).map(x => packed.data(x._2))
                       .intersect(index.circleRangeConj(cir_ranges).map(x => packed.data(x._2)))
-                  } else packed.data
+                  }
                 } else Array[InternalRow]()
               }
 
