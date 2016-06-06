@@ -23,7 +23,9 @@ case class TreapNode[K](key: K, var data: Array[Int],
 case class Treap[K: Ordering: ClassTag](var root: TreapNode[K]) extends Index with Serializable {
   private val ordering = implicitly[Ordering[K]]
 
-  def leftRotate(p: TreapNode[K]): TreapNode[K] = {
+  def this() = this(null)
+
+  private def leftRotate(p: TreapNode[K]): TreapNode[K] = {
     val t = p.left
     p.left = t.right
     t.right = p
@@ -32,7 +34,7 @@ case class Treap[K: Ordering: ClassTag](var root: TreapNode[K]) extends Index wi
     t
   }
 
-  def rightRotate(p: TreapNode[K]): TreapNode[K] = {
+  private def rightRotate(p: TreapNode[K]): TreapNode[K] = {
     val t = p.right
     p.right = t.left
     t.left = p
@@ -41,7 +43,7 @@ case class Treap[K: Ordering: ClassTag](var root: TreapNode[K]) extends Index wi
     t
   }
 
-  def insert(p: TreapNode[K], key: K, data: Int): TreapNode[K] = {
+  private def insert(p: TreapNode[K], key: K, data: Int): TreapNode[K] = {
     if (p == null) {
       new TreapNode(key, Array(data), null, null, Random.nextLong(), 1, 1)
     } else if (ordering.equiv(key, p.key)) {
@@ -66,25 +68,35 @@ case class Treap[K: Ordering: ClassTag](var root: TreapNode[K]) extends Index wi
     }
   }
 
-  def rank(p: TreapNode[K], key: K): Int = {
+  def insert(key: K, data: Int): Unit = {
+    root = insert(root, key, data)
+  }
+
+  private def rank(p: TreapNode[K], key: K): Int = {
     if (p == null) 0
     else if (ordering.lt(key, p.key)) rank(p.left, key)
     else p.left.size + p.count + rank(p.right, key)
   }
 
-  def getCount(p: TreapNode[K], key: K): Int = {
+  def rank(key: K): Int = rank(root, key)
+
+  private def getCount(p: TreapNode[K], key: K): Int = {
     if (p == null) -1
     else if (ordering.equiv(key, p.key)) p.count
     else if (ordering.lt(key, p.key)) getCount(p.left, key)
     else getCount(p.right, key)
   }
 
-  def find(p: TreapNode[K], key: K): Array[Int] = {
+  def getCount(key: K): Int = getCount(key)
+
+  private def find(p: TreapNode[K], key: K): Array[Int] = {
     if (p == null) Array()
     else if (ordering.equiv(key, p.key)) p.data
     else if (ordering.lt(key, p.key)) find(p.left, key)
     else find(p.right, key)
   }
+
+  def find(key: K): Array[Int] = find(root, key)
 
   private def range(p: TreapNode[K], low: K, high: K): Array[Int] = {
     if (p == null) Array()
@@ -105,9 +117,9 @@ case class Treap[K: Ordering: ClassTag](var root: TreapNode[K]) extends Index wi
 
 object Treap {
   def apply[K : Ordering: ClassTag](data: Array[(K, InternalRow)]): Treap[K] = {
-    val res = new Treap[K](null)
+    val res = new Treap[K]()
     for (i <- data.indices)
-      res.insert(res.root, data(i)._1, i)
+      res.insert(data(i)._1, i)
     res
   }
 }
