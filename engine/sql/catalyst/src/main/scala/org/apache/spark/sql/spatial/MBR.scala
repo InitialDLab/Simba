@@ -96,7 +96,17 @@ case class MBR(low: Point, high: Point) extends Shape {
     Math.sqrt(ans)
   }
 
-  override def toString: String = "(" + low.toString + "," + high.toString + ")"
+  def area: Double = low.coord.zip(high.coord).map(x => x._2 - x._1).product
+
+  def calcRatio(query: MBR): Double = {
+    val intersect_low = low.coord.zip(query.low.coord).map(x => Math.max(x._1, x._2))
+    val intersect_high = high.coord.zip(query.high.coord).map(x => Math.min(x._1, x._2))
+    val diff_intersect = intersect_low.zip(intersect_high).map(x => x._2 - x._1)
+    if (diff_intersect.forall(_ > 0)) 1.0 * diff_intersect.product / area
+    else 0.0
+  }
+
+  override def toString: String = "MBR(" + low.toString + "," + high.toString + ")"
 
   def getMBR: MBR = this.copy()
 }
