@@ -87,6 +87,54 @@ case class RTree(root: RTreeNode) extends Index with Serializable {
     ans.toArray
   }
 
+  def range(query: MBR, level_limit: Int, s_threshold: Double): Option[Array[(Shape, Int)]] = {
+    val ans = mutable.ArrayBuffer[(Shape, Int)]()
+    val q = new mutable.Queue[(RTreeNode, Int)]()
+    if (root.m_mbr.intersects(query) && root.m_child.nonEmpty) q.enqueue((root, 1))
+    var estimate: Double = 0
+    val loop = new Breaks
+    import loop.{break, breakable}
+    breakable {
+      while (q.nonEmpty) {
+        val now = q.front
+        val cur_node = now._1
+        val cur_level = now._2
+        if (cur_node.isLeaf) {
+          cur_node.m_child.foreach {
+            case RTreeLeafEntry(shape, m_data, _) =>
+              if (query.intersects(shape)) ans += ((shape, m_data))
+          }
+        } else if (cur_level < level_limit) {
+          cur_node.m_child.foreach {
+            case RTreeInternalEntry(mbr, node) =>
+              if (query.intersects(mbr)) q.enqueue((node, cur_level + 1))
+          }
+        } else if (cur_level == level_limit) {
+          estimate += cur_node.m_mbr.calcRatio(query) * cur_node.size
+        } else break
+      }
+    }
+    if (ans.nonEmpty) return Some(ans.toArray)
+    else if (estimate / root.size > s_threshold) return None
+    while (q.nonEmpty) {
+      val now = q.front
+      val cur_node = now._1
+      val cur_level = now._2
+      if (cur_node.isLeaf) {
+        cur_node.m_child.foreach {
+          case RTreeLeafEntry(shape, m_data, _) =>
+            if (query.intersects(shape)) ans += ((shape, m_data))
+        }
+      } else {
+        cur_node.m_child.foreach {
+          case RTreeInternalEntry(mbr, node) =>
+            if (query.intersects(mbr)) q.enqueue((node, cur_level + 1))
+        }
+      }
+    }
+    Some(ans.toArray)
+  }
+
   def circleRange(origin: Shape, r: Double): Array[(Shape, Int)] = {
     val ans = mutable.ArrayBuffer[(Shape, Int)]()
     val st = new mutable.Stack[RTreeNode]()
