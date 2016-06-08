@@ -23,7 +23,7 @@ import org.apache.spark.sql.catalyst.analysis.MultiInstanceRelation
 import org.apache.spark.sql.catalyst.expressions.{Attribute, BindReferences}
 import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, Statistics}
 import org.apache.spark.sql.execution.SparkPlan
-import org.apache.spark.sql.partitioner.{HashPartition, RangePartition, STRPartition}
+import org.apache.spark.sql.partitioner.{HashPartition, QuadTreePartitioner, RangePartition, STRPartition}
 import org.apache.spark.sql.spatial.Point
 import org.apache.spark.sql.types.{DoubleType, IntegerType}
 import org.apache.spark.storage.StorageLevel
@@ -203,7 +203,7 @@ private[sql] case class RTreeIndexedRelation(
 
     val dimension = column_keys.length
     val max_entries_per_node = maxEntriesPerNode
-    val (partitionedRDD, mbr_bounds) = STRPartition(dataRDD, dimension, numShufflePartitions,
+    val (partitionedRDD, mbr_bounds) = QuadTreePartitioner(dataRDD, dimension, numShufflePartitions,
       sampleRate, transferThreshold, max_entries_per_node)
 
 

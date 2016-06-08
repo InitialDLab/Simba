@@ -60,10 +60,10 @@ private[sql] case class IndexedRelationScan(attributes: Seq[Attribute],
                                             relation: IndexedRelation)
   extends LeafNode with PredicateHelper {
 
-  private def selectivity_enabled = sqlContext.conf.indexSelectivityEnable
-  private def s_level_limit = sqlContext.conf.indexSelectivityLevel
-  private def s_threshold = sqlContext.conf.indexSelectivityThreshold
-  private def index_threshold = sqlContext.conf.indexSizeThreshold
+  private val selectivity_enabled = sqlContext.conf.indexSelectivityEnable
+  private val s_level_limit = sqlContext.conf.indexSelectivityLevel
+  private val s_threshold = sqlContext.conf.indexSelectivityThreshold
+  private val index_threshold = sqlContext.conf.indexSizeThreshold
 
   def getLeafInterval(x: Expression): (Interval, Attribute) = {
     x match {
