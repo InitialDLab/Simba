@@ -60,10 +60,10 @@ private[sql] case class IndexedRelationScan(attributes: Seq[Attribute],
                                             relation: IndexedRelation)
   extends LeafNode with PredicateHelper {
 
-  private def selectivity_enabled = sqlContext.conf.indexSelectivityEnable
-  private def s_level_limit = sqlContext.conf.indexSelectivityLevel
-  private def s_threshold = sqlContext.conf.indexSelectivityThreshold
-  private def index_threshold = sqlContext.conf.indexSizeThreshold
+  private val selectivity_enabled = sqlContext.conf.indexSelectivityEnable
+  private val s_level_limit = sqlContext.conf.indexSelectivityLevel
+  private val s_threshold = sqlContext.conf.indexSelectivityThreshold
+  private val index_threshold = sqlContext.conf.indexSizeThreshold
 
   def getLeafInterval(x: Expression): (Interval, Attribute) = {
     x match {
@@ -174,7 +174,7 @@ private[sql] case class IndexedRelationScan(attributes: Seq[Attribute],
               if (interval != null && !interval.isNull) {
                 val tmp = index.range(interval.min._1, interval.max._1)
                 tmp_res ++= tmp
-                if (interval.max._2) tmp_res ++= index.find(interval.max._1)
+              //  if (interval.max._2) tmp_res ++= index.find(interval.max._1)
               }
             }
             tmp_res.toArray.distinct.map(t => packed.data(t))
@@ -299,7 +299,7 @@ private[sql] case class IndexedRelationScan(attributes: Seq[Attribute],
                             .eval(row).asInstanceOf[Number].doubleValue()).toArray
                         )
                         queryMBR.intersects(tmp_point)
-                      }
+                      }.intersect(index.circleRangeConj(cir_ranges).map(x => packed.data(x._2)))
                     } else {
                       res.get.map(x => packed.data(x._2))
                         .intersect(index.circleRangeConj(cir_ranges).map(x => packed.data(x._2)))
