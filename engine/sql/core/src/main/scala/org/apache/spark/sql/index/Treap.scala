@@ -17,18 +17,22 @@
 package org.apache.spark.sql.index
 
 import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.spatial.Shape
 
 import scala.collection.mutable
 import scala.reflect.ClassTag
 import scala.util.Random
+import scala.util.control.Breaks
 
 /**
   * Created by Dong Xie on 6/6/16.
   * Randomized BST a.k.a Treap
   */
-case class TreapNode[K](key: K, var data: Array[Int],
+case class TreapNode[K: Ordering: ClassTag](key: K, var data: Array[Int],
                         var left: TreapNode[K], var right: TreapNode[K],
                         rand: Long, var size: Int, var count: Int) {
+  var interval: Option[(K, K)] = None
+
   def update(): Unit = {
     val left_size = if (left != null) left.size else 0
     val right_size = if (right != null) right.size else 0
@@ -40,6 +44,26 @@ case class Treap[K: Ordering: ClassTag](var root: TreapNode[K]) extends Index wi
   private val ordering = implicitly[Ordering[K]]
 
   def this() = this(null)
+
+  private def calcInterval(p: TreapNode[K]): Unit = {
+    var min: K = {
+      if (p.left != null) {
+        calcInterval(p.left)
+        p.left.interval.get._1
+      } else p.key
+    }
+
+    var max: K = {
+      if (p.right != null) {
+        calcInterval(p.right)
+        p.right.interval.get._2
+      } else p.key
+    }
+
+    p.interval = Some((min, max))
+  }
+
+  private[index] def calcInterval(): Unit = calcInterval(root)
 
   private def leftRotate(p: TreapNode[K]): TreapNode[K] = {
     val t = p.left
@@ -129,6 +153,70 @@ case class Treap[K: Ordering: ClassTag](var root: TreapNode[K]) extends Index wi
     assert(ordering.lteq(low, high))
     range(root, low, high)
   }
+
+  private def getNumericValue(x: K): Double = x.asInstanceOf[Number].doubleValue()
+
+  private def intersects(node: TreapNode[K], low: K, high: K): Boolean = {
+    return !(ordering.gt(node.interval.get._1, high) || ordering.lt(node.interval.get._2, low))
+  }
+
+  def range(low: K, high: K, level_limit: Int, s_threshold: Double, isNumeric: Boolean)
+  : Option[Array[Int]] = {
+    val ans = mutable.ArrayBuffer[Int]()
+    val q = new mutable.Queue[(TreapNode[K], Int)]()
+    if (intersects(root, low, high)) q.enqueue((root, 1))
+    var estimate: Double = 0
+    var flag: Boolean = false
+
+    val loop = new Breaks
+    import loop.{break, breakable}
+    breakable {
+      while (q.nonEmpty) {
+        val now = q.dequeue
+        val cur_node = now._1
+        val cur_level = now._2
+        if (cur_level > level_limit) {
+          flag = true
+          break()
+        }
+
+        if (intersects(cur_node, low, high)) {
+          if (cur_level == level_limit || (cur_node.left == null && cur_node.right == null)) {
+            if (isNumeric) {
+              val node_interval = cur_node.interval.get
+              val node_low = getNumericValue(node_interval._1)
+              val node_high = getNumericValue(node_interval._2)
+              val intersect_low = Math.max(node_low, getNumericValue(low))
+              val intersect_high = Math.min(node_high, getNumericValue(high))
+              estimate += cur_node.size * (intersect_high - intersect_low) / (node_high - node_low)
+            } else estimate += cur_node.size
+          }
+
+          if (ordering.lteq(low, cur_node.key) && ordering.lteq(cur_node.key, high)) {
+            ans ++= cur_node.data
+          }
+          if (cur_node.left != null) q.enqueue((cur_node.left, cur_level + 1))
+          if (cur_node.right != null) q.enqueue((cur_node.right, cur_level + 1))
+        }
+      }
+    }
+
+    if (!flag) return Some(ans.toArray)
+    else if (estimate / root.size > s_threshold) return None
+
+    while (q.nonEmpty) {
+      val now = q.dequeue
+      val cur_node = now._1
+      val cur_level = now._2
+      if (ordering.lteq(low, cur_node.key) && ordering.lteq(cur_node.key, high)) {
+        ans ++= cur_node.data
+      }
+      if (cur_node.left != null) q.enqueue((cur_node.left, cur_level + 1))
+      if (cur_node.right != null) q.enqueue((cur_node.right, cur_level + 1))
+    }
+
+    Some(ans.toArray)
+  }
 }
 
 object Treap {
@@ -136,6 +224,7 @@ object Treap {
     val res = new Treap[K]()
     for (i <- data.indices)
       res.insert(data(i)._1, i)
+    res.calcInterval()
     res
   }
 }
