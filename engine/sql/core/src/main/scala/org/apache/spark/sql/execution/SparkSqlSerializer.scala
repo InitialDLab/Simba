@@ -55,6 +55,7 @@ private[sql] class SparkSqlSerializer(conf: SparkConf) extends KryoSerializer(co
     kryo.register(classOf[java.util.HashMap[_, _]])
     kryo.register(classOf[TreeMapIndex[_]])
     kryo.register(classOf[HashMapIndex[_]])
+    kryo.register(classOf[Treap[_]])
 
     kryo.setReferences(false)
     kryo

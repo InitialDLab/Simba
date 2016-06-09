@@ -497,11 +497,9 @@ private[spark] object SQLConf {
 
   val INDEX_SELECTIVITY_LEVEL =
     intConf("spark.sql.index.selectivityLevel",
-      defaultValue = Some(0),
+      defaultValue = Some(1),
       doc = "This only works when INDEX_SELECTIVITY_ENABLE is true." +
-        "Simab consider predicates selectivity from level 0 " +
-        "(root level, include) to the specified level (also incldue) " +
-        "in local RTree index. The default value is 0.")
+        "Simab considers predicates selectivity from this level, default root level (1)")
 
   // Threshold determine where rtree index using local index or brute force filter
   val INDEX_SIZE_THRESHOLD = intConf("spark.sql.index.threshold", defaultValue = Some(1000))
