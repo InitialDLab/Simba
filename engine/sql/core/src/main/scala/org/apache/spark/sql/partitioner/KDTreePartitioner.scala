@@ -35,7 +35,7 @@ object KDTreePartitioner {
   def sortBasedShuffleOn: Boolean = SparkEnv.get.shuffleManager.isInstanceOf[SortShuffleManager]
 
   def apply(origin: RDD[(Point, InternalRow)], dimension: Int, est_partition: Int,
-            sample_rate: Double, transfer_threshold: Long, max_entries_per_node: Int)
+            sample_rate: Double, transfer_threshold: Long)
   : (RDD[(Point, InternalRow)], Array[(MBR, Int)]) = {
     val rdd = if (sortBasedShuffleOn) {
       origin.mapPartitions { iter => iter.map(row => (row._1, row._2.copy())) }
@@ -47,7 +47,7 @@ object KDTreePartitioner {
     }
 
     val part = new KDTreePartitioner(est_partition, sample_rate, dimension,
-      transfer_threshold, max_entries_per_node, rdd)
+      transfer_threshold, rdd)
     val shuffled = new ShuffledRDD[Point, InternalRow, InternalRow](rdd, part)
     shuffled.setSerializer(new SparkSqlSerializer(new SparkConf(false)))
     (shuffled, part.mbrBound)
@@ -58,21 +58,20 @@ class KDTreePartitioner(est_partition: Int,
                           sample_rate: Double,
                           dimension: Int,
                           transfer_threshold: Long,
-                          max_entries_per_node: Int,
                           rdd: RDD[_ <: Product2[Point, Any]])
   extends Partitioner {
   private case class Bounds(min: Array[Double], max: Array[Double])
 
   var (mbrBound, partitions) = {
-    val (data_bounds, total_size) = {
-      rdd.aggregate[(Bounds, Long)]((null, 0))((bound, data) => {
+    val (data_bounds, total_size, num_of_records) = {
+      rdd.aggregate[(Bounds, Long, Int)]((null, 0, 0))((bound, data) => {
         val new_bound = if (bound._1 == null) {
           new Bounds(data._1.coord, data._1.coord)
         } else {
           new Bounds(bound._1.min.zip(data._1.coord).map(x => Math.min(x._1, x._2)),
             bound._1.max.zip(data._1.coord).map(x => Math.max(x._1, x._2)))
         }
-        (new_bound, bound._2 + SizeEstimator.estimate(data._1))
+        (new_bound, bound._2 + SizeEstimator.estimate(data._1), bound._3 + 1)
       }, (left, right) => {
         val new_bound = {
           if (left._1 == null) right._1
@@ -82,9 +81,11 @@ class KDTreePartitioner(est_partition: Int,
               left._1.max.zip(right._1.max).map(x => Math.max(x._1, x._2)))
           }
         }
-        (new_bound, left._2 + right._2)
+        (new_bound, left._2 + right._2, left._3 + right._3)
       })
     } // get the partition bound and the total size of a MBR
+
+    val max_entries_per_node = num_of_records / est_partition
 
     val seed = System.currentTimeMillis()
     val sampled = if (total_size * sample_rate <= transfer_threshold){
@@ -131,7 +132,7 @@ class KDTreePartitioner(est_partition: Int,
     (mbrs.zipWithIndex, mbrs.length)
   }
 
-  val rt = RTree(mbrBound.map(x => (x._1, x._2, 1)), max_entries_per_node)
+  val rt = RTree(mbrBound.map(x => (x._1, x._2, 1)), 25) // the default value is fine
 
   override def numPartitions: Int = partitions
   override def getPartition(key: Any): Int = {
