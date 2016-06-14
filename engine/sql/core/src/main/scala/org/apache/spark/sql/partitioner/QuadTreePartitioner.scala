@@ -103,24 +103,19 @@ class QuadTreePartitioner(est_partition: Int,
       val center: Seq[Double] = low_bound.zip(high_bound).map(a => (a._1 + a._2) / 2.0)
       var ans = mutable.ArrayBuffer[MBR]()
       val grouped = entries.groupBy(p => {
-        var quadrant_number = 0 // use a binary number to represent a quadrant
-        for (cur: Int <- center.indices) {
-          if (p.coord(cur) >= center(cur)) {quadrant_number += 1}
-          quadrant_number <<= 1
-        }
-        if (center.length != 1) quadrant_number >>= 1
-        quadrant_number
+        if (p.coord(0) < center.head && p.coord(1) < center(1)) 0
+        else if (p.coord(0) >= center.head && p.coord(1) < center(1)) 1
+        else if (p.coord(0) < center.head && p.coord(1) >= center(1)) 2
+        else 3
       })
       for (item <- grouped) {
         if (item._2.length > max_entries_per_node) { // split node
           // extract the boundary count from the quadrant_number
-          val new_low = 0 until dimension map {i =>
-            if ((item._1 >> i) % 2 == 1) center(i)
-            else low_bound(i)
-          }
-          val new_high = 0 until dimension map { i =>
-            if ((item._1 >> i) % 2 == 1) low_bound(i)
-            else center(i)
+          val (new_low, new_high) = item._1 match {
+            case 0 => (Array(low_bound.head, low_bound(1)), Array(center.head, center(1)))
+            case 1 => (Array(center.head, low_bound(1)), Array(high_bound.head, center(1)))
+            case 2 => (Array(low_bound.head, center(1)), Array(center.head, high_bound(1)))
+            case 3 => (Array(center.head, center(1)), Array(high_bound.head, high_bound(1)))
           }
           ans ++= recursiveGroupPoint(item._2, new_low, new_high)
         } else {

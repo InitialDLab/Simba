@@ -53,7 +53,7 @@ object IndexExample {
     leftRDD.toDF().registerTempTable("point1")
     rightRDD.toDF().registerTempTable("point2")
 
-    sqlContext.sql("CREATE INDEX pointIndex ON point1(x, y, z) USE rtree")
+    sqlContext.sql("CREATE INDEX pointIndex ON point1(x, y) USE rtree")
     sqlContext.sql("CREATE INDEX treeMapIndex ON point2 (x) USE treemap")
     sqlContext.sql("SHOW INDEX ON point1")
 
