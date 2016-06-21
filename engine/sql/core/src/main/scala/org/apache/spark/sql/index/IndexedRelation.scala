@@ -69,16 +69,14 @@ private[sql] case class HashMapIndexedRelation(
   index_name: String)(var _indexedRDD: IndexRDD = null)
   extends IndexedRelation with MultiInstanceRelation {
   require(column_keys.length == 1)
-  val numShufflePartitions = child.sqlContext.conf.numShufflePartitions
-  val maxEntriesPerNode = child.sqlContext.conf.maxEntriesPerNode
-  val sampleRate = child.sqlContext.conf.sampleRate
-  val transferThreshold = child.sqlContext.conf.transferThreshold
 
   if (_indexedRDD == null) {
     buildIndex()
   }
 
   private[sql] def buildIndex(): Unit = {
+    val numShufflePartitions = child.sqlContext.conf.numShufflePartitions
+
     val dataRDD = child.execute().map(row => {
       val key = BindReferences.bindReference(column_keys.head, child.output).eval(row)
       (key, row)
@@ -120,16 +118,14 @@ private[sql] case class TreeMapIndexedRelation(
                       var range_bounds: Array[Double] = null)
   extends IndexedRelation with MultiInstanceRelation {
   require(column_keys.length == 1)
-  val numShufflePartitions = child.sqlContext.conf.numShufflePartitions
-  val maxEntriesPerNode = child.sqlContext.conf.maxEntriesPerNode
-  val sampleRate = child.sqlContext.conf.sampleRate
-  val transferThreshold = child.sqlContext.conf.transferThreshold
 
   if (_indexedRDD == null) {
     buildIndex()
   }
 
   private[sql] def buildIndex(): Unit = {
+    val numShufflePartitions = child.sqlContext.conf.numShufflePartitions
+
     val dataRDD = child.execute().map(row => {
       val key = BindReferences.bindReference(column_keys.head, child.output).eval(row)
         .asInstanceOf[Number].doubleValue
@@ -184,16 +180,16 @@ private[sql] case class RTreeIndexedRelation(
   }
   require(checkKeys)
 
-  val numShufflePartitions = child.sqlContext.conf.numShufflePartitions
-  val maxEntriesPerNode = child.sqlContext.conf.maxEntriesPerNode
-  val sampleRate = child.sqlContext.conf.sampleRate
-  val transferThreshold = child.sqlContext.conf.transferThreshold
-
   if (_indexedRDD == null) {
     buildIndex()
   }
 
   private[sql] def buildIndex(): Unit = {
+    val numShufflePartitions = child.sqlContext.conf.numShufflePartitions
+    val maxEntriesPerNode = child.sqlContext.conf.maxEntriesPerNode
+    val sampleRate = child.sqlContext.conf.sampleRate
+    val transferThreshold = child.sqlContext.conf.transferThreshold
+
     val dataRDD = child.execute().map(row => {
       val now = column_keys.map(x =>
         BindReferences.bindReference(x, child.output).eval(row).asInstanceOf[Number].doubleValue()
