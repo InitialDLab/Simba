@@ -27,7 +27,7 @@ import org.apache.spark.sql.execution.columnar.{InMemoryColumnarTableScan, InMem
 import org.apache.spark.sql.execution.datasources.{CreateTableUsing, CreateTempTableUsing, DescribeCommand => LogicalDescribeCommand, _}
 import org.apache.spark.sql.execution.joins._
 import org.apache.spark.sql.execution.{DescribeCommand => RunnableDescribeCommand}
-import org.apache.spark.sql.index.{IndexedRelation, IndexedRelationScan, RTreeType, TreeMapType}
+import org.apache.spark.sql.index._
 import org.apache.spark.sql.{IndexInfo, Strategy, execution}
 
 private[sql] abstract class SparkStrategies extends QueryPlanner[SparkPlan] {
@@ -344,7 +344,7 @@ private[sql] abstract class SparkStrategies extends QueryPlanner[SparkPlan] {
             }
           }
           if (found) result = item
-        } else if (item.indexType == TreeMapType) {
+        } else if (item.indexType == TreeMapType || item.indexType == TreapType) {
           if (attributes.length == 1 && item.attributes.head == attributes.head){
             result = item
           }

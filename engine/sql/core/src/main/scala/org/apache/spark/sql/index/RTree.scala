@@ -96,7 +96,7 @@ case class RTree(root: RTreeNode) extends Index with Serializable {
     import loop.{break, breakable}
     breakable {
       while (q.nonEmpty) {
-        val now = q.front
+        val now = q.dequeue
         val cur_node = now._1
         val cur_level = now._2
         if (cur_node.isLeaf) {
@@ -111,13 +111,17 @@ case class RTree(root: RTreeNode) extends Index with Serializable {
           }
         } else if (cur_level == level_limit) {
           estimate += cur_node.m_mbr.calcRatio(query) * cur_node.size
+          cur_node.m_child.foreach {
+            case RTreeInternalEntry(mbr, node) =>
+              if (query.intersects(mbr)) q.enqueue((node, cur_level + 1))
+          }
         } else break
       }
     }
     if (ans.nonEmpty) return Some(ans.toArray)
     else if (estimate / root.size > s_threshold) return None
     while (q.nonEmpty) {
-      val now = q.front
+      val now = q.dequeue
       val cur_node = now._1
       val cur_level = now._2
       if (cur_node.isLeaf) {

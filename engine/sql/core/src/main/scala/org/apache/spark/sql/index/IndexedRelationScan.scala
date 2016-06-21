@@ -150,6 +150,38 @@ private[sql] case class IndexedRelationScan(attributes: Seq[Attribute],
 
   override protected def doExecute(): RDD[InternalRow] = {
     relation match {
+      case treap @ TreapIndexedRelation(_, _, _, column_keys, _) =>
+        if (predicates.nonEmpty) {
+          val intervals = predicates.map(conditionToInterval(_, column_keys)._1).head
+          val bounds = treap.range_bounds
+          val query_sets = new mutable.HashSet[Int]()
+          intervals.foreach {interval =>
+            if (interval != null && !interval.isNull) {
+              val start = bounds.indexWhere(x => x >= interval.min._1)
+              var end = bounds.indexWhere(x => x >= interval.max._1)
+              if (end == -1) end = bounds.length
+              if (start >= 0) {
+                for (i <- start to end + 1)
+                  query_sets.add(i)
+              } else query_sets.add(bounds.length)
+            }
+          }
+          val pruned = new PartitionPruningRDD(treap._indexedRDD, query_sets.contains)
+          pruned.flatMap {packed => {
+            val index = packed.index.asInstanceOf[Treap[Double]]
+            var tmp_res = mutable.ArrayBuffer[Int]()
+            intervals.foreach {interval =>
+              if (interval != null && !interval.isNull) {
+                val tmp = index.range(interval.min._1, interval.max._1)
+                tmp_res ++= tmp
+              //  if (interval.max._2) tmp_res ++= index.find(interval.max._1)
+              }
+            }
+            tmp_res.toArray.distinct.map(t => packed.data(t))
+          }}
+        } else {
+          treap._indexedRDD.flatMap(_.data)
+        }
       case treemap @ TreeMapIndexedRelation(_, _, _, column_keys, _) =>
         if (predicates.nonEmpty) {
           val intervals = predicates.map(conditionToInterval(_, column_keys)._1).head
@@ -178,7 +210,7 @@ private[sql] case class IndexedRelationScan(attributes: Seq[Attribute],
                 if (interval.max._2) tmp_res += index.get(interval.max._1)
               }
             }
-            tmp_res.distinct.map(t => packed.data(t))
+            tmp_res.toArray.distinct.map(t => packed.data(t))
           }}
         } else {
           treemap._indexedRDD.flatMap(_.data)
@@ -267,7 +299,7 @@ private[sql] case class IndexedRelationScan(attributes: Seq[Attribute],
                             .eval(row).asInstanceOf[Number].doubleValue()).toArray
                         )
                         queryMBR.intersects(tmp_point)
-                      }
+                      }.intersect(index.circleRangeConj(cir_ranges).map(x => packed.data(x._2)))
                     } else {
                       res.get.map(x => packed.data(x._2))
                         .intersect(index.circleRangeConj(cir_ranges).map(x => packed.data(x._2)))
