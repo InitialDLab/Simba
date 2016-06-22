@@ -23,7 +23,7 @@ import org.apache.spark.sql.catalyst.analysis.MultiInstanceRelation
 import org.apache.spark.sql.catalyst.expressions.{Attribute, BindReferences}
 import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, Statistics}
 import org.apache.spark.sql.execution.SparkPlan
-import org.apache.spark.sql.partitioner.{HashPartition, RangePartition, STRPartition}
+import org.apache.spark.sql.partitioner._
 import org.apache.spark.sql.spatial.Point
 import org.apache.spark.sql.types.{DoubleType, IntegerType, NumericType}
 import org.apache.spark.storage.StorageLevel
@@ -71,15 +71,14 @@ private[sql] case class HashMapIndexedRelation(
   index_name: String)(var _indexedRDD: IndexRDD = null)
   extends IndexedRelation with MultiInstanceRelation {
   require(column_keys.length == 1)
-  val numShufflePartitions = child.sqlContext.conf.numShufflePartitions
-  val maxEntriesPerNode = child.sqlContext.conf.maxEntriesPerNode
-  val sampleRate = child.sqlContext.conf.sampleRate
 
   if (_indexedRDD == null) {
     buildIndex()
   }
 
   private[sql] def buildIndex(): Unit = {
+    val numShufflePartitions = child.sqlContext.conf.numShufflePartitions
+
     val dataRDD = child.execute().map(row => {
       val key = BindReferences.bindReference(column_keys.head, child.output).eval(row)
       (key, row)
@@ -121,16 +120,14 @@ private[sql] case class TreeMapIndexedRelation(
                       var range_bounds: Array[Double] = null)
   extends IndexedRelation with MultiInstanceRelation {
   require(column_keys.length == 1)
-  require(column_keys.head.dataType.isInstanceOf[NumericType])
-  val numShufflePartitions = child.sqlContext.conf.numShufflePartitions
-  val maxEntriesPerNode = child.sqlContext.conf.maxEntriesPerNode
-  val sampleRate = child.sqlContext.conf.sampleRate
 
   if (_indexedRDD == null) {
     buildIndex()
   }
 
   private[sql] def buildIndex(): Unit = {
+    val numShufflePartitions = child.sqlContext.conf.numShufflePartitions
+
     val dataRDD = child.execute().map(row => {
       val key = BindReferences.bindReference(column_keys.head, child.output).eval(row)
         .asInstanceOf[Number].doubleValue
@@ -240,16 +237,16 @@ private[sql] case class RTreeIndexedRelation(
   }
   require(checkKeys)
 
-  val numShufflePartitions = child.sqlContext.conf.numShufflePartitions
-  val maxEntriesPerNode = child.sqlContext.conf.maxEntriesPerNode
-  val sampleRate = child.sqlContext.conf.sampleRate
-  val transferThreshold = child.sqlContext.conf.transferThreshold
-
   if (_indexedRDD == null) {
     buildIndex()
   }
 
   private[sql] def buildIndex(): Unit = {
+    val numShufflePartitions = child.sqlContext.conf.numShufflePartitions
+    val maxEntriesPerNode = child.sqlContext.conf.maxEntriesPerNode
+    val sampleRate = child.sqlContext.conf.sampleRate
+    val transferThreshold = child.sqlContext.conf.transferThreshold
+
     val dataRDD = child.execute().map(row => {
       val now = column_keys.map(x =>
         BindReferences.bindReference(x, child.output).eval(row).asInstanceOf[Number].doubleValue()
@@ -259,9 +256,15 @@ private[sql] case class RTreeIndexedRelation(
 
     val dimension = column_keys.length
     val max_entries_per_node = maxEntriesPerNode
-    val (partitionedRDD, mbr_bounds) = STRPartition(dataRDD, dimension, numShufflePartitions,
-      sampleRate, transferThreshold, max_entries_per_node)
-
+    val (partitionedRDD, mbr_bounds) = child.sqlContext.conf.partitionMethod match {
+      case "KDTreeParitioner" => KDTreePartitioner(dataRDD, dimension, numShufflePartitions,
+        sampleRate, transferThreshold)
+      case "QuadTreePartitioner" => QuadTreePartitioner(dataRDD, dimension, numShufflePartitions,
+        sampleRate, transferThreshold)
+      // only RTree needs max_entries_per_node parameter
+      case _ => STRPartition (dataRDD, dimension, numShufflePartitions,
+        sampleRate, transferThreshold, max_entries_per_node)// default
+    }
 
     val indexed = partitionedRDD.mapPartitions { iter =>
       val data = iter.toArray
