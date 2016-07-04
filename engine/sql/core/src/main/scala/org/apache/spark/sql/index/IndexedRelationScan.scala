@@ -55,11 +55,16 @@ private[sql] class Interval(var min: (Double, Boolean),
     (if (min._2) "[" else "(") + min._1 + ", " + max._1 + (if (max._2) "]" else ")")
 }
 
-private[sql] case class IndexedRelationScan(
-                                             attributes: Seq[Attribute],
-                                             predicates: Seq[Expression],
-                                             relation: IndexedRelation)
+private[sql] case class IndexedRelationScan(attributes: Seq[Attribute],
+                                            predicates: Seq[Expression],
+                                            relation: IndexedRelation)
   extends LeafNode with PredicateHelper {
+
+  private val selectivity_enabled = sqlContext.conf.indexSelectivityEnable
+  private val s_level_limit = sqlContext.conf.indexSelectivityLevel
+  private val s_threshold = sqlContext.conf.indexSelectivityThreshold
+  private val index_threshold = sqlContext.conf.indexSizeThreshold
+
   def getLeafInterval(x: Expression): (Interval, Attribute) = {
     x match {
       case EqualTo(left: NamedExpression, right: Literal) =>
@@ -125,7 +130,7 @@ private[sql] case class IndexedRelationScan(
       }
       var dis_b = 0.0
       for (i <- column_keys.indices) {
-        val tmp = BindReferences.bindReference(column_keys(i), relation.output).eval(a)
+        val tmp = BindReferences.bindReference(column_keys(i), relation.output).eval(b)
           .asInstanceOf[Number].doubleValue()
         dis_b += (tmp - origin.coord(i)) * (tmp - origin.coord(i))
       }
@@ -145,6 +150,38 @@ private[sql] case class IndexedRelationScan(
 
   override protected def doExecute(): RDD[InternalRow] = {
     relation match {
+      case treap @ TreapIndexedRelation(_, _, _, column_keys, _) =>
+        if (predicates.nonEmpty) {
+          val intervals = predicates.map(conditionToInterval(_, column_keys)._1).head
+          val bounds = treap.range_bounds
+          val query_sets = new mutable.HashSet[Int]()
+          intervals.foreach {interval =>
+            if (interval != null && !interval.isNull) {
+              val start = bounds.indexWhere(x => x >= interval.min._1)
+              var end = bounds.indexWhere(x => x >= interval.max._1)
+              if (end == -1) end = bounds.length
+              if (start >= 0) {
+                for (i <- start to end + 1)
+                  query_sets.add(i)
+              } else query_sets.add(bounds.length)
+            }
+          }
+          val pruned = new PartitionPruningRDD(treap._indexedRDD, query_sets.contains)
+          pruned.flatMap {packed => {
+            val index = packed.index.asInstanceOf[Treap[Double]]
+            var tmp_res = mutable.ArrayBuffer[Int]()
+            intervals.foreach {interval =>
+              if (interval != null && !interval.isNull) {
+                val tmp = index.range(interval.min._1, interval.max._1)
+                tmp_res ++= tmp
+              //  if (interval.max._2) tmp_res ++= index.find(interval.max._1)
+              }
+            }
+            tmp_res.toArray.distinct.map(t => packed.data(t))
+          }}
+        } else {
+          treap._indexedRDD.flatMap(_.data)
+        }
       case treemap @ TreeMapIndexedRelation(_, _, _, column_keys, _) =>
         if (predicates.nonEmpty) {
           val intervals = predicates.map(conditionToInterval(_, column_keys)._1).head
@@ -173,7 +210,7 @@ private[sql] case class IndexedRelationScan(
                 if (interval.max._2) tmp_res += index.get(interval.max._1)
               }
             }
-            tmp_res.distinct.map(t => packed.data(t))
+            tmp_res.toArray.distinct.map(t => packed.data(t))
           }}
         } else {
           treemap._indexedRDD.flatMap(_.data)
@@ -238,10 +275,12 @@ private[sql] case class IndexedRelationScan(
                 cir_ranges = cir_ranges :+ (query_point, r)
             }
 
-            if (knn_res == null || knn_res.length > sqlContext.conf.indexSizeThreshold) {
+            if (knn_res == null || knn_res.length > index_threshold) {
               val hash_set = new mutable.HashSet[Int]()
               hash_set ++= rtree.global_rtree.range(queryMBR).map(_._2)
-              hash_set ++= rtree.global_rtree.circleRangeConj(cir_ranges).map(_._2)
+              if (cir_ranges.nonEmpty) {
+                hash_set ++= rtree.global_rtree.circleRangeConj(cir_ranges).map(_._2)
+              }
               val pruned = new PartitionPruningRDD(rtree._indexedRDD, hash_set.contains)
 
               val tmp_rdd = pruned.flatMap {packed =>
@@ -252,10 +291,33 @@ private[sql] case class IndexedRelationScan(
                     queryMBR.contains(root_mbr.high) &&
                     cir_ranges.forall(x => Dist.furthest(x._1, root_mbr) <= x._2)
 
-                  if (!perfect_cover) {
-                    index.range(queryMBR).map(x => packed.data(x._2))
-                      .intersect(index.circleRangeConj(cir_ranges).map(x => packed.data(x._2)))
-                  } else packed.data
+                  if (perfect_cover) packed.data
+                  else if (selectivity_enabled) {
+                    val res = index.range(queryMBR, s_level_limit, s_threshold)
+                    if (res.isEmpty) {
+                      packed.data.filter { row =>
+                        val tmp_point = new Point(
+                          column_keys.map(x => BindReferences.bindReference(x, relation.output)
+                            .eval(row).asInstanceOf[Number].doubleValue()).toArray
+                        )
+                        queryMBR.intersects(tmp_point)
+                      }.intersect(index.circleRangeConj(cir_ranges).map(x => packed.data(x._2)))
+                    } else {
+                      val tmp_res = res.get.map(_._2)
+                      if (cir_ranges.isEmpty) tmp_res.map(x => packed.data(x))
+                      else {
+                        tmp_res.intersect(index.circleRangeConj(cir_ranges).map(_._2))
+                          .map(x => packed.data(x))
+                      }
+                    }
+                  } else {
+                    val res = index.range(queryMBR).map(_._2)
+                    if (cir_ranges.isEmpty) res.map(x => packed.data(x))
+                    else {
+                      res.intersect(index.circleRangeConj(cir_ranges).map(_._2))
+                        .map(x => packed.data(x))
+                    }
+                  }
                 } else Array[InternalRow]()
               }
 

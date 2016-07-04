@@ -477,6 +477,9 @@ private[spark] object SQLConf {
 
   val SAMPLE_RATE = doubleConf("spark.sql.sampleRate", defaultValue = Some(0.01))
 
+  // Partitioner Parameter
+  val PARTITION_METHOD = stringConf("spark.sql.partition.method", defaultValue = Some("STRPartitioner"))
+
   val TRANSFER_THRESHOLD = longConf("spark.sql.transferThreshold", defaultValue =
     Some(800 * 1024 * 1024))
 
@@ -497,11 +500,9 @@ private[spark] object SQLConf {
 
   val INDEX_SELECTIVITY_LEVEL =
     intConf("spark.sql.index.selectivityLevel",
-      defaultValue = Some(0),
+      defaultValue = Some(1),
       doc = "This only works when INDEX_SELECTIVITY_ENABLE is true." +
-        "Simab consider predicates selectivity from level 0 " +
-        "(root level, include) to the specified level (also incldue) " +
-        "in local RTree index. The default value is 0.")
+        "Simab considers predicates selectivity from this level, default root level (1)")
 
   // Threshold determine where rtree index using local index or brute force filter
   val INDEX_SIZE_THRESHOLD = intConf("spark.sql.index.threshold", defaultValue = Some(1000))
@@ -630,6 +631,8 @@ private[sql] class SQLConf extends Serializable with CatalystConf {
   private[spark] def distanceJoin: String = getConf(DISTANCE_JION)
 
   private[spark] def knnJoin: String = getConf(KNN_JOIN)
+
+  private[spark] def partitionMethod: String = getConf(PARTITION_METHOD)
 
   private[spark] def maxEntriesPerNode: Int = getConf(MAX_ENTRIES_PER_NODE)
 
