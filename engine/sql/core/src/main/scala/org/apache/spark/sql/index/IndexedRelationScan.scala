@@ -261,8 +261,6 @@ private[sql] case class IndexedRelationScan(
                       res.intersect(index.circleRangeConj(cir_ranges).map(_._2))
                         .map(x => packed.data(x))
                     }
-                    index.range(queryMBR).map(x => packed.data(x._2))
-                      .intersect(index.circleRangeConj(cir_ranges).map(x => packed.data(x._2)))
                   } else packed.data
                 } else Array[InternalRow]()
               }
