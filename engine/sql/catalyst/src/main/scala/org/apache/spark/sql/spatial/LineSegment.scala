@@ -97,7 +97,7 @@ case class LineSegment(start: Point, end: Point) extends Shape {
     val len = start.minDist(end)
     if (len == 0) return p.minDist(start)
     var t = ((p.coord(0) - start.coord(0)) * (end.coord(0) - start.coord(0))
-      + (p.coord(1) - start.coord(1)) * (end.coord(1) - start.coord(1))) / len
+      + (p.coord(1) - start.coord(1)) * (end.coord(1) - start.coord(1))) / (len * len)
     t = Math.max(0, Math.min(1, t))
     val proj_x = start.coord(0) + t * (end.coord(0) - start.coord(0))
     val proj_y = start.coord(1) + t * (end.coord(1) - start.coord(1))
