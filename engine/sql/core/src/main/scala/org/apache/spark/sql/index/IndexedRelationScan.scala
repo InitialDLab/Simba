@@ -89,7 +89,7 @@ private[sql] case class IndexedRelationScan(attributes: Seq[Attribute],
 
   def conditionToInterval(condition: Expression, column: List[Attribute])
   : (Array[Interval], Array[Expression]) = {
-    val leaf_nodes = splitConjunctivePredicates(condition)
+    val leaf_nodes = splitConjunctivePredicates(condition) // split AND expression
     val intervals: Array[Interval] = new Array[Interval](column.length)
     for (i <- column.indices)
       intervals(i) = new Interval(Double.MinValue, Double.MaxValue, false, false)
@@ -121,6 +121,7 @@ private[sql] case class IndexedRelationScan(attributes: Seq[Attribute],
   }
 
   class DisOrdering(origin: Point, column_keys: List[Attribute]) extends Ordering[InternalRow] {
+    // TODO can here be refactored? [GEFEI ADD here]
     def compare(a: InternalRow, b: InternalRow): Int = {
       var dis_a = 0.0
       for (i <- column_keys.indices) {
@@ -138,6 +139,7 @@ private[sql] case class IndexedRelationScan(attributes: Seq[Attribute],
     }
   }
 
+  // Tool function: Distance between row and point
   def evalDist(row: InternalRow, origin: Point, column_keys: List[Attribute]): Double = {
     var dis = 0.0
     for (i <- column_keys.indices) {
@@ -184,6 +186,8 @@ private[sql] case class IndexedRelationScan(attributes: Seq[Attribute],
         }
       case treemap @ TreeMapIndexedRelation(_, _, _, column_keys, _) =>
         if (predicates.nonEmpty) {
+          // bug here: for any multi-predicate, only the first is calculate, a intersection
+          // is needed here.
           val intervals = predicates.map(conditionToInterval(_, column_keys)._1).head
           val bounds = treemap.range_bounds
           val query_sets = new mutable.HashSet[Int]()
@@ -199,7 +203,7 @@ private[sql] case class IndexedRelationScan(attributes: Seq[Attribute],
             }
           }
           val pruned = new PartitionPruningRDD(treemap._indexedRDD, query_sets.contains)
-          pruned.flatMap {packed => {
+          pruned flatMap {packed => {
             val index = packed.index.asInstanceOf[TreeMapIndex[Double]].index
             var tmp_res = mutable.ArrayBuffer[Int]()
             intervals.foreach {interval =>
@@ -275,7 +279,7 @@ private[sql] case class IndexedRelationScan(attributes: Seq[Attribute],
                 cir_ranges = cir_ranges :+ (query_point, r)
             }
 
-            if (knn_res == null || knn_res.length > index_threshold) {
+            if (knn_res == null || knn_res.length > index_threshold) { // too large
               val hash_set = new mutable.HashSet[Int]()
               hash_set ++= rtree.global_rtree.range(queryMBR).map(_._2)
               hash_set ++= rtree.global_rtree.circleRangeConj(cir_ranges).map(_._2)
@@ -290,7 +294,7 @@ private[sql] case class IndexedRelationScan(attributes: Seq[Attribute],
                     cir_ranges.forall(x => Dist.furthest(x._1, root_mbr) <= x._2)
 
                   if (perfect_cover) packed.data
-                  else if (selectivity_enabled) {
+                  else if (selectivity_enabled) { // is perfect_cover a selectivity
                     val res = index.range(queryMBR, s_level_limit, s_threshold)
                     if (res.isEmpty) {
                       packed.data.filter { row =>
