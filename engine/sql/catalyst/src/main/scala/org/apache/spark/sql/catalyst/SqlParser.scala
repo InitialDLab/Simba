@@ -239,16 +239,20 @@ object SqlParser extends AbstractSparkSQLParser with DataTypeParser {
   protected lazy val notExpression: Parser[Expression] =
     NOT.? ~ comparisonExpression ^^ { case maybeNot ~ e => maybeNot.map(_ => Not(e)).getOrElse(e) }
 
+  protected lazy val pointWrappterExpression: Parser[List[Expression]] =
+    POINT ~> "(" ~> repsep(termExpression, ",")  <~ ")"
+
   protected lazy val comparisonExpression: Parser[Expression] =
-    ( (POINT ~> "(" ~> repsep(termExpression, ",")  <~ ")") ~
-      (IN ~ RANGE ~ "(" ~ POINT ~ "(" ~> repsep(termExpression, ",") <~ ")" ~ ",") ~
-      (POINT ~> "(" ~> repsep(termExpression, ",") <~ ")") <~ ")" ^^
+    ( pointWrappterExpression ~
+      (IN ~ RANGE ~ "(" ~> pointLiteral <~ ",") ~
+      (pointLiteral <~ ")") ^^
       { case point ~ point_low ~ point_high => InRange(point, point_low, point_high) }
-    | (POINT ~> "(" ~> repsep(termExpression, ",")  <~ ")") ~
-      (IN ~ KNN ~ "(" ~ POINT ~ "(" ~> repsep(literal, ",") <~ ")") ~ ("," ~> literal <~ ")") ^^
+    | pointWrappterExpression ~
+      (IN ~ KNN ~ "(" ~> pointLiteral) ~
+      ("," ~> literal <~ ")") ^^
       { case point ~ target ~ l => InKNN(point, target, l) }
-    | (POINT ~> "(" ~> repsep(termExpression, ",")  <~ ")") ~
-      (IN ~ CIRCLERANGE ~ "(" ~ POINT ~ "(" ~> repsep(termExpression, ",") <~ ")") ~
+    | pointWrappterExpression ~
+      (IN ~ CIRCLERANGE ~ "(" ~> pointLiteral) ~
       ("," ~> literal <~ ")") ^^
       { case point ~ target ~ l => InCircleRange(point, target, l) }
     | termExpression ~ ("="  ~> termExpression) ^^ { case e1 ~ e2 => EqualTo(e1, e2) }
@@ -366,6 +370,10 @@ object SqlParser extends AbstractSparkSQLParser with DataTypeParser {
     | sign.? ~ unsignedFloat ^^
       { case s ~ f => Literal(toDecimalOrDouble(s.getOrElse("") + f)) }
     )
+
+  protected lazy val pointLiteral: Parser[List[Literal]] =
+    POINT ~ "(" ~> repsep(numericLiteral, ",") <~ ")"
+
 
   protected lazy val unsignedFloat: Parser[String] =
     ( "." ~> numericLit ^^ { u => "0." + u }
