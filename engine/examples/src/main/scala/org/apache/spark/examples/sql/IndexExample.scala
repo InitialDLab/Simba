@@ -59,13 +59,10 @@ object IndexExample {
 
     println("----------------------------")
 
-//    val sqlQuery = "SELECT * FROM point1 " +
-//      "WHERE POINT(point1.x, point1.y, point1.z) " +
-//      "IN RANGE( POINT(100, 222, 222), POINT(300, 333, 333))" +
-//      "ORDER BY x"
-
-    val sqlQuery = "SELECT * FROM point1 WHERE" +
-      " POINT(x, y) IN KNN (POINT(50, 50), 300)"
+    val sqlQuery = "SELECT * FROM point1 " +
+      "WHERE POINT(point1.x, point1.y, point1.z) " +
+      "IN RANGE( POINT(100, 222, 222), POINT(300, 333, 333))" +
+      "ORDER BY x"
 
     val df = sqlContext.sql(sqlQuery)
     println(df.queryExecution)
