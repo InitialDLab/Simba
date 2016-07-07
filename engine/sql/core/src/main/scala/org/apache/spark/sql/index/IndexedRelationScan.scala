@@ -29,32 +29,6 @@ import scala.collection.mutable
   * Created by dong on 1/20/16.
   * Physical Scan on Indexed Relation
   */
-private[sql] class Interval(var min: (Double, Boolean),
-                            var max: (Double, Boolean)) extends Serializable {
-  def this(min_val: Double = 0.0, max_val: Double = 0.0,
-           left_closed: Boolean = true, right_closed: Boolean = true) {
-    this((min_val, left_closed), (max_val, right_closed))
-  }
-
-  def isNull: Boolean = min._1 > max._1 || (min._1 == max._1 && !(min._2 && max._2))
-
-  def intersect(other: Interval): Interval = {
-    val ans = new Interval()
-    if (!other.isNull) {
-      if (other.min._1 > max._1 || other.max._1 < min._1) {
-        ans.max = (ans.min._1 - 1, true)
-      } else {
-        ans.min = if (min._1 < other.min._1) other.min else min
-        ans.max = if (max._1 > other.max._1) other.max else max
-      }
-    } else ans.max = (ans.min._1 - 1, true)
-    ans
-  }
-
-  override def toString: String =
-    (if (min._2) "[" else "(") + min._1 + ", " + max._1 + (if (max._2) "]" else ")")
-}
-
 private[sql] case class IndexedRelationScan(attributes: Seq[Attribute],
                                             predicates: Seq[Expression],
                                             relation: IndexedRelation)
@@ -64,61 +38,6 @@ private[sql] case class IndexedRelationScan(attributes: Seq[Attribute],
   private val s_level_limit = sqlContext.conf.indexSelectivityLevel
   private val s_threshold = sqlContext.conf.indexSelectivityThreshold
   private val index_threshold = sqlContext.conf.indexSizeThreshold
-
-  def getLeafInterval(x: Expression): (Interval, Attribute) = {
-    x match {
-      case EqualTo(left: NamedExpression, right: Literal) =>
-        val tmp = NumberConverter.literalToDouble(right)
-        (new Interval(tmp, tmp), left.toAttribute)
-      case LessThan(left: NamedExpression, right: Literal) =>
-        (new Interval(Double.MinValue, NumberConverter.literalToDouble(right), false, false),
-          left.toAttribute)
-      case LessThanOrEqual(left: NamedExpression, right: Literal) =>
-        (new Interval(Double.MinValue, NumberConverter.literalToDouble(right), false, true),
-          left.toAttribute)
-      case GreaterThan(left: NamedExpression, right: Literal) =>
-        (new Interval(NumberConverter.literalToDouble(right), Double.MaxValue, false, false),
-          left.toAttribute)
-      case GreaterThanOrEqual(left: NamedExpression, right: Literal) =>
-        (new Interval(NumberConverter.literalToDouble(right), Double.MaxValue, true, false),
-          left.toAttribute)
-      case _ =>
-        null
-    }
-  }
-
-  def conditionToInterval(condition: Expression, column: List[Attribute])
-  : (Array[Interval], Array[Expression]) = {
-    val leaf_nodes = splitConjunctivePredicates(condition) // split AND expression
-    val intervals: Array[Interval] = new Array[Interval](column.length)
-    for (i <- column.indices)
-      intervals(i) = new Interval(Double.MinValue, Double.MaxValue, false, false)
-    var ans = mutable.ArrayBuffer[Expression]()
-    leaf_nodes.foreach {now =>
-      val tmp_interval = getLeafInterval(now)
-      if (tmp_interval != null) {
-        for (i <- column.indices)
-          if (column.indexOf(tmp_interval._2) == i) {
-            intervals(i) = intervals(i).intersect(tmp_interval._1)
-          }
-      } else {
-        now match {
-          case InRange(point: Seq[NamedExpression], point_low, point_high) =>
-            for (i <- point.indices) {
-              val id = column.indexOf(point(i).toAttribute)
-              val low = point_low(i).asInstanceOf[Literal].toString.toDouble
-              val high = point_high(i).asInstanceOf[Literal].toString.toDouble
-              intervals(id) = intervals(id).intersect(new Interval(low, high))
-            }
-          case knn @ InKNN(point: Seq[NamedExpression], target: Seq[Expression], k: Literal) =>
-            ans += knn
-          case cr @ InCircleRange(point: Seq[NamedExpression], target, r: Literal) =>
-            ans += cr
-        }
-      }
-    }
-    (intervals, ans.toArray)
-  }
 
   class DisOrdering(origin: Point, column_keys: List[Attribute]) extends Ordering[InternalRow] {
     // TODO can here be refactored? [GEFEI ADD here]
@@ -154,7 +73,7 @@ private[sql] case class IndexedRelationScan(attributes: Seq[Attribute],
     relation match {
       case treap @ TreapIndexedRelation(_, _, _, column_keys, _) =>
         if (predicates.nonEmpty) {
-          val intervals = predicates.map(conditionToInterval(_, column_keys)._1).head
+          val intervals = predicates.map(Interval.conditionToInterval(_, column_keys)._1).head
           val bounds = treap.range_bounds
           val query_sets = new mutable.HashSet[Int]()
           intervals.foreach {interval =>
@@ -188,7 +107,7 @@ private[sql] case class IndexedRelationScan(attributes: Seq[Attribute],
         if (predicates.nonEmpty) {
           // bug here: for any multi-predicate, only the first is calculate, a intersection
           // is needed here.
-          val intervals = predicates.map(conditionToInterval(_, column_keys)._1).head
+          val intervals = predicates.map(Interval.conditionToInterval(_, column_keys)._1).head
           val bounds = treemap.range_bounds
           val query_sets = new mutable.HashSet[Int]()
           intervals.foreach {interval =>
@@ -222,7 +141,7 @@ private[sql] case class IndexedRelationScan(attributes: Seq[Attribute],
       case rtree @ RTreeIndexedRelation(_, _, _, column_keys, _) =>
         if (predicates.nonEmpty) {
           predicates.map { predicate =>
-            val (intervals, exps) = conditionToInterval(predicate, column_keys)
+            val (intervals, exps) = Interval.conditionToInterval(predicate, column_keys)
             val minPoint = intervals.map(_.min._1)
             val maxPoint = intervals.map(_.max._1)
             val queryMBR = new MBR(new Point(minPoint), new Point(maxPoint))

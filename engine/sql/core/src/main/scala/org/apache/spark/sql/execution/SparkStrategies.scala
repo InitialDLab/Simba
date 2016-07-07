@@ -375,7 +375,7 @@ private[sql] abstract class SparkStrategies extends QueryPlanner[SparkPlan] {
         val (predicatesCanBeIndexed, perfect_indexed) = selectFilter(filters)
         pruneFilterProject(
           projectList,
-          if (!perfect_indexed) filters else Seq.empty,
+          if (!perfect_indexed) filters else Seq.empty, // all indexed then nothing left for Filter
           identity[Seq[Expression]],
           IndexedRelationScan(_, predicatesCanBeIndexed, indexed)) :: Nil
       case _ => Nil
