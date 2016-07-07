@@ -40,19 +40,16 @@ private[sql] case class IndexedRelationScan(attributes: Seq[Attribute],
   private val index_threshold = sqlContext.conf.indexSizeThreshold
 
   class DisOrdering(origin: Point, column_keys: List[Attribute]) extends Ordering[InternalRow] {
-    // TODO can here be refactored? [GEFEI ADD here]
     def compare(a: InternalRow, b: InternalRow): Int = {
       var dis_a = 0.0
-      for (i <- column_keys.indices) {
-        val tmp = BindReferences.bindReference(column_keys(i), relation.output).eval(a)
-          .asInstanceOf[Number].doubleValue()
-        dis_a += (tmp - origin.coord(i)) * (tmp - origin.coord(i))
-      }
       var dis_b = 0.0
       for (i <- column_keys.indices) {
-        val tmp = BindReferences.bindReference(column_keys(i), relation.output).eval(b)
+        val tmp_a = BindReferences.bindReference(column_keys(i), relation.output).eval(a)
           .asInstanceOf[Number].doubleValue()
-        dis_b += (tmp - origin.coord(i)) * (tmp - origin.coord(i))
+        val tmp_b = BindReferences.bindReference(column_keys(i), relation.output).eval(b)
+          .asInstanceOf[Number].doubleValue()
+        dis_a += (tmp_a - origin.coord(i)) * (tmp_a - origin.coord(i))
+        dis_b += (tmp_b - origin.coord(i)) * (tmp_b - origin.coord(i))
       }
       dis_a.compare(dis_b)
     }
@@ -71,99 +68,82 @@ private[sql] case class IndexedRelationScan(attributes: Seq[Attribute],
 
   override protected def doExecute(): RDD[InternalRow] = {
     relation match {
+      case treemap @ TreeMapIndexedRelation(_, _, _, column_keys, _) =>
+        if (predicates.nonEmpty) {
+          val intervals = predicates.map(Interval.conditionToInterval(_, column_keys)._1)
+
+          // global index
+          val bounds = treemap.range_bounds
+          val query_sets = intervals.map{
+            in => Interval.getBoundNumberForInterval(in.headOption.orNull, bounds)
+          }.reduce((a, b) => a ++ b).distinct
+          val pruned = new PartitionPruningRDD(treemap._indexedRDD, query_sets.contains)
+
+          val broadcastInterval = sparkContext.broadcast(intervals)
+          // local index
+          pruned flatMap {packed =>
+            val index = packed.index.asInstanceOf[TreeMapIndex[Double]].index
+            broadcastInterval.value.flatMap{interval_t =>
+              // can be optimized if the local index bound is known
+              val interval = interval_t.headOption.orNull
+              var res = Array[Int]()
+              if (interval != null && !interval.isNull) {
+                res ++= index.subMap(interval.min._1, interval.max._1).values()
+                  .toArray.map(_.asInstanceOf[Int])
+                if (interval.max._2) res ++= Seq(index.get(interval.max._1)) // boundary
+              }
+              res.toIterable
+            }.distinct.map(t => packed.data(t))
+          }
+        } else {
+          treemap._indexedRDD.flatMap(_.data)
+        }
       case treap @ TreapIndexedRelation(_, _, _, column_keys, _) =>
         if (predicates.nonEmpty) {
-          val intervals = predicates.map(Interval.conditionToInterval(_, column_keys)._1).head
+          val intervals = predicates.map(Interval.conditionToInterval(_, column_keys)._1)
+
+          // global index
           val bounds = treap.range_bounds
-          val query_sets = new mutable.HashSet[Int]()
-          intervals.foreach {interval =>
-            if (interval != null && !interval.isNull) {
-              val start = bounds.indexWhere(x => x >= interval.min._1)
-              var end = bounds.indexWhere(x => x >= interval.max._1)
-              if (end == -1) end = bounds.length
-              if (start >= 0) {
-                for (i <- start to end + 1)
-                  query_sets.add(i)
-              } else query_sets.add(bounds.length)
-            }
-          }
+          val query_sets = intervals.map{
+            in => Interval.getBoundNumberForInterval(in.headOption.orNull, bounds)
+          }.reduce((a, b) => a ++ b).distinct
           val pruned = new PartitionPruningRDD(treap._indexedRDD, query_sets.contains)
+
+          val broadcastInterval = sparkContext.broadcast(intervals)
+          // local index
           pruned.flatMap {packed => {
             val index = packed.index.asInstanceOf[Treap[Double]]
-            var tmp_res = mutable.ArrayBuffer[Int]()
-            intervals.foreach {interval =>
+            broadcastInterval.value.flatMap{interval_t =>
+              val interval = interval_t.headOption.orNull
               if (interval != null && !interval.isNull) {
-                val tmp = index.range(interval.min._1, interval.max._1)
-                tmp_res ++= tmp
+                index.range(interval.min._1, interval.max._1).toIterable
               //  if (interval.max._2) tmp_res ++= index.find(interval.max._1)
+              } else {
+                Iterable.empty
               }
-            }
-            tmp_res.toArray.distinct.map(t => packed.data(t))
+            }.distinct.map(t => packed.data(t))
           }}
         } else {
           treap._indexedRDD.flatMap(_.data)
-        }
-      case treemap @ TreeMapIndexedRelation(_, _, _, column_keys, _) =>
-        if (predicates.nonEmpty) {
-          // bug here: for any multi-predicate, only the first is calculate, a intersection
-          // is needed here.
-          val intervals = predicates.map(Interval.conditionToInterval(_, column_keys)._1).head
-          val bounds = treemap.range_bounds
-          val query_sets = new mutable.HashSet[Int]()
-          intervals.foreach {interval =>
-            if (interval != null && !interval.isNull) {
-              val start = bounds.indexWhere(x => x >= interval.min._1)
-              var end = bounds.indexWhere(x => x >= interval.max._1)
-              if (end == -1) end = bounds.length
-              if (start >= 0) {
-                for (i <- start to end + 1)
-                  query_sets.add(i)
-              } else query_sets.add(bounds.length)
-            }
-          }
-          val pruned = new PartitionPruningRDD(treemap._indexedRDD, query_sets.contains)
-          pruned flatMap {packed => {
-            val index = packed.index.asInstanceOf[TreeMapIndex[Double]].index
-            var tmp_res = mutable.ArrayBuffer[Int]()
-            intervals.foreach {interval =>
-              if (interval != null && !interval.isNull) {
-                val tmp = index.subMap(interval.min._1, interval.max._1).values()
-                  .toArray.map(_.asInstanceOf[Int])
-                tmp_res ++= tmp
-                if (interval.max._2) tmp_res += index.get(interval.max._1)
-              }
-            }
-            tmp_res.toArray.distinct.map(t => packed.data(t))
-          }}
-        } else {
-          treemap._indexedRDD.flatMap(_.data)
         }
       case rtree @ RTreeIndexedRelation(_, _, _, column_keys, _) =>
         if (predicates.nonEmpty) {
           predicates.map { predicate =>
             val (intervals, exps) = Interval.conditionToInterval(predicate, column_keys)
-            val minPoint = intervals.map(_.min._1)
-            val maxPoint = intervals.map(_.max._1)
-            val queryMBR = new MBR(new Point(minPoint), new Point(maxPoint))
+            val queryMBR = new MBR(new Point(intervals.map(_.min._1)),
+              new Point(intervals.map(_.max._1)))
             var cir_ranges = Array[(Point, Double)]()
             var knn_res: Array[InternalRow] = null
 
             exps.foreach {
               case InKNN(point: Seq[NamedExpression], target: Seq[Literal], l: Literal) =>
                 val query_point = new Point(target.map(NumberConverter.literalToDouble).toArray)
-                val k = l.value.asInstanceOf[Number].intValue()
-                val mbr_ans = rtree.global_rtree.kNN(query_point, (a: Point, b: MBR) => {
-                  require(a.coord.length == b.low.coord.length)
-                  var ans = 0.0
-                  for (i <- a.coord.indices) {
-                    ans += Math.max((a.coord(i) - b.low.coord(i)) * (a.coord(i) - b.low.coord(i)),
-                      (a.coord(i) - b.high.coord(i)) * (a.coord(i) - b.high.coord(i)))
-                  }
-                  Math.sqrt(ans)
-                }, k, keepSame = false)
                 val ord = new DisOrdering(query_point, column_keys)
-                val tmp_set = new mutable.HashSet[Int]()
-                tmp_set ++= mbr_ans.map(_._2)
+                val k = l.value.asInstanceOf[Number].intValue()
+
+                // first prune, get k partitions, but partitions may not be final partitions
+                val tmp_set = rtree.global_rtree.kNN(query_point, {(a: Point, b: MBR) => b.maxDist(a)},
+                  k, keepSame = false).map(_._2).toSeq
                 val tmp_pruned = new PartitionPruningRDD(rtree._indexedRDD, tmp_set.contains)
                 val tmp_ans = tmp_pruned.flatMap { packed =>
                   var tmp_ans = Array[(Shape, Int)]()
@@ -171,12 +151,11 @@ private[sql] case class IndexedRelationScan(attributes: Seq[Attribute],
                     tmp_ans = packed.index.asInstanceOf[RTree].kNN(query_point, k, keepSame = false)
                   }
                   tmp_ans.map(x => packed.data(x._2))
-                }.takeOrdered(k)(ord)
+                }.takeOrdered(k)(ord)// get a safe and tighter bound
                 val theta = evalDist(tmp_ans.last, query_point, column_keys)
 
-                val set = new mutable.HashSet[Int]()
-                set ++= rtree.global_rtree.circleRange(query_point, theta).map(_._2)
-                set --= tmp_set
+                // second prune, with the safe bound theta, to get the final global result
+                val set = (rtree.global_rtree.circleRange(query_point, theta).map(_._2) diff tmp_set).toSeq
                 val tmp_knn_res = if (set.isEmpty) tmp_ans
                 else {
                   val pruned = new PartitionPruningRDD(rtree._indexedRDD, set.contains)
@@ -199,12 +178,14 @@ private[sql] case class IndexedRelationScan(attributes: Seq[Attribute],
             }
 
             if (knn_res == null || knn_res.length > index_threshold) { // too large
-              val hash_set = new mutable.HashSet[Int]()
-              hash_set ++= rtree.global_rtree.range(queryMBR).map(_._2)
-              if (cir_ranges.nonEmpty) {
-                hash_set ++= rtree.global_rtree.circleRangeConj(cir_ranges).map(_._2)
+              var global_part = rtree.global_rtree.range(queryMBR).map(_._2).toSeq
+              if (cir_ranges.nonEmpty){ // circle range
+                global_part = global_part.intersect(
+                  rtree.global_rtree.circleRangeConj(cir_ranges).map(_._2)
+                )
               }
-              val pruned = new PartitionPruningRDD(rtree._indexedRDD, hash_set.contains)
+
+              val pruned = new PartitionPruningRDD(rtree._indexedRDD, global_part.contains)
 
               val tmp_rdd = pruned.flatMap {packed =>
                 val index = packed.index.asInstanceOf[RTree]
@@ -215,31 +196,21 @@ private[sql] case class IndexedRelationScan(attributes: Seq[Attribute],
                     cir_ranges.forall(x => Dist.furthest(x._1, root_mbr) <= x._2)
 
                   if (perfect_cover) packed.data
-                  else if (selectivity_enabled) { // is perfect_cover a selectivity
-                    val res = index.range(queryMBR, s_level_limit, s_threshold)
-                    if (res.isEmpty) {
-                      packed.data.filter { row =>
-                        val tmp_point = new Point(
+                  else {
+                    val range_res = if (selectivity_enabled) {
+                      val res = index.range(queryMBR, s_level_limit, s_threshold)
+                      if (res.isEmpty) { // full scan
+                        packed.data.filter(row => queryMBR.intersects(new Point(
                           column_keys.map(x => BindReferences.bindReference(x, relation.output)
                             .eval(row).asInstanceOf[Number].doubleValue()).toArray
-                        )
-                        queryMBR.intersects(tmp_point)
-                      }.intersect(index.circleRangeConj(cir_ranges).map(x => packed.data(x._2)))
-                    } else {
-                      val tmp_res = res.get.map(_._2)
-                      if (cir_ranges.isEmpty) tmp_res.map(x => packed.data(x))
-                      else {
-                        tmp_res.intersect(index.circleRangeConj(cir_ranges).map(_._2))
-                          .map(x => packed.data(x))
-                      }
+                        )))
+                      } else res.get.map(x => packed.data(x._2))
+                    } else index.range(queryMBR).map(x => packed.data(x._2))
+                    if (cir_ranges.nonEmpty){
+                      range_res.intersect(index.circleRangeConj(cir_ranges)
+                        .map(x => packed.data(x._2)))
                     }
-                  } else {
-                    val res = index.range(queryMBR).map(_._2)
-                    if (cir_ranges.isEmpty) res.map(x => packed.data(x))
-                    else {
-                      res.intersect(index.circleRangeConj(cir_ranges).map(_._2))
-                        .map(x => packed.data(x))
-                    }
+                    else range_res
                   }
                 } else Array[InternalRow]()
               }

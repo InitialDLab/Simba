@@ -358,24 +358,31 @@ private[sql] abstract class SparkStrategies extends QueryPlanner[SparkPlan] {
       attrs != null && lookupIndexInfo(attrs) != null
     }
 
-    def selectFilter(predicates: Seq[Expression]): (Seq[Expression], Boolean) = {
+    def selectFilter(predicates: Seq[Expression]): (Seq[Expression], Seq[Expression]) = {
       val originalPredicate = predicates.reduceLeftOption(And).getOrElse(Literal(true))
       val clauses = splitDNFPredicates(originalPredicate).map(splitCNFPredicates)
-      val temp = clauses.map(clause => clause.filter(leafNodeCanBeIndexed))
+      val predicateCanBeIndexed = clauses.map(clause => clause.filter(leafNodeCanBeIndexed))
 
       def getSize(aaExpression: Seq[Seq[_]]): Int =
         aaExpression.aggregate(0)((a, data) => a + data.length, (left, right) => left + right)
 
-      (temp.map(_.reduceLeftOption(And).getOrElse(Literal(true))),
-        getSize(clauses) == getSize(temp)) // perfect indexed
+      val expressionLeft: Seq[Expression] =
+        if (getSize(clauses) == getSize(predicateCanBeIndexed)) Seq[Expression]()
+        else if (clauses.length == 1){ // no Or clause
+          clauses.map(clause => clause.filter(cls => !leafNodeCanBeIndexed(cls))).head
+        } else predicates
+
+      (predicateCanBeIndexed.map(_.reduceLeftOption(And).getOrElse(Literal(true))),
+        expressionLeft) // perfect indexed
     }
 
     def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
       case PhysicalOperation(projectList, filters, indexed: IndexedRelation) =>
-        val (predicatesCanBeIndexed, perfect_indexed) = selectFilter(filters)
+        val (predicatesCanBeIndexed, parentPredicate) = selectFilter(filters)
         pruneFilterProject(
           projectList,
-          if (!perfect_indexed) filters else Seq.empty, // all indexed then nothing left for Filter
+          parentPredicate, // all indexed then nothing left for Filter
+//          filters,
           identity[Seq[Expression]],
           IndexedRelationScan(_, predicatesCanBeIndexed, indexed)) :: Nil
       case _ => Nil

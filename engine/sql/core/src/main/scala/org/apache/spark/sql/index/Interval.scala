@@ -123,9 +123,25 @@ object Interval extends PredicateHelper{
             ans += knn
           case cr @ InCircleRange(point: Seq[NamedExpression], target, r: Literal) =>
             ans += cr
+          case _ =>
         }
       }
     }
     (intervals, ans.toArray)
+  }
+
+  def getBoundNumberForInterval(interval: Interval,
+        range_bounds: Array[Double]): Seq[Int] = {
+    val res = new mutable.HashSet[Int]()
+    if (interval != null){
+      val start = range_bounds.indexWhere(x => x >= interval.min._1)
+      var end = range_bounds.indexWhere(x => x >= interval.max._1)
+      if (end == -1) end = range_bounds.length
+      if (start >= 0) {
+        for (i <- start to end + 1)
+          res.add(i)
+      } else res.add(range_bounds.length)
+    }
+    res.toArray
   }
 }
