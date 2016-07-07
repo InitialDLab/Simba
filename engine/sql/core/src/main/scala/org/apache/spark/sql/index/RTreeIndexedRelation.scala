@@ -47,16 +47,17 @@ private[sql] case class RTreeIndexedRelation(
   }
   require(checkKeys)
 
-  val numShufflePartitions = child.sqlContext.conf.numShufflePartitions
-  val maxEntriesPerNode = child.sqlContext.conf.maxEntriesPerNode
-  val sampleRate = child.sqlContext.conf.sampleRate
-  val transferThreshold = child.sqlContext.conf.transferThreshold
 
   if (_indexedRDD == null) {
     buildIndex()
   }
 
   private[sql] def buildIndex(): Unit = {
+    val numShufflePartitions = child.sqlContext.conf.numShufflePartitions
+    val maxEntriesPerNode = child.sqlContext.conf.maxEntriesPerNode
+    val sampleRate = child.sqlContext.conf.sampleRate
+    val transferThreshold = child.sqlContext.conf.transferThreshold
+
     val dataRDD = child.execute().map(row => {
       val now = column_keys.map(x =>
         BindReferences.bindReference(x, child.output).eval(row).asInstanceOf[Number].doubleValue()

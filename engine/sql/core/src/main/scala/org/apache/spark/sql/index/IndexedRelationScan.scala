@@ -50,7 +50,7 @@ private[sql] case class IndexedRelationScan(attributes: Seq[Attribute],
       }
       var dis_b = 0.0
       for (i <- column_keys.indices) {
-        val tmp = BindReferences.bindReference(column_keys(i), relation.output).eval(a)
+        val tmp = BindReferences.bindReference(column_keys(i), relation.output).eval(b)
           .asInstanceOf[Number].doubleValue()
         dis_b += (tmp - origin.coord(i)) * (tmp - origin.coord(i))
       }
@@ -201,7 +201,9 @@ private[sql] case class IndexedRelationScan(attributes: Seq[Attribute],
             if (knn_res == null || knn_res.length > index_threshold) { // too large
               val hash_set = new mutable.HashSet[Int]()
               hash_set ++= rtree.global_rtree.range(queryMBR).map(_._2)
-              hash_set ++= rtree.global_rtree.circleRangeConj(cir_ranges).map(_._2)
+              if (cir_ranges.nonEmpty) {
+                hash_set ++= rtree.global_rtree.circleRangeConj(cir_ranges).map(_._2)
+              }
               val pruned = new PartitionPruningRDD(rtree._indexedRDD, hash_set.contains)
 
               val tmp_rdd = pruned.flatMap {packed =>
@@ -224,12 +226,20 @@ private[sql] case class IndexedRelationScan(attributes: Seq[Attribute],
                         queryMBR.intersects(tmp_point)
                       }.intersect(index.circleRangeConj(cir_ranges).map(x => packed.data(x._2)))
                     } else {
-                      res.get.map(x => packed.data(x._2))
-                        .intersect(index.circleRangeConj(cir_ranges).map(x => packed.data(x._2)))
+                      val tmp_res = res.get.map(_._2)
+                      if (cir_ranges.isEmpty) tmp_res.map(x => packed.data(x))
+                      else {
+                        tmp_res.intersect(index.circleRangeConj(cir_ranges).map(_._2))
+                          .map(x => packed.data(x))
+                      }
                     }
                   } else {
-                    index.range(queryMBR).map(x => packed.data(x._2))
-                      .intersect(index.circleRangeConj(cir_ranges).map(x => packed.data(x._2)))
+                    val res = index.range(queryMBR).map(_._2)
+                    if (cir_ranges.isEmpty) res.map(x => packed.data(x))
+                    else {
+                      res.intersect(index.circleRangeConj(cir_ranges).map(_._2))
+                        .map(x => packed.data(x))
+                    }
                   }
                 } else Array[InternalRow]()
               }

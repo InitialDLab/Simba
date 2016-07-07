@@ -23,7 +23,7 @@ import org.apache.spark.sql.catalyst.analysis.MultiInstanceRelation
 import org.apache.spark.sql.catalyst.expressions.{Attribute, BindReferences}
 import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, Statistics}
 import org.apache.spark.sql.execution.SparkPlan
-import org.apache.spark.sql.partitioner.{HashPartition, RangePartition, STRPartition}
+import org.apache.spark.sql.partitioner._
 import org.apache.spark.sql.spatial.Point
 import org.apache.spark.sql.types.{DoubleType, IntegerType, NumericType}
 import org.apache.spark.storage.StorageLevel

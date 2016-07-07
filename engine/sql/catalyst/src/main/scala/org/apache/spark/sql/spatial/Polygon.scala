@@ -84,7 +84,12 @@ case class Polygon(content: JTSPolygon) extends Shape {
     content.distance(gf.toGeometry(new Envelope(low, high)))
   }
 
-  def minDist(cir: Circle): Double = minDist(cir.center) - cir.radius
+  def minDist(cir: Circle): Double = {
+    val res = minDist(cir.center) - cir.radius
+    if (res <= 0) 0
+    else res
+  }
+
 
   def minDist(poly: Polygon): Double = content.distance(poly.content)
 

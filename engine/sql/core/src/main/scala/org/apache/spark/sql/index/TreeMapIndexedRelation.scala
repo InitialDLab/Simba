@@ -38,15 +38,14 @@ private[sql] case class TreeMapIndexedRelation(
   extends IndexedRelation with MultiInstanceRelation {
   require(column_keys.length == 1)
   require(column_keys.head.dataType.isInstanceOf[NumericType])
-  val numShufflePartitions = child.sqlContext.conf.numShufflePartitions
-  val maxEntriesPerNode = child.sqlContext.conf.maxEntriesPerNode
-  val sampleRate = child.sqlContext.conf.sampleRate
 
   if (_indexedRDD == null) {
     buildIndex()
   }
 
   private[sql] def buildIndex(): Unit = {
+    val numShufflePartitions = child.sqlContext.conf.numShufflePartitions
+
     val dataRDD = child.execute().map(row => {
       val key = BindReferences.bindReference(column_keys.head, child.output).eval(row)
         .asInstanceOf[Number].doubleValue
