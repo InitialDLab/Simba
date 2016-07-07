@@ -194,10 +194,14 @@ object SqlParser extends AbstractSparkSQLParser with DataTypeParser {
     }
 
   protected lazy val joinConditions: Parser[Expression] =
-    ( ON ~> (POINT ~ "(" ~> repsep(termExpression, ",")  <~ ")") ~
-      (IN ~ KNN ~ "(" ~ POINT ~ "(" ~> repsep(termExpression, ",") <~ ")")
-      ~ ("," ~> literal <~ ")") ^^
+    ( ON ~> pointWrappterExpression ~
+      (IN ~ KNN ~ "(" ~> pointWrappterExpression)
+      ~ ("," ~> numericLiteral <~ ")") ^^
       { case point ~ target ~ l => InKNN(point, target, l) }
+      | ON ~> pointWrappterExpression ~
+      (IN ~ CIRCLERANGE ~ "(" ~> pointWrappterExpression)
+      ~ ("," ~> numericLiteral <~ ")") ^^
+      { case point ~ center ~l => InCircleRange(point, center, l)}
     | ON ~> expression
     )
 
