@@ -63,8 +63,9 @@ object SpatialOperationExample {
 //    val sqlQuery =
 //      "SELECT * FROM point1 WHERE x > 50 " +
 //        "AND ((x < 52) OR (x <= 70 AND y < 80) OR (x > 80 AND x <= 100 AND y > 90)) ORDER BY y"
-//    val sqlQuery = "SELECT * FROM point1 WHERE POINT(x, y) IN KNN(POINT(50, 50), 300) ORDER BY y"
-    val sqlQuery = "SELECT * FROM point1 WHERE POINT(x, y) IN RANGE(POINT(50, 50), POINT(100, 100)) ORDER BY y"
+    val sqlQuery = "SELECT * FROM point1 WHERE POINT(x, y) IN KNN(POINT(50, 50), 201) " +
+  "AND POINT(x, y) IN KNN(POINT(200, 200), 11) ORDER BY y"
+//    val sqlQuery = "SELECT * FROM point1 WHERE POINT(x, y) IN RANGE(POINT(50, 50), POINT(100, 100)) ORDER BY y"
     val df = sqlContext.sql(sqlQuery)
     println(df.queryExecution)
     println("-------------------")

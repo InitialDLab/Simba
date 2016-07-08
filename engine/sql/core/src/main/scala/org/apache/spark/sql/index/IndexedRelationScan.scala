@@ -141,36 +141,31 @@ private[sql] case class IndexedRelationScan(attributes: Seq[Attribute],
                 val ord = new DisOrdering(query_point, column_keys)
                 val k = l.value.asInstanceOf[Number].intValue()
 
-                // first prune, get k partitions, but partitions may not be final partitions
-                val tmp_set = rtree.global_rtree.kNN(query_point, {(a: Point, b: MBR) => b.maxDist(a)},
-                  k, keepSame = false).map(_._2).toSeq
-                val tmp_pruned = new PartitionPruningRDD(rtree._indexedRDD, tmp_set.contains)
-                val tmp_ans = tmp_pruned.flatMap { packed =>
-                  var tmp_ans = Array[(Shape, Int)]()
-                  if (packed.index.asInstanceOf[RTree] != null) {
-                    tmp_ans = packed.index.asInstanceOf[RTree].kNN(query_point, k, keepSame = false)
-                  }
-                  tmp_ans.map(x => packed.data(x._2))
-                }.takeOrdered(k)(ord)// get a safe and tighter bound
-                val theta = evalDist(tmp_ans.last, query_point, column_keys)
-
-                // second prune, with the safe bound theta, to get the final global result
-                val set = (rtree.global_rtree.circleRange(query_point, theta).map(_._2) diff tmp_set).toSeq
-                val tmp_knn_res = if (set.isEmpty) tmp_ans
-                else {
-                  val pruned = new PartitionPruningRDD(rtree._indexedRDD, set.contains)
-                  pruned.flatMap { packed =>
+                def knnGlobalPrune(global_part: Seq[Int]): Array[InternalRow] = {
+                  val pruned = new PartitionPruningRDD(rtree._indexedRDD, global_part.contains)
+                  pruned.flatMap{ packed =>
                     var tmp_ans = Array[(Shape, Int)]()
                     if (packed.index.asInstanceOf[RTree] != null) {
                       tmp_ans = packed.index.asInstanceOf[RTree]
                         .kNN(query_point, k, keepSame = false)
                     }
                     tmp_ans.map(x => packed.data(x._2))
-                  }.takeOrdered(k)(ord).union(tmp_ans).sorted(ord).take(k)
+                  }.takeOrdered(k)(ord)
                 }
 
+                // first prune, get k partitions, but partitions may not be final partitions
+                val global_part1 = rtree.global_rtree.kNN(query_point, {(a: Point, b: MBR) => b.maxDist(a)},
+                  k, keepSame = false).map(_._2).toSeq
+                val tmp_ans = knnGlobalPrune(global_part1) // to get a safe and tighter bound
+                val theta = evalDist(tmp_ans.last, query_point, column_keys)
+
+                // second prune, with the safe bound theta, to get the final global result
+                val global_part2 = (rtree.global_rtree.circleRange(query_point, theta).map(_._2) diff global_part1).toSeq
+                val tmp_knn_res = if (global_part2.isEmpty) tmp_ans
+                else knnGlobalPrune(global_part2).union(tmp_ans).sorted(ord).take(k)
+
                 if (knn_res == null) knn_res = tmp_knn_res
-                else knn_res = knn_res.intersect(tmp_knn_res)
+                else knn_res = knn_res.intersect(tmp_knn_res) // for multiple knn predicate
               case InCircleRange(point: Seq[NamedExpression], target: Seq[Literal], l: Literal) =>
                 val query_point = new Point(target.map(NumberConverter.literalToDouble).toArray)
                 val r = NumberConverter.literalToDouble(l)
@@ -206,7 +201,7 @@ private[sql] case class IndexedRelationScan(attributes: Seq[Attribute],
                         )))
                       } else res.get.map(x => packed.data(x._2))
                     } else index.range(queryMBR).map(x => packed.data(x._2))
-                    if (cir_ranges.nonEmpty){
+                    if (cir_ranges.nonEmpty) { // circle range processing
                       range_res.intersect(index.circleRangeConj(cir_ranges)
                         .map(x => packed.data(x._2)))
                     }
