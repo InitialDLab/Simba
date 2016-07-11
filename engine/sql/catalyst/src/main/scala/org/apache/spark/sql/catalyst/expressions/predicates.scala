@@ -302,14 +302,14 @@ case class InCircleRange(point: Seq[Expression],
   }
 }
 
-case class InKNN(point: Seq[Expression],
-                 target: Seq[Expression],
+case class InKNN(point: Expression,
+                 target: Expression,
                  k: Literal) extends Predicate with CodegenFallback {
   require(k.dataType.isInstanceOf[IntegralType])
 
   override def hasSpatial: Boolean = true
 
-  override def children: Seq[Expression] = point ++ target ++ Seq(k)
+  override def children: Seq[Expression] = Seq(point, target) ++ Seq(k)
 
   override def nullable: Boolean = false
 

@@ -368,8 +368,8 @@ private[sql] abstract class SparkStrategies extends QueryPlanner[SparkPlan] {
 
         case InRange(point: Seq[NamedExpression], boundL, boundR) =>
           lookupIndexInfo(point.map(x => x.toAttribute))
-        case InKNN(point: Seq[NamedExpression], target: Seq[Expression], k: Literal) =>
-          lookupIndexInfo(point.map(x => x.toAttribute))
+//        case InKNN(point: Seq[NamedExpression], target: Seq[Expression], k: Literal) =>
+//          lookupIndexInfo(point.map(x => x.toAttribute))
         case InCircleRange(point: Seq[NamedExpression], target: Seq[Expression], r: Literal) =>
           lookupIndexInfo(point.map(x => x.toAttribute))
         case _ =>

@@ -44,6 +44,7 @@ import scala.language.implicitConversions
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe.TypeTag
 
+import org.apache.spark.sql.spatial.Point
 
 private[sql] object DataFrame {
   def apply(sqlContext: SQLContext, logicalPlan: LogicalPlan): DataFrame = {
@@ -1201,11 +1202,11 @@ class DataFrame private[sql](
     *   point.range(Point(point1("x"), point1("y")), Point(1.0, 1.0), Point(2.0, 2.0))
     * }}}
     */
-  def range(keys: PointFromColumn, point1: PointFromCoords, point2: PointFromCoords): DataFrame =
-    withPlan {
-      Filter(InRange(keys.cols.map(_.expr), point1.coords.map(Literal(_)),
-        point2.coords.map(Literal(_))), logicalPlan)
-    }
+//  def range(keys: PointFromColumn, point1: PointFromCoords, point2: PointFromCoords): DataFrame =
+//    withPlan {
+//      Filter(InRange(keys.cols.map(_.expr), point1.coords.map(Literal(_)),
+//        point2.coords.map(Literal(_))), logicalPlan)
+//    }
 
   /**
     * Spatial operation, range query.
@@ -1214,19 +1215,19 @@ class DataFrame private[sql](
     *   point.filter($"x" >= 10 && $"x" <= 20 && $"y" >= 10 && $"y" <= 20)
     * }}}
     */
-  def range(keys: Array[String], point1: Array[Double], point2: Array[Double]): DataFrame =
-   withPlan {
-      val attrs = getAttributes(keys)
-      attrs.foreach(attr => assert(attr != null, "column not found"))
+//  def range(keys: Array[String], point1: Array[Double], point2: Array[Double]): DataFrame =
+//   withPlan {
+//      val attrs = getAttributes(keys)
+//      attrs.foreach(attr => assert(attr != null, "column not found"))
+//
+//      Filter(InRange(attrs, point1.map(Literal(_)), point2.map(Literal(_))), logicalPlan)
+//    }
 
-      Filter(InRange(attrs, point1.map(Literal(_)), point2.map(Literal(_))), logicalPlan)
-    }
-
-  def circleRange(keys: PointFromColumn, point: PointFromCoords, r: Double): DataFrame =
-    withPlan {
-      Filter(InCircleRange(keys.cols.map(_.expr), point.coords.map(Literal(_)),
-        Literal(r)), logicalPlan)
-    }
+//  def circleRange(keys: PointFromColumn, point: PointFromCoords, r: Double): DataFrame =
+//    withPlan {
+//      Filter(InCircleRange(keys.cols.map(_.expr), point.coords.map(Literal(_)),
+//        Literal(r)), logicalPlan)
+//    }
 
   /**
     * Spatial operation circle range query
@@ -1245,49 +1246,49 @@ class DataFrame private[sql](
     * Spatial operation knn
     * Find k nearest neighbor of a given point
     */
-  def knn(keys: Array[String], point: Array[Double], k: Int): DataFrame = withPlan{
-    val attrs = getAttributes(keys)
+  def knn(keys: String, point: Array[Double], k: Int): DataFrame = withPlan{
+    val attrs = getAttributes(Array(keys))
     attrs.foreach(attr => assert(attr != null, "column not found"))
-    Filter(InKNN(attrs, point.map(Literal(_)), Literal(k)), logicalPlan)
+    Filter(InKNN(attrs(0), Literal(new Point(point)), Literal(k)), logicalPlan)
   }
 
   def knn(keys: PointFromColumn, point: PointFromCoords, k: Int): DataFrame = withPlan {
-    Filter(InKNN(keys.cols.map(_.expr), point.coords.map(Literal(_)), Literal(k)), logicalPlan)
+    Filter(InKNN(keys.cols.expr, Literal(new Point(point.coords.toArray)), Literal(k)), logicalPlan)
   }
 
   /**
     * Spatial operation DistanceJoin
     */
-  def distanceJoin(right: DataFrame, leftKeys: Array[String],
-                   rightKeys: Array[String], r: Double) : DataFrame = withPlan {
-    val leftAttrs = getAttributes(leftKeys)
-    val rightAttrs = getAttributes(rightKeys, right.queryExecution.analyzed.output)
-    Join(this.logicalPlan, right.logicalPlan, DistanceJoin,
-      Some(InCircleRange(rightAttrs, leftAttrs, Literal(r))))
-  }
-
-  def distanceJoin(right: DataFrame, leftKeys: PointFromColumn,
-                   rightKeys: PointFromColumn, r: Double): DataFrame = withPlan {
-    Join(this.logicalPlan, right.logicalPlan, DistanceJoin,
-      Some(InCircleRange(rightKeys.cols.map(_.expr), leftKeys.cols.map(_.expr), Literal(r))))
-  }
+//  def distanceJoin(right: DataFrame, leftKeys: Array[String],
+//                   rightKeys: Array[String], r: Double) : DataFrame = withPlan {
+//    val leftAttrs = getAttributes(leftKeys)
+//    val rightAttrs = getAttributes(rightKeys, right.queryExecution.analyzed.output)
+//    Join(this.logicalPlan, right.logicalPlan, DistanceJoin,
+//      Some(InCircleRange(rightAttrs, leftAttrs, Literal(r))))
+//  }
+//
+//  def distanceJoin(right: DataFrame, leftKeys: PointFromColumn,
+//                   rightKeys: PointFromColumn, r: Double): DataFrame = withPlan {
+//    Join(this.logicalPlan, right.logicalPlan, DistanceJoin,
+//      Some(InCircleRange(rightKeys.cols.map(_.expr), leftKeys.cols.map(_.expr), Literal(r))))
+//  }
 
   /**
     * Spatial operation KNNJoin
     */
-  def knnJoin(right: DataFrame, leftKeys: Array[String],
-              rightKeys: Array[String], k : Int) : DataFrame = withPlan {
-    val leftAttrs = getAttributes(leftKeys)
-    val rightAttrs = getAttributes(rightKeys, right.queryExecution.analyzed.output)
-    Join(this.logicalPlan, right.logicalPlan, KNNJoin,
-      Some(InKNN(rightAttrs, leftAttrs, Literal(k))))
-  }
-
-  def knnJoin(right: DataFrame, leftKeys: PointFromColumn,
-              rightKeys: PointFromColumn, k: Int): DataFrame = withPlan {
-    Join(this.logicalPlan, right.logicalPlan, KNNJoin,
-      Some(InKNN(rightKeys.cols.map(_.expr), leftKeys.cols.map(_.expr), Literal(k))))
-  }
+//  def knnJoin(right: DataFrame, leftKeys: Array[String],
+//              rightKeys: Array[String], k : Int) : DataFrame = withPlan {
+//    val leftAttrs = getAttributes(leftKeys)
+//    val rightAttrs = getAttributes(rightKeys, right.queryExecution.analyzed.output)
+//    Join(this.logicalPlan, right.logicalPlan, KNNJoin,
+//      Some(InKNN(rightAttrs, leftAttrs, Literal(k))))
+//  }
+//
+//  def knnJoin(right: DataFrame, leftKeys: PointFromColumn,
+//              rightKeys: PointFromColumn, k: Int): DataFrame = withPlan {
+//    Join(this.logicalPlan, right.logicalPlan, KNNJoin,
+//      Some(InKNN(rightKeys.cols.map(_.expr), leftKeys.cols.map(_.expr), Literal(k))))
+//  }
 
   /**
    * (Scala-specific) Returns a new [[DataFrame]] where each row has been expanded to zero or more

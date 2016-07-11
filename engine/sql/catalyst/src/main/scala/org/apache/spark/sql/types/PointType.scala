@@ -14,12 +14,22 @@
  *  limitations under the License.
  */
 
-package org.apache.spark.sql.types;
+package org.apache.spark.sql.types
 
 import org.apache.spark.sql.spatial.Point
+
 /**
  * Created by zhongpu on 16-7-11.
  */
-class PointType private() extends DataType {
 
-        }
+class PointType private() extends DataType {
+   private[sql] type InternalType = Point
+
+   override def asNullable: DataType = this
+
+   override def defaultSize: Int = 4096
+
+   override def simpleString: String = "Point"
+}
+
+case object PointType extends PointType

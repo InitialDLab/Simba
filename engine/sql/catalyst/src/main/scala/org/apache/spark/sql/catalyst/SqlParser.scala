@@ -25,6 +25,7 @@ import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.catalyst.util.DataTypeParser
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.types.CalendarInterval
+import org.apache.spark.sql.spatial.Point
 
 import scala.language.implicitConversions
 
@@ -194,8 +195,8 @@ object SqlParser extends AbstractSparkSQLParser with DataTypeParser {
     }
 
   protected lazy val joinConditions: Parser[Expression] =
-    ( ON ~> pointWrapperExpression ~
-      (IN ~ KNN ~ "(" ~> pointWrapperExpression)
+    ( ON ~> termExpression ~
+      (IN ~ KNN ~ "(" ~> termExpression)
       ~ ("," ~> numericLiteral <~ ")") ^^
       { case point ~ target ~ l => InKNN(point, target, l) }
       | ON ~> pointWrapperExpression ~
@@ -248,15 +249,15 @@ object SqlParser extends AbstractSparkSQLParser with DataTypeParser {
 
   protected lazy val comparisonExpression: Parser[Expression] =
     ( pointWrapperExpression ~
-      (IN ~ RANGE ~ "(" ~> pointLiteral <~ ",") ~
-      (pointLiteral <~ ")") ^^
+      (IN ~ RANGE ~ "(" ~> pointLiteral2 <~ ",") ~
+      (pointLiteral2 <~ ")") ^^
       { case point ~ point_low ~ point_high => InRange(point, point_low, point_high) }
-    | pointWrapperExpression ~
+    | termExpression ~
       (IN ~ KNN ~ "(" ~> pointLiteral) ~
       ("," ~> literal <~ ")") ^^
       { case point ~ target ~ l => InKNN(point, target, l) }
     | pointWrapperExpression ~
-      (IN ~ CIRCLERANGE ~ "(" ~> pointLiteral) ~
+      (IN ~ CIRCLERANGE ~ "(" ~> pointLiteral2) ~
       ("," ~> literal <~ ")") ^^
       { case point ~ target ~ l => InCircleRange(point, target, l) }
     | termExpression ~ ("="  ~> termExpression) ^^ { case e1 ~ e2 => EqualTo(e1, e2) }
@@ -361,6 +362,7 @@ object SqlParser extends AbstractSparkSQLParser with DataTypeParser {
     | booleanLiteral
     | stringLit ^^ { case s => Literal.create(s, StringType) }
     | intervalLiteral
+    | pointLiteral
     | NULL ^^^ Literal.create(null, NullType)
     )
 
@@ -375,7 +377,12 @@ object SqlParser extends AbstractSparkSQLParser with DataTypeParser {
       { case s ~ f => Literal(toDecimalOrDouble(s.getOrElse("") + f)) }
     )
 
-  protected lazy val pointLiteral: Parser[List[Literal]] =
+  protected lazy val pointLiteral: Parser[Literal] =
+   (POINT ~ "(" ~> repsep(numericLiteral, ",") <~ ")") ^^
+  {case points => Literal(new Point(points.toArray.map(x =>
+    x.value.asInstanceOf[Number].doubleValue())))}
+
+  protected lazy val pointLiteral2: Parser[List[Literal]] =
     POINT ~ "(" ~> repsep(numericLiteral, ",") <~ ")"
 
 
