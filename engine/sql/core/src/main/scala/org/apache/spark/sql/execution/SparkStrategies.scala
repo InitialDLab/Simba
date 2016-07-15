@@ -372,8 +372,7 @@ private[sql] abstract class SparkStrategies extends QueryPlanner[SparkPlan] {
           clauses.map(clause => clause.filter(cls => !leafNodeCanBeIndexed(cls))).head
         } else predicates
 
-      (predicateCanBeIndexed.map(_.reduceLeftOption(And).getOrElse(Literal(true))),
-        expressionLeft) // perfect indexed
+      (predicateCanBeIndexed.map(_.reduceLeftOption(And).getOrElse(Literal(true))), expressionLeft)
     }
 
     def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
@@ -381,8 +380,7 @@ private[sql] abstract class SparkStrategies extends QueryPlanner[SparkPlan] {
         val (predicatesCanBeIndexed, parentPredicate) = selectFilter(filters)
         pruneFilterProject(
           projectList,
-          parentPredicate, // all indexed then nothing left for Filter
-//          filters,
+          parentPredicate,
           identity[Seq[Expression]],
           IndexedRelationScan(_, predicatesCanBeIndexed, indexed)) :: Nil
       case _ => Nil
