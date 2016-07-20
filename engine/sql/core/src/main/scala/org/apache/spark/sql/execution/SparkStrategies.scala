@@ -354,6 +354,7 @@ private[sql] abstract class SparkStrategies extends QueryPlanner[SparkPlan] {
     }
 
     def leafNodeCanBeIndexed(expression: Expression): Boolean = {
+      println("leafNodeCanBeIndexed " + expression)
       val indexInfo = expression match {
         case l @ LessThan(left: NamedExpression, right: Literal) =>
           lookupIndexInfo(Array(left.toAttribute))
@@ -365,8 +366,13 @@ private[sql] abstract class SparkStrategies extends QueryPlanner[SparkPlan] {
           lookupIndexInfo(Array(left.toAttribute))
         case GreaterThanOrEqual(left: NamedExpression, right: Literal) =>
           lookupIndexInfo(Array(left.toAttribute))
-
-//        case InRange(point: Seq[NamedExpression], boundL, boundR) =>
+        case InRange(point: Expression, boundL, boundR) =>
+          point match {
+            case wrapper: PointWrapperExpression =>
+              lookupIndexInfo(wrapper.points.map(_.asInstanceOf[NamedExpression].toAttribute))
+            case p =>
+              lookupIndexInfo(Array(p.asInstanceOf[NamedExpression].toAttribute))
+          }
 //          lookupIndexInfo(point.map(x => x.toAttribute))
 //        case InKNN(point: Seq[NamedExpression], target: Seq[Expression], k: Literal) =>
 //          lookupIndexInfo(point.map(x => x.toAttribute))

@@ -16,17 +16,17 @@
 
 package org.apache.spark.sql.index
 
-import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.IndexRDD
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.analysis.MultiInstanceRelation
-import org.apache.spark.sql.catalyst.expressions.{Attribute, BindReferences}
+import org.apache.spark.sql.catalyst.expressions.{Attribute, BindReferences, GenericInternalRow}
 import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, Statistics}
+import org.apache.spark.sql.catalyst.util.GenericArrayData
 import org.apache.spark.sql.execution.SparkPlan
 import org.apache.spark.sql.partitioner._
-import org.apache.spark.sql.spatial.Point
-import org.apache.spark.sql.types.{DoubleType, IntegerType, NumericType}
+import org.apache.spark.sql.types.{DoubleType, IntegerType, NumericType, StructType}
 import org.apache.spark.storage.StorageLevel
+import org.apache.spark.sql.util.FetchPointUtils
 
 /**
  * Created by dong on 1/15/16.
@@ -80,8 +80,14 @@ private[sql] case class HashMapIndexedRelation(
     val numShufflePartitions = child.sqlContext.conf.numShufflePartitions
 
     val dataRDD = child.execute().map(row => {
-      val key = BindReferences.bindReference(column_keys.head, child.output).eval(row)
-      (key, row)
+      val eval_key = BindReferences.bindReference(column_keys.head, child.output).eval(row)
+      eval_key match {
+        case key: GenericInternalRow =>
+          val row_array = key.values(0).asInstanceOf[GenericArrayData].array
+          require(row_array.length == 1)
+          (row_array.head, row)
+        case key => (key, row)
+      }
     })
 
     val partitionedRDD = HashPartition(dataRDD, numShufflePartitions)
@@ -129,9 +135,14 @@ private[sql] case class TreeMapIndexedRelation(
     val numShufflePartitions = child.sqlContext.conf.numShufflePartitions
 
     val dataRDD = child.execute().map(row => {
-      val key = BindReferences.bindReference(column_keys.head, child.output).eval(row)
-        .asInstanceOf[Number].doubleValue
-      (key, row)
+      val eval_key = BindReferences.bindReference(column_keys.head, child.output).eval(row)
+      eval_key match {
+        case key: Number => (key.doubleValue, row)
+        case key: GenericInternalRow =>
+          val row_array = key.values(0).asInstanceOf[GenericArrayData].array
+          require(row_array.length == 1)
+          (row_array.head.asInstanceOf[Double], row)
+      }
     })
 
     val (partitionedRDD, tmp_bounds) = RangePartition.rowPartition(dataRDD, numShufflePartitions)
@@ -173,7 +184,8 @@ private[sql] case class TreapIndexedRelation(
                      var range_bounds: Array[Double] = null)
   extends IndexedRelation with MultiInstanceRelation {
   require(column_keys.length == 1)
-  require(column_keys.head.dataType.isInstanceOf[NumericType])
+  require(column_keys.head.dataType.isInstanceOf[NumericType] ||
+  column_keys.head.dataType.isInstanceOf[StructType])
   val numShufflePartitions = child.sqlContext.conf.numShufflePartitions
   val maxEntriesPerNode = child.sqlContext.conf.maxEntriesPerNode
   val sampleRate = child.sqlContext.conf.sampleRate
@@ -184,9 +196,14 @@ private[sql] case class TreapIndexedRelation(
 
   private[sql] def buildIndex(): Unit = {
     val dataRDD = child.execute().map(row => {
-      val key = BindReferences.bindReference(column_keys.head, child.output).eval(row)
-        .asInstanceOf[Number].doubleValue
-      (key, row)
+      val eval_key = BindReferences.bindReference(column_keys.head, child.output).eval(row)
+      eval_key match {
+        case key: Number => (key.doubleValue, row)
+        case key: GenericInternalRow =>
+          val row_array = key.values(0).asInstanceOf[GenericArrayData].array
+          require(row_array.length == 1)
+          (row_array.head.asInstanceOf[Double], row)
+      }
     })
 
     val (partitionedRDD, tmp_bounds) = RangePartition.rowPartition(dataRDD, numShufflePartitions)
@@ -227,13 +244,26 @@ private[sql] case class RTreeIndexedRelation(
   index_name: String)(var _indexedRDD: IndexRDD = null,
                       var global_rtree: RTree = null)
   extends IndexedRelation with MultiInstanceRelation {
+
+  var isPoint = false
   private def checkKeys: Boolean = {
-    for (i <- column_keys.indices)
-      if (!(column_keys(i).dataType.isInstanceOf[DoubleType] ||
-        column_keys(i).dataType.isInstanceOf[IntegerType])) {
-        return false
-      }
-    true
+    if (column_keys.length > 1) {
+      for (i <- column_keys.indices)
+        if (!(column_keys(i).dataType.isInstanceOf[DoubleType] ||
+          column_keys(i).dataType.isInstanceOf[IntegerType])) {
+          return false
+        }
+      true
+    } else {
+        column_keys.head.dataType match {
+          case t: StructType =>
+            isPoint = true
+            true
+          case t: NumericType =>
+            true
+          case _ => false
+        }
+    }
   }
   require(checkKeys)
 
@@ -246,15 +276,11 @@ private[sql] case class RTreeIndexedRelation(
     val maxEntriesPerNode = child.sqlContext.conf.maxEntriesPerNode
     val sampleRate = child.sqlContext.conf.sampleRate
     val transferThreshold = child.sqlContext.conf.transferThreshold
-
     val dataRDD = child.execute().map(row => {
-      val now = column_keys.map(x =>
-        BindReferences.bindReference(x, child.output).eval(row).asInstanceOf[Number].doubleValue()
-      ).toArray
-      (new Point(now), row)
+      (FetchPointUtils.getFromRow(row, column_keys, child, isPoint), row)
     })
 
-    val dimension = column_keys.length
+    val dimension = dataRDD.first._1.coord.length
     val max_entries_per_node = maxEntriesPerNode
     val (partitionedRDD, mbr_bounds) = child.sqlContext.conf.partitionMethod match {
       case "KDTreeParitioner" => KDTreePartitioner(dataRDD, dimension, numShufflePartitions,

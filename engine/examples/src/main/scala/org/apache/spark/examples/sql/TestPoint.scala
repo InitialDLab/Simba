@@ -47,6 +47,11 @@ object TestPoint {
     points2 += PointItem(1, Point(Array(30, 30)))
     points2 += PointItem(1, Point(Array(70, 70)))
 
+    val points3 = ListBuffer[PointItem]()
+    points3 += PointItem(1, Point(Array(3)))
+    points3 += PointItem(2, Point(Array(5)))
+    points3 += PointItem(3, Point(Array(7)))
+
     for (i <- 1 to 100) {
       val p = new Point(Array(i, i))
       points += PointItem(i, p)
@@ -54,21 +59,26 @@ object TestPoint {
 
     val rdd = sc.parallelize(points)
     val rdd2 = sc.parallelize(points2)
+    val rdd3 = sc.parallelize(points3)
 
     rdd.toDF().registerTempTable("MyPoint")
     rdd2.toDF().registerTempTable("FuckPoint")
+    rdd3.toDF().registerTempTable("IndexPoint")
 
-   val sqlQuery = "SELECT * FROM MyPoint KNN JOIN FuckPoint" +
-     " ON FuckPoint.fuck IN KNN(MyPoint.fuck, 2)"
+    sqlContext.sql("CREATE INDEX treeMapIndex ON MyPoint (fuck) USE rtree")
+    sqlContext.sql("SHOW INDEX ON MyPoint")
+
+    val sqlQuery = "SELECT * FROM MyPoint WHERE fuck IN RANGE(POINT(8, 8), POINT(20, 20))"
+
+//   val sqlQuery = "SELECT * FROM MyPoint KNN JOIN FuckPoint" +
+//     " ON FuckPoint.fuck IN KNN(MyPoint.fuck, 2)"
 
 //    val sqlQuery = "SELECT * FROM MyPoint WHERE fuck IN KNN (POINT(8, 8), 9)"
 
     val df = sqlContext.sql(sqlQuery)
     println(df.queryExecution)
 
-//    df.collect().foreach(println)
     df.show()
-//    df.collect().foreach(x => println(x.getClass))
     sc.stop()
 
   }

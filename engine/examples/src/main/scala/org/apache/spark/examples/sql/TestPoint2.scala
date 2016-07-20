@@ -32,6 +32,7 @@ object TestPoint2 {
     val sparkConf = new SparkConf().setAppName("PointTest2").setMaster("local[4]")
     val sc = new SparkContext(sparkConf)
     val sqlContext = new SQLContext(sc)
+    sqlContext.setConf("spark.sql.sampleRate", 1.toString)
 
     import sqlContext.implicits._
 
@@ -41,9 +42,11 @@ object TestPoint2 {
       points += PointData(i, i)
     }
     val rdd = sc.parallelize(points)
-    rdd.toDF().registerTempTable("Mypoint")
+    rdd.toDF().registerTempTable("MyPoint")
 
-    val sqlQuery = "SELECT x FROM Mypoint WHERE POINT(x, y) IN CIRCLERANGE (POINT(5, 5), 5)"
+    sqlContext.sql("CREATE INDEX treeMapIndex ON MyPoint (x, y) USE rtree")
+
+    val sqlQuery = "SELECT x FROM MyPoint WHERE POINT(x, y) IN RANGE (POINT(5, 5), POINT(20, 20))"
 
     val df = sqlContext.sql(sqlQuery)
     println(df.queryExecution)

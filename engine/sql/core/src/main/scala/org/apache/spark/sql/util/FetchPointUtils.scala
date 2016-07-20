@@ -16,7 +16,8 @@
 package org.apache.spark.sql.util
 
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.{BindReferences, Expression, GenericInternalRow, PointWrapperExpression}
+import org.apache.spark.sql.catalyst.expressions.{Attribute, BindReferences, Expression, GenericInternalRow, PointWrapperExpression}
+import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.catalyst.util.GenericArrayData
 import org.apache.spark.sql.execution.SparkPlan
 import org.apache.spark.sql.spatial.Point
@@ -33,6 +34,19 @@ object FetchPointUtils {
       case e => BindReferences.bindReference(e, plan.output).eval(row)
         .asInstanceOf[GenericInternalRow].values(0)
         .asInstanceOf[GenericArrayData].array.map(x => x.asInstanceOf[Double])
+    }
+    Point(coord)
+  }
+
+  def getFromRow(row: InternalRow, columns: List[Attribute], plan: LogicalPlan,
+                 isPoint: Boolean): Point = {
+    val coord = if (isPoint) {
+      BindReferences.bindReference(columns.head, plan.output).eval(row)
+        .asInstanceOf[GenericInternalRow].values(0)
+        .asInstanceOf[GenericArrayData].array.map(_.asInstanceOf[Double])
+    } else {
+      columns.toArray.map(BindReferences.bindReference(_, plan.output).eval(row)
+        .asInstanceOf[Number].doubleValue())
     }
     Point(coord)
   }

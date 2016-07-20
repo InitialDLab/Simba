@@ -22,6 +22,7 @@ import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.util.NumberConverter
 import org.apache.spark.sql.execution.LeafNode
 import org.apache.spark.sql.spatial._
+import org.apache.spark.sql.util.FetchPointUtils
 
 import scala.collection.mutable
 
@@ -103,17 +104,17 @@ private[sql] case class IndexedRelationScan(attributes: Seq[Attribute],
           }
       } else {
         now match {
-//          case InRange(point: NamedExpression, point_low, point_high) =>
+          case InRange(point: Expression, point_low, point_high) =>
 //            for (i <- point.indices) {
 //              val id = column.indexOf(point(i).toAttribute)
 //              val low = point_low(i).asInstanceOf[Literal].toString.toDouble
 //              val high = point_high(i).asInstanceOf[Literal].toString.toDouble
 //              intervals(id) = intervals(id).intersect(new Interval(low, high))
 //            }
-          case knn @ InKNN(point: NamedExpression,
+          case knn @ InKNN(point: Expression,
                             target: Expression, k: Literal) =>
             ans += knn
-          case cr @ InCircleRange(point: Seq[NamedExpression], target, r: Literal) =>
+          case cr @ InCircleRange(point: Expression, target, r: Literal) =>
             ans += cr
         }
       }
@@ -226,55 +227,56 @@ private[sql] case class IndexedRelationScan(attributes: Seq[Attribute],
             var cir_ranges = Array[(Point, Double)]()
             var knn_res: Array[InternalRow] = null
 
-//            exps.foreach {
-//              case InKNN(point: Seq[NamedExpression], target: Seq[Literal], l: Literal) =>
-//                val query_point = new Point(target.map(NumberConverter.literalToDouble).toArray)
-//                val k = l.value.asInstanceOf[Number].intValue()
-//                val mbr_ans = rtree.global_rtree.kNN(query_point, (a: Point, b: MBR) => {
-//                  require(a.coord.length == b.low.coord.length)
-//                  var ans = 0.0
-//                  for (i <- a.coord.indices) {
-//                    ans += Math.max((a.coord(i) - b.low.coord(i)) * (a.coord(i) - b.low.coord(i)),
-//                      (a.coord(i) - b.high.coord(i)) * (a.coord(i) - b.high.coord(i)))
-//                  }
-//                  Math.sqrt(ans)
-//                }, k, keepSame = false)
-//                val ord = new DisOrdering(query_point, column_keys)
-//                val tmp_set = new mutable.HashSet[Int]()
-//                tmp_set ++= mbr_ans.map(_._2)
-//                val tmp_pruned = new PartitionPruningRDD(rtree._indexedRDD, tmp_set.contains)
-//                val tmp_ans = tmp_pruned.flatMap { packed =>
-//                  var tmp_ans = Array[(Shape, Int)]()
-//                  if (packed.index.asInstanceOf[RTree] != null) {
-//                    tmp_ans = packed.index.asInstanceOf[RTree].kNN(query_point, k, keepSame = false)
-//                  }
-//                  tmp_ans.map(x => packed.data(x._2))
-//                }.takeOrdered(k)(ord)
-//                val theta = evalDist(tmp_ans.last, query_point, column_keys)
-//
-//                val set = new mutable.HashSet[Int]()
-//                set ++= rtree.global_rtree.circleRange(query_point, theta).map(_._2)
-//                set --= tmp_set
-//                val tmp_knn_res = if (set.isEmpty) tmp_ans
-//                else {
-//                  val pruned = new PartitionPruningRDD(rtree._indexedRDD, set.contains)
-//                  pruned.flatMap { packed =>
-//                    var tmp_ans = Array[(Shape, Int)]()
-//                    if (packed.index.asInstanceOf[RTree] != null) {
-//                      tmp_ans = packed.index.asInstanceOf[RTree]
-//                        .kNN(query_point, k, keepSame = false)
-//                    }
-//                    tmp_ans.map(x => packed.data(x._2))
-//                  }.takeOrdered(k)(ord).union(tmp_ans).sorted(ord).take(k)
-//                }
-//
-//                if (knn_res == null) knn_res = tmp_knn_res
-//                else knn_res = knn_res.intersect(tmp_knn_res)
-//              case InCircleRange(point: Seq[NamedExpression], target: Seq[Literal], l: Literal) =>
-//                val query_point = new Point(target.map(NumberConverter.literalToDouble).toArray)
-//                val r = NumberConverter.literalToDouble(l)
-//                cir_ranges = cir_ranges :+ (query_point, r)
-//            }
+            exps.foreach {
+              case InKNN(point: Expression, target: Literal, l: Literal) =>
+                val query_point = target.value.asInstanceOf[Point]
+                val k = l.value.asInstanceOf[Number].intValue()
+                val mbr_ans = rtree.global_rtree.kNN(query_point, (a: Point, b: MBR) => {
+                  require(a.coord.length == b.low.coord.length)
+                  var ans = 0.0
+                  for (i <- a.coord.indices) {
+                    ans += Math.max((a.coord(i) - b.low.coord(i)) * (a.coord(i) - b.low.coord(i)),
+                      (a.coord(i) - b.high.coord(i)) * (a.coord(i) - b.high.coord(i)))
+                  }
+                  Math.sqrt(ans)
+                }, k, keepSame = false)
+                val ord = new DisOrdering(query_point, column_keys)
+                val tmp_set = new mutable.HashSet[Int]()
+                tmp_set ++= mbr_ans.map(_._2)
+                val tmp_pruned = new PartitionPruningRDD(rtree._indexedRDD, tmp_set.contains)
+                val tmp_ans = tmp_pruned.flatMap { packed =>
+                  var tmp_ans = Array[(Shape, Int)]()
+                  if (packed.index.asInstanceOf[RTree] != null) {
+                    tmp_ans = packed.index.asInstanceOf[RTree].
+                      kNN(query_point, k, keepSame = false)
+                  }
+                  tmp_ans.map(x => packed.data(x._2))
+                }.takeOrdered(k)(ord)
+                val theta = evalDist(tmp_ans.last, query_point, column_keys)
+
+                val set = new mutable.HashSet[Int]()
+                set ++= rtree.global_rtree.circleRange(query_point, theta).map(_._2)
+                set --= tmp_set
+                val tmp_knn_res = if (set.isEmpty) tmp_ans
+                else {
+                  val pruned = new PartitionPruningRDD(rtree._indexedRDD, set.contains)
+                  pruned.flatMap { packed =>
+                    var tmp_ans = Array[(Shape, Int)]()
+                    if (packed.index.asInstanceOf[RTree] != null) {
+                      tmp_ans = packed.index.asInstanceOf[RTree]
+                        .kNN(query_point, k, keepSame = false)
+                    }
+                    tmp_ans.map(x => packed.data(x._2))
+                  }.takeOrdered(k)(ord).union(tmp_ans).sorted(ord).take(k)
+                }
+
+                if (knn_res == null) knn_res = tmp_knn_res
+                else knn_res = knn_res.intersect(tmp_knn_res)
+              case InCircleRange(point: Expression, target: Literal, l: Literal) =>
+                val query_point = target.value.asInstanceOf[Point]
+                val r = NumberConverter.literalToDouble(l)
+                cir_ranges = cir_ranges :+ (query_point, r)
+            }
 
             if (knn_res == null || knn_res.length > index_threshold) {
               val hash_set = new mutable.HashSet[Int]()
@@ -297,10 +299,8 @@ private[sql] case class IndexedRelationScan(attributes: Seq[Attribute],
                     val res = index.range(queryMBR, s_level_limit, s_threshold)
                     if (res.isEmpty) {
                       packed.data.filter { row =>
-                        val tmp_point = new Point(
-                          column_keys.map(x => BindReferences.bindReference(x, relation.output)
-                            .eval(row).asInstanceOf[Number].doubleValue()).toArray
-                        )
+                        val tmp_point = FetchPointUtils.getFromRow(row,
+                          column_keys, relation, rtree.isPoint)
                         queryMBR.intersects(tmp_point)
                       }.intersect(index.circleRangeConj(cir_ranges).map(x => packed.data(x._2)))
                     } else {
@@ -326,11 +326,7 @@ private[sql] case class IndexedRelationScan(attributes: Seq[Attribute],
               else tmp_rdd
             } else {
               val final_res = knn_res.filter {row =>
-                val tmp_point = new Point(
-                  column_keys.map(x => BindReferences.bindReference(x, relation.output)
-                    .eval(row).asInstanceOf[Number].doubleValue()).toArray
-                )
-
+                val tmp_point = FetchPointUtils.getFromRow(row, column_keys, relation, rtree.isPoint)
                 val contain = cir_ranges.forall(x => tmp_point.minDist(x._1) <= x._2)
                 contain && queryMBR.contains(tmp_point)
               }
