@@ -195,15 +195,15 @@ object SqlParser extends AbstractSparkSQLParser with DataTypeParser {
     }
 
   protected lazy val joinConditions: Parser[Expression] =
-    ( ON ~> termExpression ~
-      (IN ~ KNN ~ "(" ~> termExpression)
+    (ON ~> pointExpression ~
+      (IN ~ KNN ~ "(" ~> pointExpression)
       ~ ("," ~> numericLiteral <~ ")") ^^
-      { case point ~ target ~ l => InKNN(point, target, l) }
-      | ON ~> pointWrapperExpression ~
-      (IN ~ CIRCLERANGE ~ "(" ~> pointWrapperExpression)
+      { case point ~ target ~ l => InKNN(point, target, l)}
+      | ON ~> pointExpression ~
+      (IN ~ CIRCLERANGE ~ "(" ~> pointExpression)
       ~ ("," ~> numericLiteral <~ ")") ^^
       { case point ~ center ~l => InCircleRange(point, center, l)}
-    | ON ~> expression
+      | ON ~> expression
     )
 
   protected lazy val joinType: Parser[JoinType] =
@@ -244,21 +244,20 @@ object SqlParser extends AbstractSparkSQLParser with DataTypeParser {
   protected lazy val notExpression: Parser[Expression] =
     NOT.? ~ comparisonExpression ^^ { case maybeNot ~ e => maybeNot.map(_ => Not(e)).getOrElse(e) }
 
-  protected lazy val pointWrapperExpression: Parser[List[Expression]] =
-    POINT ~> "(" ~> repsep(termExpression, ",")  <~ ")"
+  protected lazy val pointWrapper: Parser[Expression] =
+    POINT ~> "(" ~> repsep(termExpression, ",")  <~ ")" ^^ {
+      case points => PointWrapperExpression(points)
+    }
+
+  protected lazy val pointExpression: Parser[Expression] =
+    pointWrapper | termExpression
 
   protected lazy val comparisonExpression: Parser[Expression] =
-    ( pointWrapperExpression ~
-      (IN ~ RANGE ~ "(" ~> pointLiteral2 <~ ",") ~
-      (pointLiteral2 <~ ")") ^^
+    (pointExpression ~ (IN ~ RANGE ~ "(" ~> pointLiteral <~ ",") ~ (pointLiteral <~ ")") ^^
       { case point ~ point_low ~ point_high => InRange(point, point_low, point_high) }
-    | termExpression ~
-      (IN ~ KNN ~ "(" ~> pointLiteral) ~
-      ("," ~> literal <~ ")") ^^
-      { case point ~ target ~ l => InKNN(point, target, l) }
-    | pointWrapperExpression ~
-      (IN ~ CIRCLERANGE ~ "(" ~> pointLiteral2) ~
-      ("," ~> literal <~ ")") ^^
+    | pointExpression ~ (IN ~ KNN ~ "(" ~> pointLiteral) ~ ("," ~> literal <~ ")") ^^
+      { case point ~ (target: Literal) ~ l => InKNN(point, target, l)}
+    | pointExpression ~ (IN ~ CIRCLERANGE ~ "(" ~> pointLiteral) ~ ("," ~> literal <~ ")") ^^
       { case point ~ target ~ l => InCircleRange(point, target, l) }
     | termExpression ~ ("="  ~> termExpression) ^^ { case e1 ~ e2 => EqualTo(e1, e2) }
     | termExpression ~ ("<"  ~> termExpression) ^^ { case e1 ~ e2 => LessThan(e1, e2) }
@@ -381,10 +380,6 @@ object SqlParser extends AbstractSparkSQLParser with DataTypeParser {
    (POINT ~ "(" ~> repsep(numericLiteral, ",") <~ ")") ^^
   {case points => Literal(new Point(points.toArray.map(x =>
     x.value.asInstanceOf[Number].doubleValue())))}
-
-  protected lazy val pointLiteral2: Parser[List[Literal]] =
-    POINT ~ "(" ~> repsep(numericLiteral, ",") <~ ")"
-
 
   protected lazy val unsignedFloat: Parser[String] =
     ( "." ~> numericLit ^^ { u => "0." + u }

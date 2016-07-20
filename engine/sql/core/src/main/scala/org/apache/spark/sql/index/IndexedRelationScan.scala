@@ -103,14 +103,15 @@ private[sql] case class IndexedRelationScan(attributes: Seq[Attribute],
           }
       } else {
         now match {
-          case InRange(point: Seq[NamedExpression], point_low, point_high) =>
-            for (i <- point.indices) {
-              val id = column.indexOf(point(i).toAttribute)
-              val low = point_low(i).asInstanceOf[Literal].toString.toDouble
-              val high = point_high(i).asInstanceOf[Literal].toString.toDouble
-              intervals(id) = intervals(id).intersect(new Interval(low, high))
-            }
-          case knn @ InKNN(point: Seq[NamedExpression], target: Seq[Expression], k: Literal) =>
+//          case InRange(point: NamedExpression, point_low, point_high) =>
+//            for (i <- point.indices) {
+//              val id = column.indexOf(point(i).toAttribute)
+//              val low = point_low(i).asInstanceOf[Literal].toString.toDouble
+//              val high = point_high(i).asInstanceOf[Literal].toString.toDouble
+//              intervals(id) = intervals(id).intersect(new Interval(low, high))
+//            }
+          case knn @ InKNN(point: NamedExpression,
+                            target: Expression, k: Literal) =>
             ans += knn
           case cr @ InCircleRange(point: Seq[NamedExpression], target, r: Literal) =>
             ans += cr
@@ -225,7 +226,7 @@ private[sql] case class IndexedRelationScan(attributes: Seq[Attribute],
             var cir_ranges = Array[(Point, Double)]()
             var knn_res: Array[InternalRow] = null
 
-            exps.foreach {
+//            exps.foreach {
 //              case InKNN(point: Seq[NamedExpression], target: Seq[Literal], l: Literal) =>
 //                val query_point = new Point(target.map(NumberConverter.literalToDouble).toArray)
 //                val k = l.value.asInstanceOf[Number].intValue()
@@ -269,11 +270,11 @@ private[sql] case class IndexedRelationScan(attributes: Seq[Attribute],
 //
 //                if (knn_res == null) knn_res = tmp_knn_res
 //                else knn_res = knn_res.intersect(tmp_knn_res)
-              case InCircleRange(point: Seq[NamedExpression], target: Seq[Literal], l: Literal) =>
-                val query_point = new Point(target.map(NumberConverter.literalToDouble).toArray)
-                val r = NumberConverter.literalToDouble(l)
-                cir_ranges = cir_ranges :+ (query_point, r)
-            }
+//              case InCircleRange(point: Seq[NamedExpression], target: Seq[Literal], l: Literal) =>
+//                val query_point = new Point(target.map(NumberConverter.literalToDouble).toArray)
+//                val r = NumberConverter.literalToDouble(l)
+//                cir_ranges = cir_ranges :+ (query_point, r)
+//            }
 
             if (knn_res == null || knn_res.length > index_threshold) {
               val hash_set = new mutable.HashSet[Int]()

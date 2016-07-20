@@ -23,13 +23,12 @@ import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateUnsafeRowJoiner
 import org.apache.spark.sql.catalyst.plans.physical._
-import org.apache.spark.sql.catalyst.util.GenericArrayData
+import org.apache.spark.sql.catalyst.util.{GenericArrayData}
 import org.apache.spark.sql.execution.metric.SQLMetrics
-import org.apache.spark.sql.types.DoubleType
 import org.apache.spark.util.MutablePair
 import org.apache.spark.util.random.PoissonSampler
 import org.apache.spark.{HashPartitioner, SparkEnv}
-import org.apache.spark.sql.spatial.Point
+import org.apache.spark.sql.spatial.{Circle, MBR, Point}
 
 case class Project(projectList: Seq[NamedExpression], child: SparkPlan) extends UnaryNode {
 
@@ -59,6 +58,15 @@ case class Project(projectList: Seq[NamedExpression], child: SparkPlan) extends 
 
 
 case class Filter(condition: Expression, child: SparkPlan) extends UnaryNode {
+
+  val getCoord = (row: InternalRow, point: Expression) => point match {
+    case p: PointWrapperExpression => p.points.toArray.map(BindReferences.
+      bindReference(_, child.output).eval(row).asInstanceOf[Number].doubleValue())
+    case e => BindReferences.bindReference(e, child.output).eval(row)
+      .asInstanceOf[GenericInternalRow].values(0)
+      .asInstanceOf[GenericArrayData].array.map(x => x.asInstanceOf[Double])
+  }
+
   override def output: Seq[Attribute] = child.output
 
   // NOTE: we remove metrics in filter. Should be back somewhere
@@ -69,40 +77,38 @@ case class Filter(condition: Expression, child: SparkPlan) extends UnaryNode {
   private class DistanceOrdering(point: Expression,
                                  target: Point) extends Ordering[InternalRow] {
     override def compare(x: InternalRow, y: InternalRow): Int = {
-//      var dis_x: Double = 0
-//      for (i <- point.indices) {
-//        val tmp = BindReferences.bindReference(point(i), child.output).eval(x)
-//          .asInstanceOf[Number].doubleValue()
-//        dis_x += (tmp - target(i)) * (tmp - target(i))
-//      }
-//      var dis_y: Double = 0
-//      for (i <- point.indices) {
-//        val tmp = BindReferences.bindReference(point(i), child.output).eval(y)
-//          .asInstanceOf[Number].doubleValue()
-//        dis_y += (tmp - target(i)) * (tmp - target(i))
-//      }
-//      dis_x.compare(dis_y)
-      val point_cood_x = BindReferences.bindReference(point, child.output).eval(x)
-        .asInstanceOf[GenericInternalRow].values(0)
-        .asInstanceOf[GenericArrayData].array.map(x => x.asInstanceOf[Double])
-
-      val point_cood_y = BindReferences.bindReference(point, child.output).eval(y)
-        .asInstanceOf[GenericInternalRow].values(0)
-        .asInstanceOf[GenericArrayData].array.map(x => x.asInstanceOf[Double])
-
-      val point_x = new Point(point_cood_x)
-      val point_y = new Point(point_cood_y)
-      val dis_x = target.minDist(point_x)
-      val dis_y = target.minDist(point_y)
+      val point_cood_x = getCoord(x, point)
+      val point_cood_y = getCoord(y, point)
+      val dis_x = target.minDist(Point(point_cood_x))
+      val dis_y = target.minDist(Point(point_cood_y))
       dis_x.compare(dis_y)
     }
   }
 
   // TODO change target partition from 1 to some good value
+  // Note that target here must be an point literal in WHERE clause,
+  // hence we can consider it as Point safely
+
   def knn(rdd: RDD[InternalRow], point: Expression,
           target: Point, k: Int): RDD[InternalRow] =
     sparkContext.parallelize(rdd.map(_.copy())
       .takeOrdered(k)(new DistanceOrdering(point, target)), 1)
+
+  def range(rdd: RDD[InternalRow], point: Expression,
+            point_low: Point, point_high: Point): RDD[InternalRow] =
+    rdd.filter(row => {
+      val point_coord = getCoord(row, point)
+      val eval_point = Point(point_coord)
+      MBR(point_low, point_high).contains(eval_point)
+    })
+
+  def circleRange(rdd: RDD[InternalRow], point: Expression,
+                  target: Point, r: Double): RDD[InternalRow] =
+    rdd.filter(row => {
+      val point_coord = getCoord(row, point)
+      val eval_point = Point(point_coord)
+      Circle(target, r).contains(eval_point)
+    })
 
   def applyCondition(rdd: RDD[InternalRow],
                      condition: Expression,
@@ -139,31 +145,22 @@ case class Filter(condition: Expression, child: SparkPlan) extends UnaryNode {
         }
         left_res.union(right_res).mapPartitionsInternal(iter => iter.map(_.copy())).distinct()
       case InKNN(point, target, k) =>
-         knn(rootRDD, point, target.asInstanceOf[Literal].value.asInstanceOf[Point],
-            k.value.asInstanceOf[Number].intValue())
+        val _target = target.asInstanceOf[Literal].value.asInstanceOf[Point]
+        knn(rootRDD, point, _target, k.value.asInstanceOf[Number].intValue())
+      case InRange(point, point_low, point_high) =>
+        val _point_low = point_low.asInstanceOf[Literal].value.asInstanceOf[Point]
+        val _point_high = point_high.asInstanceOf[Literal].value.asInstanceOf[Point]
+        range(rootRDD, point, _point_low, _point_high)
+      case InCircleRange(point, target, r) =>
+        val _target = target.asInstanceOf[Literal].value.asInstanceOf[Point]
+        val _r = r.asInstanceOf[Literal].value.asInstanceOf[Number].doubleValue()
+        circleRange(rootRDD, point, _target, _r)
     }
   }
 
   protected override def doExecute(): RDD[InternalRow] = {
     val root_rdd = child.execute()
-    val new_condition = condition transform {
-      case InRange(point, point_low, point_high) =>
-        val cons = new Array[Expression](point.length)
-        for (i <- point.indices)
-          cons(i) = And(LessThanOrEqual(Cast(point_low(i), DoubleType), Cast(point(i), DoubleType)),
-            LessThanOrEqual(Cast(point(i), DoubleType), Cast(point_high(i), DoubleType)))
-        cons.foldLeft[Expression](null)
-          { (left, right) => if (left == null) right else And(left, right) }
-      case InCircleRange(point, target, r) =>
-        val exps = new Array[Expression](point.length)
-        for (i <- point.indices)
-          exps(i) = Multiply(Subtract(Cast(point(i), DoubleType), Cast(target(i), DoubleType)),
-            Subtract(Cast(point(i), DoubleType), Cast(target(i), DoubleType)))
-        val ans = exps.foldLeft[Expression](null)
-          { (left, right) => if (left == null) right else Add(left, right) }
-        LessThanOrEqual(ans, Cast(Multiply(r, r), DoubleType))
-    }
-    applyCondition(root_rdd, new_condition, root_rdd)
+    applyCondition(root_rdd, condition, root_rdd)
   }
 
   override def outputOrdering: Seq[SortOrder] = child.outputOrdering

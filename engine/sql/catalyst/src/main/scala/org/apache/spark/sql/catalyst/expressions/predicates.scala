@@ -20,8 +20,8 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.analysis.TypeCheckResult
 import org.apache.spark.sql.catalyst.expressions.codegen.{CodeGenContext, CodegenFallback, GeneratedExpressionCode}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
-import org.apache.spark.sql.catalyst.util.{NumberConverter, TypeUtils}
-import org.apache.spark.sql.spatial.Shape
+import org.apache.spark.sql.catalyst.util.{FetchPointUtils, NumberConverter, TypeUtils}
+import org.apache.spark.sql.spatial.{MBR, Point, Shape, Circle}
 import org.apache.spark.sql.types._
 import org.apache.spark.util.Utils
 
@@ -252,13 +252,13 @@ case class In(value: Expression, list: Seq[Expression]) extends Predicate
   }
 }
 
-case class InRange(point: Seq[Expression],
-                   point_low: Seq[Expression],
-                   point_high: Seq[Expression]) extends Predicate with CodegenFallback {
-  require(point.length == point_low.length && point.length == point_high.length)
+case class InRange(point: Expression,
+                   point_low: Expression,
+                   point_high: Expression) extends Predicate with CodegenFallback {
+
   override def hasSpatial: Boolean = true
 
-  override def children: Seq[Expression] = point ++ point_low ++ point_high
+  override def children: Seq[Expression] = Seq(point, point_low, point_high)
 
   override def nullable: Boolean = false
 
@@ -266,25 +266,23 @@ case class InRange(point: Seq[Expression],
 
   /** Returns the result of evaluating this expression on a given input Row */
   override def eval(input: InternalRow): Any = {
-    val eval_point = point.map(_.eval(input).asInstanceOf[Number].doubleValue())
-    val eval_low = point_low.map(_.eval(input).asInstanceOf[Number].doubleValue())
-    val eval_high = point_high.map(_.eval(input).asInstanceOf[Number].doubleValue())
-    for (i <- point.indices)
-      if (eval_point(i) < eval_low(i) || eval_point(i) > eval_high(i)) {
-        return false
-      }
-    true
+    val eval_point = FetchPointUtils.getFromRow(input, point)
+    val eval_low = point_low.asInstanceOf[Literal].value.asInstanceOf[Point]
+    val eval_high = point_high.asInstanceOf[Literal].value.asInstanceOf[Point]
+    require(eval_point.coord.length == eval_low.coord.length &&
+      eval_point.coord.length == eval_high.coord.length)
+    val mbr = MBR(eval_low, eval_high)
+    mbr.contains(eval_point)
   }
 }
 
-case class InCircleRange(point: Seq[Expression],
-                         target: Seq[Expression],
+case class InCircleRange(point: Expression,
+                         target: Expression,
                          r: Literal) extends Predicate with CodegenFallback {
-  require(point.length == target.length)
   require(r.dataType.isInstanceOf[NumericType])
   override def hasSpatial: Boolean = true
 
-  override def children: Seq[Expression] = point ++ target ++ Seq(r)
+  override def children: Seq[Expression] = Seq(point, target, r)
 
   override def nullable: Boolean = false
 
@@ -292,13 +290,11 @@ case class InCircleRange(point: Seq[Expression],
 
   /** Returns the result of evaluating this expression on a given input Row */
   override def eval(input: InternalRow): Any = {
-    val eval_point = point.map(_.eval(input).asInstanceOf[Number].doubleValue())
-    val eval_target = target.map(_.eval(input).asInstanceOf[Number].doubleValue())
+    val eval_point = FetchPointUtils.getFromRow(input, point)
+    val eval_target = FetchPointUtils.getFromRow(input, target)
+    require(eval_point.coord.length == eval_target.coord.length)
     val eval_r = NumberConverter.literalToDouble(r)
-    var dis = 0.0
-    for (i <- point.indices)
-      dis += (eval_point(i) - eval_target(i)) * (eval_point(i) - eval_target(i))
-    if (dis <= eval_r * eval_r) true else false
+    Circle(eval_target, eval_r).contains(eval_point)
   }
 }
 
@@ -309,7 +305,7 @@ case class InKNN(point: Expression,
 
   override def hasSpatial: Boolean = true
 
-  override def children: Seq[Expression] = Seq(point, target) ++ Seq(k)
+  override def children: Seq[Expression] = Seq(point, target, k)
 
   override def nullable: Boolean = false
 

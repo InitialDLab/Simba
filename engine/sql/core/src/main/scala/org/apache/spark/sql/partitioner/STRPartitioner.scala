@@ -151,6 +151,7 @@ class STRPartitioner(est_partition: Int,
 
     val cur_min = new Array[Double](dimension)
     val cur_max = new Array[Double](dimension)
+    println("riririri = " + dimension)
     val mbrs = recursiveGroupPoint(sampled, cur_min, cur_max, 0, dimension - 1)
 
     (mbrs.zipWithIndex, mbrs.length)

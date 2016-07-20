@@ -1236,25 +1236,25 @@ class DataFrame private[sql](
     *   point.filter(($"x" - 10) * ($"x" - 10) + ($"y" - 10) * ($"y" - 10) <= 5 * 5)
     * }}}
     */
-  def circleRange(keys: Array[String], point: Array[Double], r: Double): DataFrame = withPlan {
-    val attrs = getAttributes(keys)
-    attrs.foreach(attr => assert(attr != null, "column not found"))
-    Filter(InCircleRange(attrs, point.map(Literal(_)), Literal(r)), logicalPlan)
-  }
+//  def circleRange(keys: Array[String], point: Array[Double], r: Double): DataFrame = withPlan {
+//    val attrs = getAttributes(keys)
+//    attrs.foreach(attr => assert(attr != null, "column not found"))
+//    Filter(InCircleRange(attrs, point.map(Literal(_)), Literal(r)), logicalPlan)
+//  }
 
   /**
     * Spatial operation knn
     * Find k nearest neighbor of a given point
     */
-  def knn(keys: String, point: Array[Double], k: Int): DataFrame = withPlan{
-    val attrs = getAttributes(Array(keys))
-    attrs.foreach(attr => assert(attr != null, "column not found"))
-    Filter(InKNN(attrs(0), Literal(new Point(point)), Literal(k)), logicalPlan)
-  }
-
-  def knn(keys: PointFromColumn, point: PointFromCoords, k: Int): DataFrame = withPlan {
-    Filter(InKNN(keys.cols.expr, Literal(new Point(point.coords.toArray)), Literal(k)), logicalPlan)
-  }
+//  def knn(keys: String, point: Array[Double], k: Int): DataFrame = withPlan{
+//    val attrs = getAttributes(Array(keys))
+//    attrs.foreach(attr => assert(attr != null, "column not found"))
+//    Filter(InKNN(attrs(0), Literal(new Point(point)), Literal(k)), logicalPlan)
+//  }
+//
+//  def knn(keys: PointFromColumn, point: PointFromCoords, k: Int): DataFrame = withPlan {
+//    Filter(InKNN(keys.cols.expr, Literal(new Point(point.coords.toArray)), Literal(k)), logicalPlan)
+//  }
 
   /**
     * Spatial operation DistanceJoin

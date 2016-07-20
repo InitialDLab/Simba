@@ -23,13 +23,14 @@ import org.apache.spark.sql.catalyst.plans.physical.Partitioning
 import org.apache.spark.sql.catalyst.util.NumberConverter
 import org.apache.spark.sql.execution.{BinaryNode, SparkPlan}
 import org.apache.spark.sql.spatial._
+import org.apache.spark.sql.util.FetchPointUtils
 
 /**
   * Created by dong on 1/20/16.
   * Distance Join based on Cartesian Product
   */
-case class CDJSpark(left_keys: Seq[Expression],
-                    right_keys: Seq[Expression],
+case class CDJSpark(left_key: Expression,
+                    right_key: Expression,
                     l: Literal,
                     left: SparkPlan,
                     right: SparkPlan) extends BinaryNode {
@@ -43,11 +44,9 @@ case class CDJSpark(left_keys: Seq[Expression],
     left.execute().cartesian(right.execute()).mapPartitions { iter =>
       val joinedRow = new JoinedRow
       iter.filter { row =>
-        val point1 = left_keys.map(x => BindReferences.bindReference(x, right.output).eval(row._2)
-          .asInstanceOf[Number].doubleValue).toArray
-        val point2 = right_keys.map(x => BindReferences.bindReference(x, left.output).eval(row._1)
-          .asInstanceOf[Number].doubleValue).toArray
-        new Point(point1).minDist(new Point(point2)) <= r
+        val point1 = FetchPointUtils.getFromRow(row._1, left_key, left)
+        val point2 = FetchPointUtils.getFromRow(row._2, right_key, right)
+        point1.minDist(point2) <= r
       }.map(row => joinedRow(row._1, row._2))
     }
 }

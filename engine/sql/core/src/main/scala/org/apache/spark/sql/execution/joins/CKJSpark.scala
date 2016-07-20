@@ -23,14 +23,15 @@ import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.plans.physical.Partitioning
 import org.apache.spark.sql.execution.{BinaryNode, SparkPlan}
 import org.apache.spark.sql.spatial._
+import org.apache.spark.sql.util.FetchPointUtils
 
 
 /**
   * Created by dong on 1/20/16.
   * KNN Join based on Cartesian Product
   */
-case class CKJSpark(left_keys: Seq[Expression],
-                    right_keys: Seq[Expression],
+case class CKJSpark(left_key: Expression,
+                    right_key: Expression,
                     l: Literal,
                     left: SparkPlan,
                     right: SparkPlan) extends BinaryNode {
@@ -45,12 +46,10 @@ case class CKJSpark(left_keys: Seq[Expression],
     val right_rdd = right.execute()
 
     left_rdd.map(row =>
-      (new Point(left_keys.map(x => BindReferences.bindReference(x, left.output).eval(row)
-        .asInstanceOf[Number].doubleValue()).toArray), row)
+      (FetchPointUtils.getFromRow(row, left_key, left), row)
     ).cartesian(right_rdd).map {
       case (l: (Point, InternalRow), r: InternalRow) =>
-        val tmp_point = new Point(right_keys.map(x => BindReferences.bindReference(x, right.output)
-          .eval(r).asInstanceOf[Number].doubleValue()).toArray)
+        val tmp_point = FetchPointUtils.getFromRow(r, right_key, right)
         l._2 -> List((tmp_point.minDist(l._1), r))
     }.reduceByKey {
       case (l_list: Seq[(Double, InternalRow)], r_list: Seq[(Double, InternalRow)]) =>

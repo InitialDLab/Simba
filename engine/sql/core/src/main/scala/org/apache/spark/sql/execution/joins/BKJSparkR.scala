@@ -23,6 +23,7 @@ import org.apache.spark.sql.execution.{BinaryNode, SparkPlan}
 import org.apache.spark.sql.index.RTree
 import org.apache.spark.sql.partitioner.MapDPartition
 import org.apache.spark.sql.spatial.Point
+import org.apache.spark.sql.util.FetchPointUtils
 
 import scala.collection.mutable
 import scala.util.Random
@@ -31,8 +32,8 @@ import scala.util.Random
   * Created by dong on 1/20/16.
   * KNN Join based on Block Nested Loop + Local R-Tree
   */
-case class BKJSparkR(left_keys: Seq[Expression],
-                     right_keys: Seq[Expression],
+case class BKJSparkR(left_key: Expression,
+                     right_key: Expression,
                      l: Literal,
                      left: SparkPlan,
                      right: SparkPlan) extends BinaryNode {
@@ -72,12 +73,10 @@ case class BKJSparkR(left_keys: Seq[Expression],
       while (iter.hasNext) {
         val data = iter.next()
         if (data._2._1 == 0) {
-          val tmp = new Point(left_keys.map(x => BindReferences.bindReference(x, left.output)
-            .eval(data._2._2).asInstanceOf[Number].doubleValue()).toArray)
+          val tmp = FetchPointUtils.getFromRow(data._2._2, left_key, left)
           left_data += ((tmp, data._2._2))
         } else {
-          val tmp = new Point(right_keys.map(x => BindReferences.bindReference(x, right.output)
-            .eval(data._2._2).asInstanceOf[Number].doubleValue()).toArray)
+          val tmp = FetchPointUtils.getFromRow(data._2._2, right_key, right)
           right_data += ((tmp, data._2._2))
         }
       }

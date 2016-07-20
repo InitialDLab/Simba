@@ -14,62 +14,43 @@
  *  limitations under the License.
  */
 // scalastyle:off println
+
+
 package org.apache.spark.examples.sql
 
 import org.apache.spark.sql.SQLContext
 import org.apache.spark.{SparkConf, SparkContext}
-import org.apache.spark.sql.spatial.Point
-
 import scala.collection.mutable.ListBuffer
 /**
-  * Created by zhongpu on 16-7-11.
+  * Created by zhongpu on 16-7-14.
   */
-object TestPoint {
+object TestPoint2 {
 
-  case class PointItem(id: Int, fuck: Point)
+  case class PointData(x: Double, y: Double)
 
   def main(args: Array[String]) {
-    val sparkConf = new SparkConf().setAppName("PointTest").setMaster("local[4]")
-
+    val sparkConf = new SparkConf().setAppName("PointTest2").setMaster("local[4]")
     val sc = new SparkContext(sparkConf)
     val sqlContext = new SQLContext(sc)
 
-    sqlContext.setConf("spark.sql.sampleRate", 1.toString)
-
     import sqlContext.implicits._
 
-    var points = ListBuffer[PointItem]()
-
-    val points2 = ListBuffer[PointItem]()
-
-    points2 += PointItem(1, Point(Array(3, 3)))
-    points2 += PointItem(1, Point(Array(5, 5)))
-    points2 += PointItem(1, Point(Array(30, 30)))
-    points2 += PointItem(1, Point(Array(70, 70)))
+    var points = ListBuffer[PointData]()
 
     for (i <- 1 to 100) {
-      val p = new Point(Array(i, i))
-      points += PointItem(i, p)
+      points += PointData(i, i)
     }
-
     val rdd = sc.parallelize(points)
-    val rdd2 = sc.parallelize(points2)
+    rdd.toDF().registerTempTable("Mypoint")
 
-    rdd.toDF().registerTempTable("MyPoint")
-    rdd2.toDF().registerTempTable("FuckPoint")
-
-   val sqlQuery = "SELECT * FROM MyPoint KNN JOIN FuckPoint" +
-     " ON FuckPoint.fuck IN KNN(MyPoint.fuck, 2)"
-
-//    val sqlQuery = "SELECT * FROM MyPoint WHERE fuck IN KNN (POINT(8, 8), 9)"
+    val sqlQuery = "SELECT x FROM Mypoint WHERE POINT(x, y) IN CIRCLERANGE (POINT(5, 5), 5)"
 
     val df = sqlContext.sql(sqlQuery)
     println(df.queryExecution)
 
-//    df.collect().foreach(println)
     df.show()
-//    df.collect().foreach(x => println(x.getClass))
-    sc.stop()
 
+    sc.stop()
   }
+
 }

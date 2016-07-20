@@ -35,37 +35,37 @@ private[sql] abstract class SparkStrategies extends QueryPlanner[SparkPlan] {
 
   object SpatialJoinExtractor extends Strategy with PredicateHelper{
     def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
-      case ExtractSpatialJoinKeys(leftKeys, rightKeys, k, KNNJoin, left, right) =>
+      case ExtractSpatialJoinKeys(leftKey, rightKey, k, KNNJoin, left, right) =>
         sqlContext.conf.knnJoin match {
           case "RKJSpark" =>
-            RKJSpark(leftKeys, rightKeys, k, planLater(left), planLater(right)) :: Nil
+            RKJSpark(leftKey, rightKey, k, planLater(left), planLater(right)) :: Nil
           case "CKJSpark" =>
-            CKJSpark(leftKeys, rightKeys, k, planLater(left), planLater(right)) :: Nil
+            CKJSpark(leftKey, rightKey, k, planLater(left), planLater(right)) :: Nil
           case "VKJSpark" =>
-            VKJSpark(leftKeys, rightKeys, k, planLater(left), planLater(right)) :: Nil
+            VKJSpark(leftKey, rightKey, k, planLater(left), planLater(right)) :: Nil
           case "BKJSpark" =>
-            BKJSpark(leftKeys, rightKeys, k, planLater(left), planLater(right)) :: Nil
+            BKJSpark(leftKey, rightKey, k, planLater(left), planLater(right)) :: Nil
           case "BKJSpark-R" =>
-            BKJSparkR(leftKeys, rightKeys, k, planLater(left), planLater(right)) :: Nil
+            BKJSparkR(leftKey, rightKey, k, planLater(left), planLater(right)) :: Nil
           case _ =>
-            RKJSpark(leftKeys, rightKeys, k, planLater(left), planLater(right)) :: Nil
+            RKJSpark(leftKey, rightKey, k, planLater(left), planLater(right)) :: Nil
         }
-      case ExtractSpatialJoinKeys(leftKeys, rightKeys, k, ZKNNJoin, left, right) =>
-        ZKJSpark(leftKeys, rightKeys, k, planLater(left), planLater(right)) :: Nil
-      case ExtractSpatialJoinKeys(leftKeys, rightKeys, r, DistanceJoin, left, right) =>
+      case ExtractSpatialJoinKeys(leftKey, rightKey, k, ZKNNJoin, left, right) =>
+        ZKJSpark(leftKey, rightKey, k, planLater(left), planLater(right)) :: Nil
+      case ExtractSpatialJoinKeys(leftKey, rightKey, r, DistanceJoin, left, right) =>
         sqlContext.conf.distanceJoin match {
           case "RDJSpark" =>
-            RDJSpark(leftKeys, rightKeys, r, planLater(left), planLater(right)) :: Nil
+            RDJSpark(leftKey, rightKey, r, planLater(left), planLater(right)) :: Nil
           case "DJSpark" =>
-            DJSpark(leftKeys, rightKeys, r, planLater(left), planLater(right)) :: Nil
+            DJSpark(leftKey, rightKey, r, planLater(left), planLater(right)) :: Nil
           case "CDJSpark" =>
-            CDJSpark(leftKeys, rightKeys, r, planLater(left), planLater(right)) :: Nil
+            CDJSpark(leftKey, rightKey, r, planLater(left), planLater(right)) :: Nil
           case "BDJSpark" =>
-            BDJSpark(leftKeys, rightKeys, r, planLater(left), planLater(right)) :: Nil
+            BDJSpark(leftKey, rightKey, r, planLater(left), planLater(right)) :: Nil
           case "BDJSpark-R" =>
-            BDJSparkR(leftKeys, rightKeys, r, planLater(left), planLater(right)) :: Nil
+            BDJSparkR(leftKey, rightKey, r, planLater(left), planLater(right)) :: Nil
           case _ =>
-            RDJSpark(leftKeys, rightKeys, r, planLater(left), planLater(right)) :: Nil
+            RDJSpark(leftKey, rightKey, r, planLater(left), planLater(right)) :: Nil
         }
       case _ => Nil
     }
@@ -366,12 +366,12 @@ private[sql] abstract class SparkStrategies extends QueryPlanner[SparkPlan] {
         case GreaterThanOrEqual(left: NamedExpression, right: Literal) =>
           lookupIndexInfo(Array(left.toAttribute))
 
-        case InRange(point: Seq[NamedExpression], boundL, boundR) =>
-          lookupIndexInfo(point.map(x => x.toAttribute))
+//        case InRange(point: Seq[NamedExpression], boundL, boundR) =>
+//          lookupIndexInfo(point.map(x => x.toAttribute))
 //        case InKNN(point: Seq[NamedExpression], target: Seq[Expression], k: Literal) =>
 //          lookupIndexInfo(point.map(x => x.toAttribute))
-        case InCircleRange(point: Seq[NamedExpression], target: Seq[Expression], r: Literal) =>
-          lookupIndexInfo(point.map(x => x.toAttribute))
+//        case InCircleRange(point: Seq[NamedExpression], target: Seq[Expression], r: Literal) =>
+//          lookupIndexInfo(point.map(x => x.toAttribute))
         case _ =>
           null
       }
