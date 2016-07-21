@@ -23,14 +23,13 @@ import org.scalatest.FunSuite
   * Created by Zhihao Bai on 16-7-19.
   */
 class TreapSuite extends FunSuite{
-  val data = new Array[(Int, InternalRow)](1)
-  data(0) = (0, null)
-  val treap = Treap.apply[Int](data)
-
+  val data = new Array[(Int, InternalRow)](101)
   val divisor = 11
-  for(i <- 1 to 100) {
-    treap.insert(i % divisor, i)
+  for(i <- 0 to 100) {
+    data(i) = (i % divisor, null)
   }
+
+  val treap = Treap.apply[Int](data)
 
   test("Treap: rank"){
     var rank = 0
@@ -77,7 +76,7 @@ class TreapSuite extends FunSuite{
       assert(j % divisor >= 3 && j % divisor <= 5)
     }
 
-    var ints_none = treap.range(3, 5, 2, 0.0, true)
+    var ints_none = treap.range(0, 10, 1, 0.0, true)
     assert(ints_none == None)
   }
 }
