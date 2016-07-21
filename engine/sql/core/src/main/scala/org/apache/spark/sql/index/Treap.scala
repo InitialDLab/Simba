@@ -36,7 +36,7 @@ case class TreapNode[K: Ordering: ClassTag](key: K, var data: Array[Int],
   def update(): Unit = {
     val left_size = if (left != null) left.size else 0
     val right_size = if (right != null) right.size else 0
-    size = left_size + right_size + 1
+    size = left_size + right_size + count
   }
 }
 
@@ -47,7 +47,7 @@ case class Treap[K: Ordering: ClassTag](var root: TreapNode[K]) extends Index wi
 
   private def calcInterval(p: TreapNode[K]): Unit = {
     if (p == null) return
-    
+
     var min: K = {
       if (p.left != null) {
         calcInterval(p.left)
