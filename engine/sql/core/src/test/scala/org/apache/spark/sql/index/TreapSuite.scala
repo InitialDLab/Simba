@@ -23,8 +23,8 @@ import org.scalatest.FunSuite
   * Created by Zhihao Bai on 16-7-19.
   */
 class TreapSuite extends FunSuite{
-  val data = new Array[(Int, InternalRow)](0)
-//  data(0) = (0, null)
+  val data = new Array[(Int, InternalRow)](1)
+  data(0) = (0, null)
   val treap = Treap.apply[Int](data)
 
   val divisor = 11
@@ -72,6 +72,12 @@ class TreapSuite extends FunSuite{
     }
   }
   test("Treap: range, complex"){
+    var ints = treap.range(3, 5, 5, 1.1, true).get
+    for(j <- ints){
+      assert(j % divisor >= 3 && j % divisor <= 5)
+    }
 
+    var ints_none = treap.range(3, 5, 2, 0.0, true)
+    assert(ints_none == None)
   }
 }
