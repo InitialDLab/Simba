@@ -81,6 +81,16 @@ case class MBR(low: Point, high: Point) extends Shape {
     Math.sqrt(ans)
   }
 
+  def maxDist(p: Point): Double = {
+    require(low.coord.length == p.coord.length)
+    var ans = 0.0
+    for (i <- p.coord.indices) {
+      ans += Math.max((p.coord(i) - low.coord(i)) * (p.coord(i) - low.coord(i)),
+        (p.coord(i) - high.coord(i)) * (p.coord(i) - high.coord(i)))
+    }
+    Math.sqrt(ans)
+  }
+
   def minDist(other: MBR): Double = {
     require(low.coord.length == other.low.coord.length)
     var ans = 0.0
