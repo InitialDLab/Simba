@@ -68,17 +68,17 @@ object TestPoint {
     sqlContext.sql("CREATE INDEX treeMapIndex ON MyPoint (fuck) USE rtree")
     sqlContext.sql("SHOW INDEX ON MyPoint")
 
-    val sqlQuery = "SELECT * FROM MyPoint WHERE fuck IN RANGE(POINT(8, 8), POINT(20, 20))"
+//    val sqlQuery = "SELECT * FROM MyPoint WHERE fuck IN RANGE(POINT(8, 8), POINT(20, 20))"
 
 //   val sqlQuery = "SELECT * FROM MyPoint KNN JOIN FuckPoint" +
 //     " ON FuckPoint.fuck IN KNN(MyPoint.fuck, 2)"
 
 //    val sqlQuery = "SELECT * FROM MyPoint WHERE fuck IN KNN (POINT(8, 8), 9)"
 
-    val df = sqlContext.sql(sqlQuery)
-    println(df.queryExecution)
-
-    df.show()
+//    val df = sqlContext.sql(sqlQuery)
+//    println(df.queryExecution)
+//
+//    df.show()
     sc.stop()
 
   }

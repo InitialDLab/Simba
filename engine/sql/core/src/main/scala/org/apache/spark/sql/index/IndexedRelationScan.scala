@@ -48,20 +48,16 @@ private[sql] case class IndexedRelationScan(attributes: Seq[Attribute],
   }
 
   // Tool function: Distance between row and point
-  def evalDist(row: InternalRow, origin: Point, column_keys: List[Attribute]): Double = {
-    var dis = 0.0
-    for (i <- column_keys.indices) {
-      val tmp = BindReferences.bindReference(column_keys(i), relation.output).eval(row)
-        .asInstanceOf[Number].doubleValue()
-      dis += (tmp - origin.coord(i)) * (tmp - origin.coord(i))
-    }
-    Math.sqrt(dis)
+  def evalDist(row: InternalRow, origin: Point, column_keys: List[Attribute],
+               isPoint: Boolean): Double = {
+    origin.minDist(FetchPointUtils.getFromRow(row, column_keys, relation, isPoint))
   }
 
   override protected def doExecute(): RDD[InternalRow] = {
     relation match {
       case treemap @ TreeMapIndexedRelation(_, _, _, column_keys, _) =>
         if (predicates.nonEmpty) {
+          // for treemap, the length of column_keys is 1
           val intervals = predicates.map(Interval.conditionToInterval(_, column_keys)._1)
 
           // global index
@@ -149,7 +145,7 @@ private[sql] case class IndexedRelationScan(attributes: Seq[Attribute],
                 val global_part1 = rtree.global_rtree.kNN(query_point, {(a: Point, b: MBR) => b.maxDist(a)},
                   k, keepSame = false).map(_._2).toSeq
                 val tmp_ans = knnGlobalPrune(global_part1) // to get a safe and tighter bound
-                val theta = evalDist(tmp_ans.last, query_point, column_keys)
+                val theta = evalDist(tmp_ans.last, query_point, column_keys, rtree.isPoint)
 
                 // second prune, with the safe bound theta, to get the final global result
                 val global_part2 = (rtree.global_rtree.circleRange(query_point, theta).map(_._2) diff global_part1).toSeq

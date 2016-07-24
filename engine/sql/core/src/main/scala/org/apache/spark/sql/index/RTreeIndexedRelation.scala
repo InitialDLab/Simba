@@ -40,6 +40,7 @@ private[sql] case class RTreeIndexedRelation(
   extends IndexedRelation with MultiInstanceRelation {
 
   var isPoint = false
+  var dimen = 0
   private def checkKeys: Boolean = {
     if (column_keys.length > 1) {
       for (i <- column_keys.indices)
@@ -47,10 +48,13 @@ private[sql] case class RTreeIndexedRelation(
           column_keys(i).dataType.isInstanceOf[IntegerType])) {
           return false
         }
+      dimen = column_keys.length
       true
     } else {
       column_keys.head.dataType match {
         case t: StructType =>
+          println("xxxxxxxxxxxxxxxxx = " + t.length)
+          dimen = t.length
           isPoint = true
           true
         case t: NumericType =>
