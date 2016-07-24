@@ -328,106 +328,74 @@ private[sql] abstract class SparkStrategies extends QueryPlanner[SparkPlan] {
   object IndexRelationScans extends Strategy with PredicateHelper{
     import org.apache.spark.sql.catalyst.expressions._
     lazy val indexInfos = sqlContext.indexManager.getIndexInfo
-    // lookup
-    def lookupIndexInfo(attributes: Seq[Attribute]): IndexInfo = {
-      var result: IndexInfo = null
-      indexInfos.foreach(item => {
-        if (item.indexType == RTreeType){
-          val temp = item.attributes
-          var found : Boolean = true
-          if (temp.length != attributes.length) found = false
-          else {
-            for (i <- attributes.indices) {
-              if (temp(i) != attributes(i)) {
-                found = false
-              }
-            }
-          }
-          if (found) result = item
-        } else if (item.indexType == TreeMapType || item.indexType == TreapType) {
-          if (attributes.length == 1 && item.attributes.head == attributes.head){
-            result = item
-          }
-        }
-      })
-      result
-    }
+
+    def lookupIndexInfo(attributes: Seq[Attribute]): IndexInfo =
+      indexInfos.find(item => attributes.count(item.attributes.contains)
+        == attributes.length).orNull
 
     def leafNodeCanBeIndexed(expression: Expression): Boolean = {
-      println("leafNodeCanBeIndexed " + expression)
-      val indexInfo = expression match {
-        case l @ LessThan(left: NamedExpression, right: Literal) =>
-          lookupIndexInfo(Array(left.toAttribute))
+      val attrs: Seq[Attribute] = expression match {
+        case LessThan(left: NamedExpression, right: Literal) =>
+          Array(left.toAttribute)
         case EqualTo(left: NamedExpression, right: Literal) =>
-          lookupIndexInfo(Array(left.toAttribute))
+          Array(left.toAttribute)
         case LessThanOrEqual(left: NamedExpression, right: Literal) =>
-          lookupIndexInfo(Array(left.toAttribute))
+          Array(left.toAttribute)
         case GreaterThan(left: NamedExpression, right: Literal) =>
-          lookupIndexInfo(Array(left.toAttribute))
+          Array(left.toAttribute)
         case GreaterThanOrEqual(left: NamedExpression, right: Literal) =>
-          lookupIndexInfo(Array(left.toAttribute))
-        case InRange(point: Expression, boundL, boundR) =>
+          Array(left.toAttribute)
+
+        case InRange(point: Expression, _, _) =>
           point match {
             case wrapper: PointWrapperExpression =>
-              lookupIndexInfo(wrapper.points.map(_.asInstanceOf[NamedExpression].toAttribute))
+              wrapper.points.map(_.asInstanceOf[NamedExpression].toAttribute)
             case p =>
-              lookupIndexInfo(Array(p.asInstanceOf[NamedExpression].toAttribute))
+              Array(p.asInstanceOf[NamedExpression].toAttribute)
           }
-//          lookupIndexInfo(point.map(x => x.toAttribute))
-//        case InKNN(point: Seq[NamedExpression], target: Seq[Expression], k: Literal) =>
-//          lookupIndexInfo(point.map(x => x.toAttribute))
-//        case InCircleRange(point: Seq[NamedExpression], target: Seq[Expression], r: Literal) =>
-//          lookupIndexInfo(point.map(x => x.toAttribute))
+        case InKNN(point: Expression, target: Expression, k: Literal) =>
+          point match {
+            case wrapper: PointWrapperExpression =>
+              wrapper.points.map(_.asInstanceOf[NamedExpression].toAttribute)
+            case p =>
+              Array(p.asInstanceOf[NamedExpression].toAttribute)
+          }
+        case InCircleRange(point: Seq[NamedExpression], target: Expression, r: Literal) =>
+          point match {
+            case wrapper: PointWrapperExpression =>
+              wrapper.points.map(_.asInstanceOf[NamedExpression].toAttribute)
+            case p =>
+              Array(p.asInstanceOf[NamedExpression].toAttribute)
+          }
         case _ =>
           null
       }
-      indexInfo != null
+      attrs != null && lookupIndexInfo(attrs) != null
     }
 
-    def extractIndexOperation(expression: Expression): Seq[Expression] = {
-      expression match {
-        case And(l1 @ And(l2, r2), r1) =>
-          extractIndexOperation(And(l2, And(r2, r1)))
-        case And(l1, r1 @ And(l2, r2)) =>
-          val temp = extractIndexOperation(r1)
-          if (leafNodeCanBeIndexed(l1)) temp :+ l1
-          else temp
-        case And(left, right) =>
-          var ans = Seq[Expression]()
-          if (leafNodeCanBeIndexed(left)) ans = ans :+ left
-          if (leafNodeCanBeIndexed(right)) ans = ans :+ right
-          ans
-        case other =>
-          if (!leafNodeCanBeIndexed(other)) Seq[Expression]()
-          else Seq[Expression](other)
-      }
-    }
-
-    def selectFilter(predicates: Seq[Expression]): Seq[Expression] = {
+    def selectFilter(predicates: Seq[Expression]): (Seq[Expression], Seq[Expression]) = {
       val originalPredicate = predicates.reduceLeftOption(And).getOrElse(Literal(true))
-      val dnf_clauses = splitDNFPredicates(originalPredicate)
-      var indexedOperations = Seq[Expression]()
-      dnf_clauses.foreach(dnf => {
-        val tempIndexedOperations = extractIndexOperation(dnf)
-        if (tempIndexedOperations.nonEmpty){
-          indexedOperations = indexedOperations :+ tempIndexedOperations.reduce{
-            (a, b) => {
-              if (a == null) b
-              else if (b == null) a
-              else And(a, b)
-            }
-          }
-        }
-      })
-      indexedOperations
+      val clauses = splitDNFPredicates(originalPredicate).map(splitCNFPredicates)
+      val predicateCanBeIndexed = clauses.map(clause => clause.filter(leafNodeCanBeIndexed))
+
+      def getSize(aaExpression: Seq[Seq[_]]): Int =
+        aaExpression.aggregate(0)((a, data) => a + data.length, (left, right) => left + right)
+
+      val expressionLeft: Seq[Expression] =
+        if (getSize(clauses) == getSize(predicateCanBeIndexed)) Seq[Expression]()
+        else if (clauses.length == 1){ // no Or clause
+          clauses.map(clause => clause.filter(cls => !leafNodeCanBeIndexed(cls))).head
+        } else predicates
+
+      (predicateCanBeIndexed.map(_.reduceLeftOption(And).getOrElse(Literal(true))), expressionLeft)
     }
 
     def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
       case PhysicalOperation(projectList, filters, indexed: IndexedRelation) =>
-        val predicatesCanBeIndexed = selectFilter(filters)
+        val (predicatesCanBeIndexed, parentPredicate) = selectFilter(filters)
         pruneFilterProject(
           projectList,
-          filters,   // the parent Filter node of IndexRelationSca
+          parentPredicate,
           identity[Seq[Expression]],
           IndexedRelationScan(_, predicatesCanBeIndexed, indexed)) :: Nil
       case _ => Nil

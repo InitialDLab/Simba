@@ -50,4 +50,17 @@ object FetchPointUtils {
     }
     Point(coord)
   }
+
+  def getFromRow(row: InternalRow, columns: List[Attribute], plan: SparkPlan,
+                 isPoint: Boolean): Point = {
+    val coord = if (isPoint) {
+      BindReferences.bindReference(columns.head, plan.output).eval(row)
+        .asInstanceOf[GenericInternalRow].values(0)
+        .asInstanceOf[GenericArrayData].array.map(_.asInstanceOf[Double])
+    } else {
+      columns.toArray.map(BindReferences.bindReference(_, plan.output).eval(row)
+        .asInstanceOf[Number].doubleValue())
+    }
+    Point(coord)
+  }
 }
