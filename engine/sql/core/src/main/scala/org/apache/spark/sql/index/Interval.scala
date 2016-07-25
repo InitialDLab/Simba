@@ -73,43 +73,28 @@ object Interval extends PredicateHelper{
         null
     }
   }
-  def conditionToInterval(condition: Expression, column: List[Attribute])
+  def conditionToInterval(condition: Expression, column: List[Attribute], dimension: Int)
   : (Array[Interval], Array[Expression]) = {
     val leaf_nodes = splitConjunctivePredicates(condition) // split AND expression
-    val intervals: Array[Interval] = new Array[Interval](column.length)
-    for (i <- column.indices)
+    val intervals: Array[Interval] = new Array[Interval](dimension)
+    for (i <- 0 until dimension)
       intervals(i) = new Interval(Double.MinValue, Double.MaxValue, false, false)
     var ans = mutable.ArrayBuffer[Expression]()
     leaf_nodes.foreach {now =>
       val tmp_interval = getLeafInterval(now)
       if (tmp_interval != null) {
-        for (i <- column.indices)
+        for (i <- 0 until dimension)
           if (column.indexOf(tmp_interval._2) == i) {
             intervals(i) = intervals(i).intersect(tmp_interval._1)
           }
       } else {
         now match {
           case range @ InRange(point: Expression, point_low, point_high) =>
-//            for (i <- point.indices) {
-//              val id = column.indexOf(point(i).toAttribute)
-//              val low = point_low(i).asInstanceOf[Literal].toString.toDouble
-//              val high = point_high(i).asInstanceOf[Literal].toString.toDouble
-//              intervals(id) = intervals(id).intersect(new Interval(low, high))
-//            }
-//            point match {
-//              case wrapper: PointWrapperExpression =>
-//               // intervals.foreach(x => )
-//                val low = point_low.asInstanceOf[Literal].value.asInstanceOf[Point].coord
-//                val high = point_high.asInstanceOf[Literal].value.asInstanceOf[Point].coord
-//                val p_att = wrapper.points.map(_.asInstanceOf[NamedExpression].toAttribute).toArray
-//                for (i <- p_att.indices) {
-//                  val id = column.indexOf(p_att(i))
-//                  intervals(id) = intervals(id).intersect(new Interval(low(i), high(i)))
-//                }
-//              case p =>
-//                val eval_point
-//            }
-            ans += range
+            val low = point_low.asInstanceOf[Literal].value.asInstanceOf[Point].coord
+            val high = point_high.asInstanceOf[Literal].value.asInstanceOf[Point].coord
+            for (i <- 0 until dimension) {
+              intervals(i) = intervals(i).intersect(new Interval(low(i), high(i)))
+            }
           case knn @ InKNN(point: Expression, target, k: Literal) =>
             ans += knn
           case cr @ InCircleRange(point: Expression, target, r: Literal) =>

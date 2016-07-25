@@ -58,7 +58,7 @@ private[sql] case class IndexedRelationScan(attributes: Seq[Attribute],
       case treemap @ TreeMapIndexedRelation(_, _, _, column_keys, _) =>
         if (predicates.nonEmpty) {
           // for treemap, the length of column_keys is 1
-          val intervals = predicates.map(Interval.conditionToInterval(_, column_keys)._1)
+          val intervals = predicates.map(Interval.conditionToInterval(_, column_keys, 1)._1)
 
           // global index
           val bounds = treemap.range_bounds
@@ -88,7 +88,7 @@ private[sql] case class IndexedRelationScan(attributes: Seq[Attribute],
         }
       case treap @ TreapIndexedRelation(_, _, _, column_keys, _) =>
         if (predicates.nonEmpty) {
-          val intervals = predicates.map(Interval.conditionToInterval(_, column_keys)._1)
+          val intervals = predicates.map(Interval.conditionToInterval(_, column_keys, 1)._1)
 
           // global index
           val bounds = treap.range_bounds
@@ -117,7 +117,9 @@ private[sql] case class IndexedRelationScan(attributes: Seq[Attribute],
       case rtree @ RTreeIndexedRelation(_, _, _, column_keys, _) =>
         if (predicates.nonEmpty) {
           predicates.map { predicate =>
-            val (intervals, exps) = Interval.conditionToInterval(predicate, column_keys)
+            println(predicate)
+            val (intervals, exps) = Interval.conditionToInterval(predicate, column_keys,
+              rtree.dimension)
             val queryMBR = new MBR(new Point(intervals.map(_.min._1)),
               new Point(intervals.map(_.max._1)))
             var cir_ranges = Array[(Point, Double)]()
@@ -142,13 +144,14 @@ private[sql] case class IndexedRelationScan(attributes: Seq[Attribute],
                 }
 
                 // first prune, get k partitions, but partitions may not be final partitions
-                val global_part1 = rtree.global_rtree.kNN(query_point, {(a: Point, b: MBR) => b.maxDist(a)},
-                  k, keepSame = false).map(_._2).toSeq
+                val global_part1 = rtree.global_rtree.kNN(query_point,
+                  {(a: Point, b: MBR) => b.maxDist(a)}, k, keepSame = false).map(_._2).toSeq
                 val tmp_ans = knnGlobalPrune(global_part1) // to get a safe and tighter bound
                 val theta = evalDist(tmp_ans.last, query_point, column_keys, rtree.isPoint)
 
                 // second prune, with the safe bound theta, to get the final global result
-                val global_part2 = (rtree.global_rtree.circleRange(query_point, theta).map(_._2) diff global_part1).toSeq
+                val global_part2 = (rtree.global_rtree.circleRange(query_point, theta).
+                  map(_._2) diff global_part1).toSeq
                 val tmp_knn_res = if (global_part2.isEmpty) tmp_ans
                 else knnGlobalPrune(global_part2).union(tmp_ans).sorted(ord).take(k)
 

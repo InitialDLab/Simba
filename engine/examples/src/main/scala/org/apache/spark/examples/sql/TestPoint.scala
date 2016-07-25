@@ -26,7 +26,7 @@ import scala.collection.mutable.ListBuffer
   */
 object TestPoint {
 
-  case class PointItem(id: Int, fuck: Point)
+  case class PointItem(id: Int, p: Point)
 
   def main(args: Array[String]) {
     val sparkConf = new SparkConf().setAppName("PointTest").setMaster("local[4]")
@@ -42,43 +42,31 @@ object TestPoint {
 
     val points2 = ListBuffer[PointItem]()
 
-    points2 += PointItem(1, Point(Array(3, 3)))
-    points2 += PointItem(1, Point(Array(5, 5)))
-    points2 += PointItem(1, Point(Array(30, 30)))
-    points2 += PointItem(1, Point(Array(70, 70)))
-
-    val points3 = ListBuffer[PointItem]()
-    points3 += PointItem(1, Point(Array(3)))
-    points3 += PointItem(2, Point(Array(5)))
-    points3 += PointItem(3, Point(Array(7)))
-
     for (i <- 1 to 100) {
       val p = new Point(Array(i, i))
       points += PointItem(i, p)
+      points2 += PointItem(i, p)
     }
 
     val rdd = sc.parallelize(points)
     val rdd2 = sc.parallelize(points2)
-    val rdd3 = sc.parallelize(points3)
 
-    rdd.toDF().registerTempTable("MyPoint")
-    rdd2.toDF().registerTempTable("FuckPoint")
-    rdd3.toDF().registerTempTable("IndexPoint")
+    rdd.toDF().registerTempTable("Point1")
+    rdd2.toDF().registerTempTable("Point2")
 
-    sqlContext.sql("CREATE INDEX treeMapIndex ON MyPoint (fuck) USE rtree")
-    sqlContext.sql("SHOW INDEX ON MyPoint")
+    sqlContext.sql("CREATE INDEX rIndex ON Point1 (p) USE rtree")
+    sqlContext.sql("SHOW INDEX ON Point1")
 
-//    val sqlQuery = "SELECT * FROM MyPoint WHERE fuck IN RANGE(POINT(8, 8), POINT(20, 20))"
+    val sqlQuery = "SELECT * FROM Point1 WHERE p IN RANGE(POINT(8, 8), POINT(20, 20))"
+    val df = sqlContext.sql(sqlQuery)
+    println(df.queryExecution)
+    df.show()
 
-//   val sqlQuery = "SELECT * FROM MyPoint KNN JOIN FuckPoint" +
-//     " ON FuckPoint.fuck IN KNN(MyPoint.fuck, 2)"
+    val sqlQuery2 = "SELECT * FROM Point2 WHERE p IN KNN (POINT(8, 8), 9)"
+    val df2 = sqlContext.sql(sqlQuery2)
+    println(df2.queryExecution)
+    df.show()
 
-//    val sqlQuery = "SELECT * FROM MyPoint WHERE fuck IN KNN (POINT(8, 8), 9)"
-
-//    val df = sqlContext.sql(sqlQuery)
-//    println(df.queryExecution)
-//
-//    df.show()
     sc.stop()
 
   }
