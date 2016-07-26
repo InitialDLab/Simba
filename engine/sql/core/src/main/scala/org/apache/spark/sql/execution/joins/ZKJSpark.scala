@@ -22,7 +22,6 @@ import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.execution.{BinaryNode, SparkPlan}
 import org.apache.spark.sql.partitioner.{MapDPartition, RangeDPartition, RangePartition}
 import org.apache.spark.sql.spatial.{Point, ZValue}
-import org.apache.spark.sql.util.FetchPointUtils
 
 import scala.collection.mutable
 import scala.util.Random
@@ -145,11 +144,13 @@ case class ZKJSpark(left_key: Expression,
 
   def doExecute(): RDD[InternalRow] = {
     val left_rdd = left.execute().map(row =>
-      (FetchPointUtils.getFromRow(row, left_key, left), row)
+      (BindReferences.bindReference(left_key, left.output).eval(row)
+        .asInstanceOf[Point], row)
     )
 
     val right_rdd = right.execute().map(row =>
-      (FetchPointUtils.getFromRow(row, right_key, right), row)
+      (BindReferences.bindReference(right_key, right.output).eval(row)
+        .asInstanceOf[Point], row)
     )
 
     val dimension = right_rdd.first._1.coord.length

@@ -18,12 +18,11 @@ package org.apache.spark.sql.index
 
 import org.apache.spark.sql._
 import org.apache.spark.sql.catalyst.analysis.MultiInstanceRelation
-import org.apache.spark.sql.catalyst.expressions.{Attribute, BindReferences}
+import org.apache.spark.sql.catalyst.expressions.Attribute
 import org.apache.spark.sql.catalyst.plans.logical.Statistics
 import org.apache.spark.sql.execution.SparkPlan
 import org.apache.spark.sql.partitioner.{KDTreePartitioner, QuadTreePartitioner, STRPartition}
-import org.apache.spark.sql.spatial.Point
-import org.apache.spark.sql.types.{DoubleType, IntegerType, NumericType, StructType}
+import org.apache.spark.sql.types._
 import org.apache.spark.sql.util.FetchPointUtils
 import org.apache.spark.storage.StorageLevel
 
@@ -49,9 +48,9 @@ private[sql] case class RTreeIndexedRelation(
           return false
         }
       true
-    } else {
+    } else { // length = 1
       column_keys.head.dataType match {
-        case t: StructType =>
+        case t: ShapeType =>
           isPoint = true
           true
         case t: NumericType =>

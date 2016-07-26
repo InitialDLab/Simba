@@ -19,12 +19,10 @@ package org.apache.spark.sql.execution.joins
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
-import org.apache.spark.sql.catalyst.util.GenericArrayData
 import org.apache.spark.sql.execution.{BinaryNode, SparkPlan}
 import org.apache.spark.sql.index.RTree
 import org.apache.spark.sql.partitioner.{MapDPartition, STRPartition}
 import org.apache.spark.sql.spatial._
-import org.apache.spark.sql.util.FetchPointUtils
 
 import scala.collection.mutable
 
@@ -48,11 +46,13 @@ case class RKJSpark(left_key: Expression,
 
   override protected def doExecute(): RDD[InternalRow] = {
     val left_rdd = left.execute().map(row =>
-      (FetchPointUtils.getFromRow(row, left_key, left), row)
+      (BindReferences.bindReference(left_key, left.output).eval(row)
+          .asInstanceOf[Point], row)
     )
 
     val right_rdd = right.execute().map(row =>
-      (FetchPointUtils.getFromRow(row, right_key, right), row)
+      (BindReferences.bindReference(right_key, right.output).eval(row)
+        .asInstanceOf[Point], row)
     )
 
     val right_sampled = right_rdd

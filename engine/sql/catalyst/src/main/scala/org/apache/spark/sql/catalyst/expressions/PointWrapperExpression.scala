@@ -17,8 +17,8 @@ package org.apache.spark.sql.catalyst.expressions
 
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.codegen.CodegenFallback
-import org.apache.spark.sql.types.DataType
-import org.apache.spark.sql.types.PointType
+import org.apache.spark.sql.spatial.Point
+import org.apache.spark.sql.types.{DataType, ShapeType}
 
 
 /**
@@ -31,8 +31,11 @@ case class PointWrapperExpression (points: Seq[Expression])
 
   override def nullable: Boolean = false
 
-  override def dataType: DataType = PointType
+  override def dataType: DataType = ShapeType
 
-  override def eval(input: InternalRow): Any = true
+  override def eval(input: InternalRow): Any = {
+    val coord = points.map(_.eval(input).asInstanceOf[Double]).toArray
+    Point(coord)
+  }
 
 }

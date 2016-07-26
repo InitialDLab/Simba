@@ -59,7 +59,7 @@ case class Project(projectList: Seq[NamedExpression], child: SparkPlan) extends 
 
 case class Filter(condition: Expression, child: SparkPlan) extends UnaryNode {
 
-  val getCoord = (row: InternalRow, point: Expression) => point match {
+val getCoord = (row: InternalRow, point: Expression) => point match {
     case p: PointWrapperExpression => p.points.toArray.map(BindReferences.
       bindReference(_, child.output).eval(row).asInstanceOf[Number].doubleValue())
     case e => BindReferences.bindReference(e, child.output).eval(row)
@@ -77,10 +77,10 @@ case class Filter(condition: Expression, child: SparkPlan) extends UnaryNode {
   private class DistanceOrdering(point: Expression,
                                  target: Point) extends Ordering[InternalRow] {
     override def compare(x: InternalRow, y: InternalRow): Int = {
-      val point_cood_x = getCoord(x, point)
-      val point_cood_y = getCoord(y, point)
-      val dis_x = target.minDist(Point(point_cood_x))
-      val dis_y = target.minDist(Point(point_cood_y))
+      val point_x = BindReferences.bindReference(point, child.output).eval(x).asInstanceOf[Point]
+      val point_y = BindReferences.bindReference(point, child.output).eval(y).asInstanceOf[Point]
+      val dis_x = target.minDist(point_x)
+      val dis_y = target.minDist(point_y)
       dis_x.compare(dis_y)
     }
   }
@@ -97,16 +97,16 @@ case class Filter(condition: Expression, child: SparkPlan) extends UnaryNode {
   def range(rdd: RDD[InternalRow], point: Expression,
             point_low: Point, point_high: Point): RDD[InternalRow] =
     rdd.filter(row => {
-      val point_coord = getCoord(row, point)
-      val eval_point = Point(point_coord)
+      val eval_point = BindReferences.bindReference(point, child.output).eval(row).
+        asInstanceOf[Point]
       MBR(point_low, point_high).contains(eval_point)
     })
 
   def circleRange(rdd: RDD[InternalRow], point: Expression,
                   target: Point, r: Double): RDD[InternalRow] =
     rdd.filter(row => {
-      val point_coord = getCoord(row, point)
-      val eval_point = Point(point_coord)
+      val eval_point = BindReferences.bindReference(point, child.output).eval(row).
+        asInstanceOf[Point]
       Circle(target, r).contains(eval_point)
     })
 
@@ -147,7 +147,7 @@ case class Filter(condition: Expression, child: SparkPlan) extends UnaryNode {
       case InKNN(point, target, k) =>
         val _target = target.asInstanceOf[Literal].value.asInstanceOf[Point]
         knn(rootRDD, point, _target, k.value.asInstanceOf[Number].intValue())
-      case InRange(point, point_low, point_high) =>
+      case fuckR @ InRange(point, point_low, point_high) =>
         val _point_low = point_low.asInstanceOf[Literal].value.asInstanceOf[Point]
         val _point_high = point_high.asInstanceOf[Literal].value.asInstanceOf[Point]
         range(rootRDD, point, _point_low, _point_high)

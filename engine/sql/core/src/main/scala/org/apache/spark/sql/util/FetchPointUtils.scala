@@ -16,9 +16,8 @@
 package org.apache.spark.sql.util
 
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.{Attribute, BindReferences, Expression, GenericInternalRow, PointWrapperExpression}
+import org.apache.spark.sql.catalyst.expressions.{Attribute, BindReferences}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
-import org.apache.spark.sql.catalyst.util.GenericArrayData
 import org.apache.spark.sql.execution.SparkPlan
 import org.apache.spark.sql.spatial.Point
 
@@ -27,40 +26,25 @@ import org.apache.spark.sql.spatial.Point
   */
 object FetchPointUtils {
 
-  def getFromRow(row: InternalRow, point: Expression, plan: SparkPlan): Point = {
-    val coord = point match {
-      case p: PointWrapperExpression => p.points.toArray.map(BindReferences.
-        bindReference(_, plan.output).eval(row).asInstanceOf[Number].doubleValue())
-      case e => BindReferences.bindReference(e, plan.output).eval(row)
-        .asInstanceOf[GenericInternalRow].values(0)
-        .asInstanceOf[GenericArrayData].array.map(x => x.asInstanceOf[Double])
-    }
-    Point(coord)
-  }
-
   def getFromRow(row: InternalRow, columns: List[Attribute], plan: LogicalPlan,
                  isPoint: Boolean): Point = {
-    val coord = if (isPoint) {
+    if (isPoint) {
       BindReferences.bindReference(columns.head, plan.output).eval(row)
-        .asInstanceOf[GenericInternalRow].values(0)
-        .asInstanceOf[GenericArrayData].array.map(_.asInstanceOf[Double])
+        .asInstanceOf[Point]
     } else {
-      columns.toArray.map(BindReferences.bindReference(_, plan.output).eval(row)
-        .asInstanceOf[Number].doubleValue())
+      Point(columns.toArray.map(BindReferences.bindReference(_, plan.output).eval(row)
+        .asInstanceOf[Number].doubleValue()))
     }
-    Point(coord)
   }
 
   def getFromRow(row: InternalRow, columns: List[Attribute], plan: SparkPlan,
                  isPoint: Boolean): Point = {
-    val coord = if (isPoint) {
+    if (isPoint) {
       BindReferences.bindReference(columns.head, plan.output).eval(row)
-        .asInstanceOf[GenericInternalRow].values(0)
-        .asInstanceOf[GenericArrayData].array.map(_.asInstanceOf[Double])
+        .asInstanceOf[Point]
     } else {
-      columns.toArray.map(BindReferences.bindReference(_, plan.output).eval(row)
-        .asInstanceOf[Number].doubleValue())
+      Point(columns.toArray.map(BindReferences.bindReference(_, plan.output).eval(row)
+        .asInstanceOf[Number].doubleValue()))
     }
-    Point(coord)
   }
 }

@@ -17,13 +17,14 @@
 package org.apache.spark.sql.index
 import org.apache.spark.sql.IndexRDD
 import org.apache.spark.sql.catalyst.analysis.MultiInstanceRelation
-import org.apache.spark.sql.catalyst.expressions.{Attribute, BindReferences, GenericInternalRow}
+import org.apache.spark.sql.catalyst.expressions.{Attribute, BindReferences}
 import org.apache.spark.sql.catalyst.plans.logical.Statistics
 import org.apache.spark.sql.catalyst.util.GenericArrayData
 import org.apache.spark.sql.execution.SparkPlan
 import org.apache.spark.sql.partitioner.RangePartition
-import org.apache.spark.sql.types.{NumericType, StructType}
+import org.apache.spark.sql.types.{NumericType, ShapeType}
 import org.apache.spark.storage.StorageLevel
+import org.apache.spark.sql.spatial.Point
 
 /**
   * Created by gefei on 16-6-21.
@@ -38,7 +39,7 @@ private[sql] case class TreapIndexedRelation(
   extends IndexedRelation with MultiInstanceRelation {
   require(column_keys.length == 1)
   require(column_keys.head.dataType.isInstanceOf[NumericType] ||
-    column_keys.head.dataType.isInstanceOf[StructType])
+    column_keys.head.dataType.isInstanceOf[ShapeType])
   val numShufflePartitions = child.sqlContext.conf.numShufflePartitions
   val maxEntriesPerNode = child.sqlContext.conf.maxEntriesPerNode
   val sampleRate = child.sqlContext.conf.sampleRate
@@ -52,10 +53,9 @@ private[sql] case class TreapIndexedRelation(
       val eval_key = BindReferences.bindReference(column_keys.head, child.output).eval(row)
       eval_key match {
         case key: Number => (key.doubleValue, row)
-        case key: GenericInternalRow =>
-          val row_array = key.values(0).asInstanceOf[GenericArrayData].array
-          require(row_array.length == 1)
-          (row_array.head.asInstanceOf[Double], row)
+        case key: Point =>
+          require(key.coord.length == 1)
+          (key.coord.head, row)
       }
     })
 

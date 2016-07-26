@@ -22,7 +22,6 @@ import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.execution.{BinaryNode, SparkPlan}
 import org.apache.spark.sql.partitioner.{MapDPartition, VoronoiPartition}
 import org.apache.spark.sql.spatial.Point
-import org.apache.spark.sql.util.FetchPointUtils
 import org.apache.spark.util.BoundedPriorityQueue
 
 import scala.collection.mutable
@@ -236,11 +235,13 @@ case class VKJSpark(left_key: Expression,
 
   override def doExecute(): RDD[InternalRow] = {
     val left_rdd = left.execute().map(row =>
-      (FetchPointUtils.getFromRow(row, left_key, left), row)
+      (BindReferences.bindReference(left_key, left.output).eval(row)
+        .asInstanceOf[Point], row)
     )
 
     val right_rdd = right.execute().map(row =>
-      (FetchPointUtils.getFromRow(row, right_key, right), row)
+      (BindReferences.bindReference(right_key, right.output).eval(row)
+        .asInstanceOf[Point], row)
     )
 
     val pivots = generatePivots(left_rdd.map(_._1).union(right_rdd.map(_._1)), num_of_pivots)

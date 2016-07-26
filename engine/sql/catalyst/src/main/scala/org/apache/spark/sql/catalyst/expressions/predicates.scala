@@ -20,7 +20,7 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.analysis.TypeCheckResult
 import org.apache.spark.sql.catalyst.expressions.codegen.{CodeGenContext, CodegenFallback, GeneratedExpressionCode}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
-import org.apache.spark.sql.catalyst.util.{FetchPointUtils, NumberConverter, TypeUtils}
+import org.apache.spark.sql.catalyst.util.{NumberConverter, TypeUtils}
 import org.apache.spark.sql.spatial.{MBR, Point, Shape, Circle}
 import org.apache.spark.sql.types._
 import org.apache.spark.util.Utils
@@ -266,7 +266,7 @@ case class InRange(point: Expression,
 
   /** Returns the result of evaluating this expression on a given input Row */
   override def eval(input: InternalRow): Any = {
-    val eval_point = FetchPointUtils.getFromRow(input, point)
+    val eval_point = point.eval(input).asInstanceOf[Point]
     val eval_low = point_low.asInstanceOf[Literal].value.asInstanceOf[Point]
     val eval_high = point_high.asInstanceOf[Literal].value.asInstanceOf[Point]
     require(eval_point.coord.length == eval_low.coord.length &&
@@ -290,8 +290,8 @@ case class InCircleRange(point: Expression,
 
   /** Returns the result of evaluating this expression on a given input Row */
   override def eval(input: InternalRow): Any = {
-    val eval_point = FetchPointUtils.getFromRow(input, point)
-    val eval_target = FetchPointUtils.getFromRow(input, target)
+    val eval_point = point.eval(input).asInstanceOf[Point]
+    val eval_target = target.eval(input).asInstanceOf[Point]
     require(eval_point.coord.length == eval_target.coord.length)
     val eval_r = NumberConverter.literalToDouble(r)
     Circle(eval_target, eval_r).contains(eval_point)

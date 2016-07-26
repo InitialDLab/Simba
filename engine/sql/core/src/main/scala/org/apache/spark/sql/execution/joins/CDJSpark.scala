@@ -23,7 +23,6 @@ import org.apache.spark.sql.catalyst.plans.physical.Partitioning
 import org.apache.spark.sql.catalyst.util.NumberConverter
 import org.apache.spark.sql.execution.{BinaryNode, SparkPlan}
 import org.apache.spark.sql.spatial._
-import org.apache.spark.sql.util.FetchPointUtils
 
 /**
   * Created by dong on 1/20/16.
@@ -44,8 +43,10 @@ case class CDJSpark(left_key: Expression,
     left.execute().cartesian(right.execute()).mapPartitions { iter =>
       val joinedRow = new JoinedRow
       iter.filter { row =>
-        val point1 = FetchPointUtils.getFromRow(row._1, left_key, left)
-        val point2 = FetchPointUtils.getFromRow(row._2, right_key, right)
+        val point1 = BindReferences.bindReference(left_key, left.output).eval(row._1).
+          asInstanceOf[Point]
+        val point2 = BindReferences.bindReference(right_key, right.output).eval(row._2).
+          asInstanceOf[Point]
         point1.minDist(point2) <= r
       }.map(row => joinedRow(row._1, row._2))
     }

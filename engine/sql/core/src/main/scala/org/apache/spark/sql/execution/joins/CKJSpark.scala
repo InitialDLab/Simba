@@ -23,7 +23,6 @@ import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.plans.physical.Partitioning
 import org.apache.spark.sql.execution.{BinaryNode, SparkPlan}
 import org.apache.spark.sql.spatial._
-import org.apache.spark.sql.util.FetchPointUtils
 
 
 /**
@@ -46,10 +45,12 @@ case class CKJSpark(left_key: Expression,
     val right_rdd = right.execute()
 
     left_rdd.map(row =>
-      (FetchPointUtils.getFromRow(row, left_key, left), row)
+      (BindReferences.bindReference(left_key, left.output).eval(row)
+          .asInstanceOf[Point], row)
     ).cartesian(right_rdd).map {
       case (l: (Point, InternalRow), r: InternalRow) =>
-        val tmp_point = FetchPointUtils.getFromRow(r, right_key, right)
+        val tmp_point = BindReferences.bindReference(right_key, right.output).eval(r)
+          .asInstanceOf[Point]
         l._2 -> List((tmp_point.minDist(l._1), r))
     }.reduceByKey {
       case (l_list: Seq[(Double, InternalRow)], r_list: Seq[(Double, InternalRow)]) =>

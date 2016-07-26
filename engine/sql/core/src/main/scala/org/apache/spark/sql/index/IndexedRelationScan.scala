@@ -117,7 +117,6 @@ private[sql] case class IndexedRelationScan(attributes: Seq[Attribute],
       case rtree @ RTreeIndexedRelation(_, _, _, column_keys, _) =>
         if (predicates.nonEmpty) {
           predicates.map { predicate =>
-            println(predicate)
             val (intervals, exps) = Interval.conditionToInterval(predicate, column_keys,
               rtree.dimension)
             val queryMBR = new MBR(new Point(intervals.map(_.min._1)),

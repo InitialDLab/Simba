@@ -20,7 +20,6 @@ import org.apache.spark.sql.SQLContext
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.sql.spatial.Point
 
-import scala.collection.mutable.ListBuffer
 /**
   * Created by zhongpu on 16-7-11.
   */
@@ -38,34 +37,29 @@ object TestPoint {
 
     import sqlContext.implicits._
 
-    var points = ListBuffer[PointItem]()
-
-    val points2 = ListBuffer[PointItem]()
-
-    for (i <- 1 to 100) {
-      val p = new Point(Array(i, i))
-      points += PointItem(i, p)
-      points2 += PointItem(i, p)
-    }
-
-    val rdd = sc.parallelize(points)
-    val rdd2 = sc.parallelize(points2)
-
+    val rdd = sc.parallelize(1 to 100 map {i => PointItem(i, Point(Array(i, i)))})
     rdd.toDF().registerTempTable("Point1")
+
+    val rdd2 = sc.parallelize(1 to 100 map {i => PointItem(i, Point(Array(i, i)))})
     rdd2.toDF().registerTempTable("Point2")
+
+    val sqlQuery = "SELECT * FROM Point2"
+    val df = sqlContext.sql(sqlQuery)
+    println(df.queryExecution.executedPlan)
+    df.show()
+
+    val sqlQuery2 = "SELECT * FROM Point1 KNN JOIN Point2 ON" +
+      " Point2.p IN KNN(Point1.p, 3)"
+    val df2 = sqlContext.sql(sqlQuery2)
+    println(df2.queryExecution.executedPlan)
+    df2.show()
 
     sqlContext.sql("CREATE INDEX rIndex ON Point1 (p) USE rtree")
     sqlContext.sql("SHOW INDEX ON Point1")
-
-    val sqlQuery = "SELECT * FROM Point1 WHERE p IN RANGE(POINT(8, 8), POINT(20, 20))"
-    val df = sqlContext.sql(sqlQuery)
-    println(df.queryExecution)
-    df.show()
-
-    val sqlQuery2 = "SELECT * FROM Point2 WHERE p IN KNN (POINT(8, 8), 9)"
-    val df2 = sqlContext.sql(sqlQuery2)
-    println(df2.queryExecution)
-    df.show()
+    val sqlQuery3 = "SELECT * FROM Point1 WHERE p IN RANGE(POINT(8, 8), POINT(20, 20))"
+    val df3 = sqlContext.sql(sqlQuery3)
+    println(df3.queryExecution)
+    df3.show()
 
     sc.stop()
 

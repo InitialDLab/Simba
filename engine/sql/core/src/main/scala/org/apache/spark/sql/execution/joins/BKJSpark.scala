@@ -22,7 +22,6 @@ import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.execution.{BinaryNode, SparkPlan}
 import org.apache.spark.sql.partitioner.MapDPartition
 import org.apache.spark.sql.spatial._
-import org.apache.spark.sql.util.FetchPointUtils
 import org.apache.spark.util.BoundedPriorityQueue
 
 import scala.collection.mutable
@@ -72,10 +71,12 @@ case class BKJSpark(left_key: Expression,
       while (iter.hasNext) {
         val data = iter.next()
         if (data._2._1 == 0) {
-          val tmp_point = FetchPointUtils.getFromRow(data._2._2, left_key, left)
+          val tmp_point = BindReferences.bindReference(left_key, left.output).eval(data._2._2).
+            asInstanceOf[Point]
           left_data += ((tmp_point, data._2._2))
         } else {
-          val tmp_point = FetchPointUtils.getFromRow(data._2._2, right_key, right)
+          val tmp_point = BindReferences.bindReference(right_key, right.output).eval(data._2._2).
+            asInstanceOf[Point]
           right_data += ((tmp_point, data._2._2))
         }
       }

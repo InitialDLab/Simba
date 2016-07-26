@@ -18,13 +18,12 @@ package org.apache.spark.sql.index
 
 import org.apache.spark.sql._
 import org.apache.spark.sql.catalyst.analysis.MultiInstanceRelation
-import org.apache.spark.sql.catalyst.expressions.{Attribute, BindReferences, GenericInternalRow}
+import org.apache.spark.sql.catalyst.expressions.{Attribute, BindReferences}
 import org.apache.spark.sql.catalyst.plans.logical.Statistics
-import org.apache.spark.sql.catalyst.util.GenericArrayData
 import org.apache.spark.sql.execution.SparkPlan
 import org.apache.spark.sql.partitioner.RangePartition
-import org.apache.spark.sql.types.NumericType
 import org.apache.spark.storage.StorageLevel
+import org.apache.spark.sql.spatial.Point
 
 /**
   * Created by gefei on 16-6-21.
@@ -50,10 +49,9 @@ private[sql] case class TreeMapIndexedRelation(
       val eval_key = BindReferences.bindReference(column_keys.head, child.output).eval(row)
       eval_key match {
         case key: Number => (key.doubleValue, row)
-        case key: GenericInternalRow =>
-          val row_array = key.values(0).asInstanceOf[GenericArrayData].array
-          require(row_array.length == 1)
-          (row_array.head.asInstanceOf[Double], row)
+        case key: Point =>
+          require(key.coord.length == 1)
+          (key.coord.head, row)
       }
     })
 
