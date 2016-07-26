@@ -59,16 +59,16 @@ case class QuadTree(root: QuadTreeNode) extends Index with Serializable{
     root
   }
 
-  def rectQuery(x_min: Double, y_min: Double,
-                x_max: Double, y_max: Double): Array[(Double, Double, Int)] = {
+  def range(x_min: Double, y_min: Double,
+            x_max: Double, y_max: Double): Array[(Double, Double, Int)] = {
     val res = new mutable.ArrayBuffer[(Double, Double, Int)]()
     res ++= searchRecur(root, x_min, y_min, x_max, y_max)
     res.toArray
   }
 
   // interface same with RTree
-  def rectQuery(query: MBR): Array[(Point, Int)] = {
-    val temp_result = this.rectQuery(query.low.coord(0), query.low.coord(1),
+  def range(query: MBR): Array[(Point, Int)] = {
+    val temp_result = this.range(query.low.coord(0), query.low.coord(1),
       query.high.coord(0), query.high.coord(1))
     temp_result.map(item => (Point(Array(item._1, item._2)), item._3))
   }
