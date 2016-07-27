@@ -43,17 +43,14 @@ private[sql] case class RTreeIndexedRelation(
   private def checkKeys: Boolean = {
     if (column_keys.length > 1) {
       for (i <- column_keys.indices)
-        if (!(column_keys(i).dataType.isInstanceOf[DoubleType] ||
-          column_keys(i).dataType.isInstanceOf[IntegerType])) {
+        if (!column_keys(i).dataType.isInstanceOf[NumericType]) {
           return false
         }
       true
-    } else { // length = 1
+    } else { // length = 1; we do not support one dimension R-tree
       column_keys.head.dataType match {
         case t: ShapeType =>
           isPoint = true
-          true
-        case t: NumericType =>
           true
         case _ => false
       }

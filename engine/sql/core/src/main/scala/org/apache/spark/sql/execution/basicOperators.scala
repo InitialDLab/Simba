@@ -147,7 +147,7 @@ val getCoord = (row: InternalRow, point: Expression) => point match {
       case InKNN(point, target, k) =>
         val _target = target.asInstanceOf[Literal].value.asInstanceOf[Point]
         knn(rootRDD, point, _target, k.value.asInstanceOf[Number].intValue())
-      case fuckR @ InRange(point, point_low, point_high) =>
+      case InRange(point, point_low, point_high) =>
         val _point_low = point_low.asInstanceOf[Literal].value.asInstanceOf[Point]
         val _point_high = point_high.asInstanceOf[Literal].value.asInstanceOf[Point]
         range(rootRDD, point, _point_low, _point_high)

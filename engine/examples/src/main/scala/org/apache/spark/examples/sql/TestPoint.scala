@@ -26,6 +26,7 @@ import org.apache.spark.sql.spatial.Point
 object TestPoint {
 
   case class PointItem(id: Int, p: Point)
+  case class PointCoord(x: Double, y: Double)
 
   def main(args: Array[String]) {
     val sparkConf = new SparkConf().setAppName("PointTest").setMaster("local[4]")
@@ -56,10 +57,18 @@ object TestPoint {
 
     sqlContext.sql("CREATE INDEX rIndex ON Point1 (p) USE rtree")
     sqlContext.sql("SHOW INDEX ON Point1")
-    val sqlQuery3 = "SELECT * FROM Point1 WHERE p IN RANGE(POINT(8, 8), POINT(20, 20))"
+    val sqlQuery3 = "SELECT p FROM Point1 WHERE p IN RANGE(POINT(8, 8), POINT(20, 20))"
     val df3 = sqlContext.sql(sqlQuery3)
     println(df3.queryExecution)
-    df3.show()
+    df3.collect().foreach(println)
+
+    val rdd3 = sc.parallelize(1 to 100 map {i => PointCoord(i, i)})
+    rdd3.toDF().registerTempTable("Point3")
+    sqlContext.sql("CREATE INDEX treapIndex ON Point3 (x) USE treap")
+    val sqlQuery4 = "SELECT * FROM Point3 WHERE x > 90"
+    val df4 = sqlContext.sql(sqlQuery4)
+    println(df4.queryExecution)
+    df4.show()
 
     sc.stop()
 

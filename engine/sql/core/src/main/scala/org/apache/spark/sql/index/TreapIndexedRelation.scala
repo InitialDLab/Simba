@@ -19,13 +19,10 @@ import org.apache.spark.sql.IndexRDD
 import org.apache.spark.sql.catalyst.analysis.MultiInstanceRelation
 import org.apache.spark.sql.catalyst.expressions.{Attribute, BindReferences}
 import org.apache.spark.sql.catalyst.plans.logical.Statistics
-import org.apache.spark.sql.catalyst.util.GenericArrayData
 import org.apache.spark.sql.execution.SparkPlan
 import org.apache.spark.sql.partitioner.RangePartition
-import org.apache.spark.sql.types.{NumericType, ShapeType}
+import org.apache.spark.sql.types.NumericType
 import org.apache.spark.storage.StorageLevel
-import org.apache.spark.sql.spatial.Point
-
 /**
   * Created by gefei on 16-6-21.
   */
@@ -38,8 +35,7 @@ private[sql] case class TreapIndexedRelation(
                       var range_bounds: Array[Double] = null)
   extends IndexedRelation with MultiInstanceRelation {
   require(column_keys.length == 1)
-  require(column_keys.head.dataType.isInstanceOf[NumericType] ||
-    column_keys.head.dataType.isInstanceOf[ShapeType])
+  require(column_keys.head.dataType.isInstanceOf[NumericType])
   val numShufflePartitions = child.sqlContext.conf.numShufflePartitions
   val maxEntriesPerNode = child.sqlContext.conf.maxEntriesPerNode
   val sampleRate = child.sqlContext.conf.sampleRate
@@ -51,12 +47,8 @@ private[sql] case class TreapIndexedRelation(
   private[sql] def buildIndex(): Unit = {
     val dataRDD = child.execute().map(row => {
       val eval_key = BindReferences.bindReference(column_keys.head, child.output).eval(row)
-      eval_key match {
-        case key: Number => (key.doubleValue, row)
-        case key: Point =>
-          require(key.coord.length == 1)
-          (key.coord.head, row)
-      }
+        .asInstanceOf[Double]
+      (eval_key, row)
     })
 
     val (partitionedRDD, tmp_bounds) = RangePartition.rowPartition(dataRDD, numShufflePartitions)

@@ -24,6 +24,7 @@ import org.apache.spark.sql.execution.SparkPlan
 import org.apache.spark.sql.partitioner.RangePartition
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.sql.spatial.Point
+import org.apache.spark.sql.types.NumericType
 
 /**
   * Created by gefei on 16-6-21.
@@ -37,6 +38,7 @@ private[sql] case class TreeMapIndexedRelation(
                       var range_bounds: Array[Double] = null)
   extends IndexedRelation with MultiInstanceRelation {
   require(column_keys.length == 1)
+  require(column_keys.head.dataType.isInstanceOf[NumericType])
 
   if (_indexedRDD == null) {
     buildIndex()
@@ -47,12 +49,8 @@ private[sql] case class TreeMapIndexedRelation(
 
     val dataRDD = child.execute().map(row => {
       val eval_key = BindReferences.bindReference(column_keys.head, child.output).eval(row)
-      eval_key match {
-        case key: Number => (key.doubleValue, row)
-        case key: Point =>
-          require(key.coord.length == 1)
-          (key.coord.head, row)
-      }
+        .asInstanceOf[Double]
+      (eval_key, row)
     })
 
     val (partitionedRDD, tmp_bounds) = RangePartition.rowPartition(dataRDD, numShufflePartitions)

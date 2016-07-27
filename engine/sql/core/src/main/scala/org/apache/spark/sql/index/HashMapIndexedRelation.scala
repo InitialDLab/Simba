@@ -23,8 +23,7 @@ import org.apache.spark.sql.catalyst.plans.logical.Statistics
 import org.apache.spark.sql.execution.SparkPlan
 import org.apache.spark.sql.partitioner.HashPartition
 import org.apache.spark.storage.StorageLevel
-import org.apache.spark.sql.spatial.Point
-import org.apache.spark.sql.types.{NumericType, ShapeType}
+import org.apache.spark.sql.types.NumericType
 
 /**
   * Created by gefei on 16-6-21.
@@ -37,8 +36,7 @@ private[sql] case class HashMapIndexedRelation(
     index_name: String)(var _indexedRDD: IndexRDD = null)
   extends IndexedRelation with MultiInstanceRelation {
   require(column_keys.length == 1)
-  require(column_keys.head.dataType.isInstanceOf[NumericType] ||
-    column_keys.head.dataType.isInstanceOf[ShapeType])
+  require(column_keys.head.dataType.isInstanceOf[NumericType])
   if (_indexedRDD == null) {
     buildIndex()
   }
@@ -48,12 +46,7 @@ private[sql] case class HashMapIndexedRelation(
 
     val dataRDD = child.execute().map(row => {
       val eval_key = BindReferences.bindReference(column_keys.head, child.output).eval(row)
-      eval_key match {
-        case p: Point =>
-          require(p.coord.length == 1)
-          (p.coord.head, row)
-        case p: Number => (p, row)
-      }
+      (eval_key, row)
     })
 
     val partitionedRDD = HashPartition(dataRDD, numShufflePartitions)
