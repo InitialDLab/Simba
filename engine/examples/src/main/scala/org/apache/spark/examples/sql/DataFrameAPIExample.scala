@@ -69,29 +69,6 @@ object DataFrameAPIExample {
     df1.knnJoin(df2, Point(point1("x"), point1("y")), Point(point2("x"), point2("y")), 3)
       .collect().foreach(println)
     df1.knnJoin(df2, Array("x", "y"), Array("x", "y"), 3).collect().foreach(println)
-    df1.range(Point(point1("x"), point1("y"), point1("z")), Point(1.0, 1.0, 1.0),
-      Point(5.0, 5.0, 5.0)).collect().foreach(println)
-    df1.range(Array("x", "y", "z"), Array(1.0, 1.0, 1.0), Array(1.0, 1.0, 1.0))
-      .collect().foreach(println)
-
-    df1.circleRange(Array("x", "y"), Array(3.0, 3.0), 3).collect().foreach(println)
-    df1.circleRange(Point(point1("x"), point1("y")), Point(3.0, 3.0), 1.6)
-      .collect().foreach(println)
-
-    df1.range(Array("x", "y"), Array(1.0, 1.0), Array(3.0, 3.0)).collect().foreach(println)
-    df1.range(Point(point1("x"), point1("y")), Point(1.0, 1.0), Point(3.0, 3.0))
-      .collect().foreach(println)
-
-    df1.knn(Array("x", "y"), Array(3.0, 3.0), 3).collect().foreach(println)
-    df1.knn(Point(point1("x"), point1("y")), Point(3.0, 3.0), 3).collect().foreach(println)
-
-    df1.distanceJoin(df2, Point(point1("x"), point1("y")),
-      Point(point2("x"), point2("y")), 3).collect().foreach(println)
-    df1.distanceJoin(df2, Array("x", "y"), Array("x", "y"), 3).collect().foreach(println)
-
-    df1.knnJoin(df2, Point(point1("x"), point1("y")), Point(point2("x"), point2("y")), 3)
-      .collect().foreach(println)
-    df1.knnJoin(df2, Array("x", "y"), Array("x", "y"), 3).collect().foreach(println)
 
     sc.stop()
     println("Finished.")
