@@ -76,6 +76,7 @@ class SparkSQLParser(fallback: String => LogicalPlan) extends AbstractSparkSQLPa
   protected val TREEMAP = Keyword("TREEMAP")
   protected val RTREE = Keyword("RTREE")
   protected val TREAP = Keyword("TREAP")
+  protected val QUADTREE = Keyword("QUADTREE")
   protected val LOAD = Keyword("LOAD")
   protected val PERSIST = Keyword("PERSIST")
 
@@ -94,6 +95,7 @@ class SparkSQLParser(fallback: String => LogicalPlan) extends AbstractSparkSQLPa
       | TREEMAP       ^^^ TreeMapType
       | HASHMAP       ^^^ HashMapType
       | TREAP         ^^^ TreapType
+      | QUADTREE      ^^^ QuadTreeType
       )
 
   private lazy val dropIndex: Parser[LogicalPlan] = (

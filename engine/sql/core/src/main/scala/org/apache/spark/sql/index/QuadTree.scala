@@ -19,7 +19,6 @@ package org.apache.spark.sql.index
 import org.apache.spark.sql.spatial.{MBR, Point, Shape}
 
 import scala.collection._
-import scala.util.Random
 
 /**
   * Created by gefei on 16-6-10.
@@ -28,7 +27,7 @@ import scala.util.Random
 import collection.mutable
 
 case class QuadTreeNode(x_low: Double, y_low: Double, x_high: Double, y_high: Double,
-  var children: Array[QuadTreeNode], var objects: Array[(Double, Double, Int)]){
+          var children: Array[QuadTreeNode], var objects: Array[(Double, Double, Int)]){
   private val center_x = (x_low + x_high) / 2
   private val center_y = (y_low + y_high) / 2
 
