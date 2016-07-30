@@ -315,14 +315,14 @@ object CatalystTypeConverters {
   }
 
   private object ShapeConverter extends CatalystTypeConverter[Any, Shape, Any] {
-    override def toCatalystImpl(scalaValue: Any): Any = scalaValue match{
-      case polygon:JTSPolygon => new WKBWriter().write(polygon)
+    override def toCatalystImpl(scalaValue: Any): Any = scalaValue match {
+      case polygon: JTSPolygon => new WKBWriter().write(polygon)
       case shape: Shape => shape
       case _ => null
     }
     override def toScala(catalystValue: Any): Shape = catalystValue match {
-      case bytes:Array[Byte] => Polygon.fromWKB(bytes)
-      case shape:Shape => shape
+      case bytes: Array[Byte] => Polygon.fromWKB(bytes)
+      case shape: Shape => shape
       case _ => null
     }
     override def toScalaImpl(row: InternalRow, column: Int): Shape = {row.getShape(column)}

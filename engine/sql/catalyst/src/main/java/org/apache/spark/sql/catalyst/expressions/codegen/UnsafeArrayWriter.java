@@ -16,7 +16,7 @@
 
 package org.apache.spark.sql.catalyst.expressions.codegen;
 
-import org.apache.spark.sql.catalyst.expressions.KryoShapeSerializer;
+import org.apache.spark.sql.catalyst.expressions.ShapeSerializer;
 import org.apache.spark.sql.spatial.Shape;
 import org.apache.spark.sql.types.Decimal;
 import org.apache.spark.unsafe.Platform;
@@ -166,7 +166,7 @@ public class UnsafeArrayWriter {
 
   public void write(int ordinal, Shape shape) {
     // grow the global buffer before writing data.
-    byte[] input = KryoShapeSerializer.serialize(shape);
+    byte[] input = ShapeSerializer.serialize(shape);
 
     holder.grow(input.length);
 

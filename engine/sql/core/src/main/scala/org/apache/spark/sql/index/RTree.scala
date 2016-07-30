@@ -87,6 +87,58 @@ case class RTree(root: RTreeNode) extends Index with Serializable {
     ans.toArray
   }
 
+  def range(query: MBR, level_limit: Int, s_threshold: Double): Option[Array[(Shape, Int)]] = {
+    val ans = mutable.ArrayBuffer[(Shape, Int)]()
+    val q = new mutable.Queue[(RTreeNode, Int)]()
+    if (root.m_mbr.intersects(query) && root.m_child.nonEmpty) q.enqueue((root, 1))
+    var estimate: Double = 0
+    val loop = new Breaks
+    import loop.{break, breakable}
+    breakable {
+      while (q.nonEmpty) {
+        val now = q.dequeue
+        val cur_node = now._1
+        val cur_level = now._2
+        if (cur_node.isLeaf) {
+          cur_node.m_child.foreach {
+            case RTreeLeafEntry(shape, m_data, _) =>
+              if (query.intersects(shape)) ans += ((shape, m_data))
+          }
+        } else if (cur_level < level_limit) {
+          cur_node.m_child.foreach {
+            case RTreeInternalEntry(mbr, node) =>
+              if (query.intersects(mbr)) q.enqueue((node, cur_level + 1))
+          }
+        } else if (cur_level == level_limit) {
+          estimate += cur_node.m_mbr.calcRatio(query) * cur_node.size
+          cur_node.m_child.foreach {
+            case RTreeInternalEntry(mbr, node) =>
+              if (query.intersects(mbr)) q.enqueue((node, cur_level + 1))
+          }
+        } else break
+      }
+    }
+    if (ans.nonEmpty) return Some(ans.toArray)
+    else if (estimate / root.size > s_threshold) return None
+    while (q.nonEmpty) {
+      val now = q.dequeue
+      val cur_node = now._1
+      val cur_level = now._2
+      if (cur_node.isLeaf) {
+        cur_node.m_child.foreach {
+          case RTreeLeafEntry(shape, m_data, _) =>
+            if (query.intersects(shape)) ans += ((shape, m_data))
+        }
+      } else {
+        cur_node.m_child.foreach {
+          case RTreeInternalEntry(mbr, node) =>
+            if (query.intersects(mbr)) q.enqueue((node, cur_level + 1))
+        }
+      }
+    }
+    Some(ans.toArray)
+  }
+
   def circleRange(origin: Shape, r: Double): Array[(Shape, Int)] = {
     val ans = mutable.ArrayBuffer[(Shape, Int)]()
     val st = new mutable.Stack[RTreeNode]()
@@ -181,11 +233,13 @@ case class RTree(root: RTreeNode) extends Index with Serializable {
         if (cnt >= k && (!keepSame || now._2 > kNN_dis)) break()
 
         now._1 match {
-          case RTreeNode(_, m_child, isLeaf) =>
+          case RTreeNode(_, m_child, _) =>
             m_child.foreach {
               case entry @ RTreeInternalEntry(mbr, node) =>
-                if (isLeaf) pq.enqueue((entry, distFunc(query, mbr)))
-                else pq.enqueue((node, distFunc(query, mbr)))
+                pq.enqueue((node, distFunc(query, mbr)))
+              case entry @ RTreeLeafEntry(mbr, m_data, size) =>
+                require(mbr.isInstanceOf[MBR])
+                pq.enqueue((entry, distFunc(query, mbr.asInstanceOf[MBR])))
             }
           case RTreeLeafEntry(mbr, m_data, size) =>
             cnt += size
@@ -214,11 +268,13 @@ case class RTree(root: RTreeNode) extends Index with Serializable {
         if (cnt >= k && (!keepSame || now._2 > kNN_dis)) break()
 
         now._1 match {
-          case RTreeNode(_, m_child, isLeaf) =>
+          case RTreeNode(_, m_child, _) =>
             m_child.foreach {
               case entry @ RTreeInternalEntry(mbr, node) =>
-                if (isLeaf) pq.enqueue((entry, distFunc(query, mbr)))
-                else pq.enqueue((node, distFunc(query, mbr)))
+                pq.enqueue((node, distFunc(query, mbr)))
+              case entry @ RTreeLeafEntry(mbr, m_data, size) =>
+                require(mbr.isInstanceOf[MBR])
+                pq.enqueue((entry, distFunc(query, mbr.asInstanceOf[MBR])))
             }
           case RTreeLeafEntry(mbr, m_data, size) =>
             cnt += size

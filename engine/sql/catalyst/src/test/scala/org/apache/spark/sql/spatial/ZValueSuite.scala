@@ -16,22 +16,23 @@
 
 package org.apache.spark.sql.spatial
 
-import com.vividsolutions.jts.geom.{Geometry, Polygon => JTSPolygon}
+import org.scalatest.FunSuite
 
 /**
-  * Created by dong on 3/16/16.
+  * Created by Zhihao Bai on 16-7-4.
   */
-abstract class Shape extends Serializable {
-  def minDist(other: Shape): Double
+class ZValueSuite extends FunSuite{
+  test("Test for ZValue"){
+    assert(ZValue.paddingBinaryBits(7, 8).equals("00000111"))
 
-  def intersects(other: Shape): Boolean
+    var point = Array[Int](2, 0, 1, 6)
 
-  def getMBR: MBR
-}
+    var x = ZValue.apply(point)
+    assert(x.toBinaryString.equals("110010010"))
 
-object Shape {
-  final def apply(g: Geometry): Shape = g match {
-    case jtsPolygon : JTSPolygon => new Polygon(jtsPolygon)
-    case _ => null
+    var point1 = ZValue.unapply(x, 4).get
+    assert(point.length == point1.length)
+    for(i <- point.indices)
+      assert(point(i) == point1(i))
   }
 }

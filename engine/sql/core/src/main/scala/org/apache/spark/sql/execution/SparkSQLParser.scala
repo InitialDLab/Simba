@@ -20,7 +20,7 @@ import org.apache.spark.sql.catalyst.AbstractSparkSQLParser
 import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeReference}
 import org.apache.spark.sql.catalyst.plans.logical
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
-import org.apache.spark.sql.index.{HashMapType, IndexType, RTreeType, TreeMapType}
+import org.apache.spark.sql.index._
 import org.apache.spark.sql.types.StringType
 
 import scala.util.parsing.combinator.RegexParsers
@@ -71,15 +71,16 @@ class SparkSQLParser(fallback: String => LogicalPlan) extends AbstractSparkSQLPa
   protected val ON = Keyword("ON")
   protected val USE = Keyword("USE")
   protected val INDEX = Keyword("INDEX")
-  protected val DEINDEX = Keyword("DEINDEX")
+  protected val DROP = Keyword("DROP")
   protected val HASHMAP = Keyword("HASHMAP")
   protected val TREEMAP = Keyword("TREEMAP")
   protected val RTREE = Keyword("RTREE")
+  protected val TREAP = Keyword("TREAP")
   protected val LOAD = Keyword("LOAD")
   protected val PERSIST = Keyword("PERSIST")
 
   override protected lazy val start: Parser[LogicalPlan] =
-    index | deindex | persistIndex | loadIndex | cache | uncache | set | show | desc | others
+    index | dropIndex | persistIndex | loadIndex | cache | uncache | set | show | desc | others
 
   private lazy val index: Parser[LogicalPlan] =
     (CREATE ~> INDEX ~> ident) ~ (ON ~> ident ~ ("(" ~> repsep(ident, ",") <~ ")")) ~
@@ -92,14 +93,15 @@ class SparkSQLParser(fallback: String => LogicalPlan) extends AbstractSparkSQLPa
     ( RTREE           ^^^ RTreeType
       | TREEMAP       ^^^ TreeMapType
       | HASHMAP       ^^^ HashMapType
+      | TREAP         ^^^ TreapType
       )
 
-  private lazy val deindex: Parser[LogicalPlan] = (
-    DEINDEX ~> ident ~ (ON ~> ident) ^^ {
-      case indexName ~ tableName => DeindexTableByNameCommand(tableName, indexName)
+  private lazy val dropIndex: Parser[LogicalPlan] = (
+    DROP ~> INDEX ~> ident ~ (ON ~> ident) ^^ {
+      case indexName ~ tableName => DropTableIndexByNameCommand(tableName, indexName)
     }
-      | CLEAR ~> INDEX ~> (ON ~> ident) ^^ {
-      case tableName => DeindexTableCommand(tableName)
+      | DROP ~> INDEX ~> (ON ~> ident) ^^ {
+      case tableName => DropTableIndexCommand(tableName)
     }
       | CLEAR ~> INDEX ^^^ ClearIndexCommand
     )

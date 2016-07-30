@@ -104,11 +104,16 @@ private[sql] class IndexManager extends Logging {
       sqlContext.sparkContext.parallelize(Array(rtreeRelation))
         .saveAsObjectFile(fileName + "/rtreeRelation")
       rtreeRelation._indexedRDD.saveAsObjectFile(fileName + "/rdd")
-    } else {
+    } else if (preData.indexType == TreeMapType) {
       val treeMapRelation = indexedItem.indexedData.asInstanceOf[TreeMapIndexedRelation]
       sqlContext.sparkContext.parallelize(Array(treeMapRelation))
         .saveAsObjectFile(fileName + "/treeMapRelation")
       treeMapRelation._indexedRDD.saveAsObjectFile(fileName + "/rdd")
+    } else if (preData.indexType == TreapType) {
+      val treapRelation = indexedItem.indexedData.asInstanceOf[TreapIndexedRelation]
+      sqlContext.sparkContext.parallelize(Array(treapRelation))
+        .saveAsObjectFile(fileName + "/treapRelation")
+      treapRelation._indexedRDD.saveAsObjectFile(fileName + "/rdd")
     }
 
     indexInfos(dataIndex) = IndexInfo(preData.tableName, preData.indexName,
@@ -120,7 +125,7 @@ private[sql] class IndexManager extends Logging {
                              fileName: String): Unit = {
     val info = sqlContext.sparkContext.objectFile[IndexInfo](fileName + "/indexInfo").collect().head
     val plan = sqlContext.sparkContext.objectFile[LogicalPlan](fileName + "/plan").collect().head
-    val rdd = sqlContext.sparkContext.objectFile[PackedPartitionWithIndex](fileName + "/rdd")
+    val rdd = sqlContext.sparkContext.objectFile[IPartition](fileName + "/rdd")
     if (info.indexType == RTreeType){
       val rtreeRelation = sqlContext.sparkContext
         .objectFile[RTreeIndexedRelation](fileName + "/rtreeRelation").collect().head
@@ -128,13 +133,20 @@ private[sql] class IndexManager extends Logging {
         RTreeIndexedRelation(rtreeRelation.output, rtreeRelation.child,
           rtreeRelation.table_name, rtreeRelation.column_keys,
           rtreeRelation.index_name)(rdd, rtreeRelation.global_rtree))
-    } else {
+    } else if (info.indexType == TreeMapType) {
       val treeMapRelation = sqlContext.sparkContext
         .objectFile[TreeMapIndexedRelation](fileName + "/treeMapRelation").collect().head
       indexedData += IndexedData(indexName, plan,
         TreeMapIndexedRelation(treeMapRelation.output, treeMapRelation.child,
           treeMapRelation.table_name, treeMapRelation.column_keys,
           treeMapRelation.index_name)(rdd, treeMapRelation.range_bounds))
+    } else if (info.indexType == TreapType) {
+      val treapRelation = sqlContext.sparkContext
+        .objectFile[TreapIndexedRelation](fileName + "/treapRelation").collect().head
+      indexedData += IndexedData(indexName, plan,
+        TreapIndexedRelation(treapRelation.output, treapRelation.child,
+          treapRelation.table_name, treapRelation.column_keys,
+          treapRelation.index_name)(rdd, treapRelation.range_bounds))
     }
     indexInfos += info
   }

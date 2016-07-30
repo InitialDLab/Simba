@@ -1180,6 +1180,7 @@ class DataFrame private[sql](
   /**
     * a private auxiliary function to extract Attribute information from an input string
     * object.
+ *
     * @param keys  An array of String input by user
     * @param attrs A Seq of Attributes in which to search
     * @return An Array of Attribute extracted from the String
@@ -1858,7 +1859,7 @@ class DataFrame private[sql](
   /**
     * @group extended
     */
-  def deindex(blocking: Boolean): this.type = {
+  def dropIndex(blocking: Boolean): this.type = {
     sqlContext.indexManager.tryDropIndexQuery(this, blocking)
     this
   }
@@ -1866,12 +1867,12 @@ class DataFrame private[sql](
   /**
     * @group extended
     */
-  def deindex(): this.type = deindex(blocking = false)
+  def dropIndex(): this.type = dropIndex(blocking = false)
 
   /**
     * @group extended
     */
-  def deindexByName(indexName : String) : this.type = {
+  def dropIndexByName(indexName : String) : this.type = {
     sqlContext.indexManager.tryDropIndexByNameQuery(this, indexName, blocking = false)
     this
   }

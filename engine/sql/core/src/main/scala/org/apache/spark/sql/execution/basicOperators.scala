@@ -147,7 +147,7 @@ case class Filter(condition: Expression, child: SparkPlan) extends UnaryNode {
             Subtract(Cast(point(i), DoubleType), Cast(target(i), DoubleType)))
         val ans = exps.foldLeft[Expression](null)
           { (left, right) => if (left == null) right else Add(left, right) }
-        LessThanOrEqual(ans, Multiply(r, r))
+        LessThanOrEqual(ans, Cast(Multiply(r, r), DoubleType))
     }
     applyCondition(root_rdd, new_condition, root_rdd)
   }

@@ -16,22 +16,20 @@
 
 package org.apache.spark.sql.spatial
 
-import com.vividsolutions.jts.geom.{Geometry, Polygon => JTSPolygon}
+import org.scalatest.FunSuite
 
 /**
-  * Created by dong on 3/16/16.
+  * Created by Zhihao Bai on 16-7-4.
   */
-abstract class Shape extends Serializable {
-  def minDist(other: Shape): Double
+class DistSuite extends FunSuite{
+  test("Dist: furthest distance from a point to an MBR"){
+    val m = MBR(Point(Array(0.0, 0.0)), Point(Array(2.0, 2.0)))
+    val p1 = Point(Array(1.0, 1.0))
+    val p2 = Point(Array(0.0, 0.0))
+    val p3 = Point(Array(1.0, 3.0))
 
-  def intersects(other: Shape): Boolean
-
-  def getMBR: MBR
-}
-
-object Shape {
-  final def apply(g: Geometry): Shape = g match {
-    case jtsPolygon : JTSPolygon => new Polygon(jtsPolygon)
-    case _ => null
+    assert(Math.abs(Dist.furthest(p1, m) - Math.sqrt(2.0)) < 1e-8)
+    assert(Math.abs(Dist.furthest(p2, m) - Math.sqrt(8.0)) < 1e-8)
+    assert(Math.abs(Dist.furthest(p3, m) - Math.sqrt(10.0)) < 1e-8)
   }
 }

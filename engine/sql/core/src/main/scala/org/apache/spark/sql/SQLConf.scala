@@ -460,26 +460,51 @@ private[spark] object SQLConf {
         "used to benchmark the performance impact of using DistinctAggregationRewriter to " +
         "plan aggregation queries with a single distinct column.")
 
-  //Join Parameters
-  val DISTANCE_JOIN_METHOD = stringConf("spark.sql.joins.distanceJoinMethod", defaultValue = Some("SJMRDistanceJoin"))
-  val KNN_JOIN_METHOD = stringConf("spark.sql.joins.knnJoinMethod", defaultValue = Some("RTreeKNNJoin"))
+  // Join Parameters
+  val DISTANCE_JION = stringConf("spark.sql.joins.distanceJoin", defaultValue = Some("DJSpark"))
+  val KNN_JOIN = stringConf("spark.sql.joins.knnJoin", defaultValue = Some("RKJSpark"))
 
-  //RTree Parameters
+  // RTree Parameters
   val MAX_ENTRIES_PER_NODE = intConf("spark.sql.spatial.rtree.maxEntriesPerNode", defaultValue = Some(25))
 
-  //zKNN Join Parameters
+  // zKNN Join Parameters
   val ZKNN_SHIFT_TIMES = intConf("spark.sql.joins.zknn.shiftTimes", defaultValue = Some(2))
 
-  //Voronoi KNN Join Parameters
+  // Voronoi KNN Join Parameters
   val VORONOI_PIVOTSET_SIZE = intConf("spark.sql.joins.voronoi.pivotSetSize", defaultValue = Some(10))
 
   val THETA_BOOST = intConf("spark.sql.joins.thetaBoost", defaultValue = Some(16))
 
   val SAMPLE_RATE = doubleConf("spark.sql.sampleRate", defaultValue = Some(0.01))
 
-  val TRANSFER_THRESHOLD = longConf("spark.sql.transferThreshold", defaultValue = Some(800 * 1024 * 1024))
+  // Partitioner Parameter
+  val PARTITION_METHOD = stringConf("spark.sql.partition.method", defaultValue = Some("STRPartitioner"))
 
-  //Threshold determine where rtree index using local index or brute force filter
+  val TRANSFER_THRESHOLD = longConf("spark.sql.transferThreshold", defaultValue =
+    Some(800 * 1024 * 1024))
+
+  val INDEX_SELECTIVITY_ENABLE =
+    booleanConf("spark.sql.index.selectivityEnable",
+      defaultValue = Some(false),
+      doc = "When true, If the selectivity of the predicate is higher than a " +
+        "user-defined threshold, Simba will choose to scan the partition " +
+        "rather than leveraging local (RTree) indexes for Range query. " +
+        "The default value is false.")
+
+  val INDEX_SELECTIVITY_THRESHOLD =
+    doubleConf("spark.sql.index.selectivityThreshold",
+      defaultValue = Some(0.8),
+      doc = "This only works when INDEX_SELECTIVITY_ENABLE is true. " +
+        "The user-defined local (RTree) index selectivity threshold is between 0.0 to 1.0. " +
+        "The default value is 0.8.")
+
+  val INDEX_SELECTIVITY_LEVEL =
+    intConf("spark.sql.index.selectivityLevel",
+      defaultValue = Some(1),
+      doc = "This only works when INDEX_SELECTIVITY_ENABLE is true." +
+        "Simab considers predicates selectivity from this level, default root level (1)")
+
+  // Threshold determine where rtree index using local index or brute force filter
   val INDEX_SIZE_THRESHOLD = intConf("spark.sql.index.threshold", defaultValue = Some(1000))
 
   object Deprecated {
@@ -603,9 +628,11 @@ private[sql] class SQLConf extends Serializable with CatalystConf {
   protected[spark] override def specializeSingleDistinctAggPlanning: Boolean =
     getConf(SPECIALIZE_SINGLE_DISTINCT_AGG_PLANNING)
 
-  private[spark] def distanceJoinMethod: String = getConf(DISTANCE_JOIN_METHOD)
+  private[spark] def distanceJoin: String = getConf(DISTANCE_JION)
 
-  private[spark] def knnJoinMethod: String = getConf(KNN_JOIN_METHOD)
+  private[spark] def knnJoin: String = getConf(KNN_JOIN)
+
+  private[spark] def partitionMethod: String = getConf(PARTITION_METHOD)
 
   private[spark] def maxEntriesPerNode: Int = getConf(MAX_ENTRIES_PER_NODE)
 
@@ -616,6 +643,12 @@ private[sql] class SQLConf extends Serializable with CatalystConf {
   private[spark] def thetaBoost: Int = getConf(THETA_BOOST)
 
   private[spark] def sampleRate: Double = getConf(SAMPLE_RATE)
+
+  private[spark] def indexSelectivityEnable : Boolean = getConf(INDEX_SELECTIVITY_ENABLE)
+
+  private[spark] def indexSelectivityThreshold : Double = getConf(INDEX_SELECTIVITY_THRESHOLD)
+
+  private[spark] def indexSelectivityLevel : Int = getConf(INDEX_SELECTIVITY_LEVEL)
 
   private[spark] def indexSizeThreshold: Int = getConf(INDEX_SIZE_THRESHOLD)
 
