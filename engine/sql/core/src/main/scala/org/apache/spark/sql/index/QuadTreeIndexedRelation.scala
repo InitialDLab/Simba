@@ -35,7 +35,7 @@ private[sql] case class QuadTreeIndexedRelation(
      table_name: Option[String],
      column_keys: List[Attribute],
      index_name: String)(var _indexedRDD: IndexRDD = null,
-                         var range_bounds: Array[Double] = null)
+                         var global_index: RTree = null)
   extends IndexedRelation with MultiInstanceRelation {
   private def checkKeys: Boolean = {
     for (i <- column_keys.indices)
@@ -77,28 +77,20 @@ private[sql] case class QuadTreeIndexedRelation(
 
     val partitionSize = indexed.mapPartitions(iter => iter.map(_.data.length)).collect()
 
-
-//    val (partitionedRDD, tmp_bounds) = RangePartition.rowPartition(dataRDD, numShufflePartitions)
-//    range_bounds = tmp_bounds
-//    val indexed = partitionedRDD.mapPartitions(iter => {
-//      val data = iter.toArray
-//      val index = Treap(data)
-//      Array(IPartition(data.map(_._2), index)).iterator
-//    }).persist(StorageLevel.MEMORY_AND_DISK_SER)
-//
-//    indexed.setName(table_name.map(n => s"$n $index_name").getOrElse(child.toString))
-//    _indexedRDD = indexed
+    global_index = RTree(tmp_bounds.zip(partitionSize).map(x => (x._1._1, x._1._2, x._2)), 10)
+    indexed.setName(table_name.map(name => s"$name $index_name").getOrElse(child.toString))
+    _indexedRDD = indexed
   }
 
   override def newInstance(): IndexedRelation = {
-    new TreapIndexedRelation(output.map(_.newInstance()), child, table_name,
+    new QuadTreeIndexedRelation(output.map(_.newInstance()), child, table_name,
       column_keys, index_name)(_indexedRDD)
       .asInstanceOf[this.type]
   }
 
   override def withOutput(new_output: Seq[Attribute]): IndexedRelation = {
-    new TreapIndexedRelation(new_output, child, table_name,
-      column_keys, index_name)(_indexedRDD, range_bounds)
+    new QuadTreeIndexedRelation(new_output, child, table_name,
+      column_keys, index_name)(_indexedRDD, global_index)
   }
 
   @transient override lazy val statistics = Statistics(

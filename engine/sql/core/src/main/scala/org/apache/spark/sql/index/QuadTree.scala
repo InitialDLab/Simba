@@ -34,6 +34,15 @@ case class QuadTreeNode(x_low: Double, y_low: Double, x_high: Double, y_high: Do
   def whichChild(obj: (Double, Double)): Int = {
     (if (obj._1 > center_x) 1 else 0) + (if (obj._2 > center_y) 2 else 0)
   }
+
+  def makeChildren(): Unit = {
+    children = Array(
+      QuadTreeNode(x_low, y_low, center_x, center_y, null, Array()),
+      QuadTreeNode(center_x, y_low, x_high, center_y, null, Array()),
+      QuadTreeNode(x_low, center_y, center_x, y_high, null, Array()),
+      QuadTreeNode(center_x, center_y, x_high, y_high, null, Array())
+    )
+  }
   def makeChildren(grouped: Map[Int, Array[(Double, Double, Int)]]): Unit = {
     children = Array(
       QuadTreeNode(x_low, y_low, center_x, center_y, null, grouped.getOrElse(0, Array())),

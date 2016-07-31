@@ -21,7 +21,7 @@ import org.apache.spark.rdd.{RDD, ShuffledRDD}
 import org.apache.spark.shuffle.sort.SortShuffleManager
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.SparkSqlSerializer
-import org.apache.spark.sql.index.RTree
+import org.apache.spark.sql.index.{QuadTree, QuadTreeNode, RTree}
 import org.apache.spark.sql.spatial.{MBR, Point, Shape}
 import org.apache.spark.util.{MutablePair, SizeEstimator}
 
@@ -63,6 +63,8 @@ class QuadTreePartitioner(est_partition: Int,
   private case class Bounds(min: Array[Double], max: Array[Double])
 
   require(dimension == 2, "Only two dimensions are supported for a QuadTree")
+
+//  val root_qtree_node: QuadTreeNode = null
 
   var (mbrBound, partitions) = {
     val (data_bounds, total_size, num_of_records) = {
@@ -117,6 +119,7 @@ class QuadTreePartitioner(est_partition: Int,
             case 2 => (Array(low_bound.head, center(1)), Array(center.head, high_bound(1)))
             case 3 => (Array(center.head, center(1)), Array(high_bound.head, high_bound(1)))
           }
+//          root_qtree_node.makeChildren()
           ans ++= recursiveGroupPoint(item._2, new_low, new_high)
         } else {
           ans += new MBR(new Point(low_bound.toArray.clone()),
