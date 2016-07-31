@@ -79,3 +79,10 @@ final case class Point(coord: Array[Double]) extends Shape {
 
   def getMBR: MBR = new MBR(this, this)
 }
+
+object Point{
+  def apply(p: com.vividsolutions.jts.geom.Point): Point = {
+    val coords = p.getCoordinate
+    new Point(Array(coords.x, coords.y, coords.z))
+  }
+}
