@@ -248,6 +248,11 @@
       <scope>provided</scope>
     </dependency>
     <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-csv</artifactId>
+      <scope>1.1</scope>
+    </dependency>
+    <dependency>
       <groupId>com.twitter</groupId>
       <artifactId>algebird-core_${scala.binary.version}</artifactId>
       <version>0.9.0</version>

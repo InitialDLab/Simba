@@ -18,19 +18,21 @@ package org.apache.spark.examples.sql
 
 import org.apache.spark.sql.SQLContext
 import org.apache.spark.{SparkConf, SparkContext}
-import org.apache.spark.rdd.RDD
-import com.google.common.base.Objects
 /**
   * Created by gefei on 16-7-25.
   */
 object DataSourceTest {
   def main(args: Array[String]): Unit = {
-    val sparkConf = new SparkConf().setAppName("DataSourceTest").setMaster("local[2]")
+    val sparkConf =
+      new SparkConf()
+        .setAppName("DataSourceTest")
+        .setMaster("local[2]")
     val sc = new SparkContext(sparkConf)
     val sqlContext = new SQLContext(sc)
 
     val df = sqlContext.read.format("org.apache.spark.sql.execution.datasources.spatial")
-      .load("/path/to/shp/file")
+          .option("type", "geojson")
+      .load("./resources/custom.geo.json")
     df.show()
   }
 }

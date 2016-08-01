@@ -34,8 +34,8 @@ class DefaultSource extends RelationProvider with SchemaRelationProvider{
     val t = parameter.getOrElse("type", "shapefile")
     t match {
       case "shapefile" => new ShapefileRelation(path)(sqlContext)
-//      case "geojson" =>
-//      case "osm" =>
+      case "geojson" => new GeoJsonRelation(path)(sqlContext)
+      case "osm" => new OSMRelation(path)(sqlContext)
       case _ => ???
     }
   }
