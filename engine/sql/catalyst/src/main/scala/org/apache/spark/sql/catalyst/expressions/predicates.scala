@@ -256,8 +256,6 @@ case class InRange(point: Expression,
                    point_low: Expression,
                    point_high: Expression) extends Predicate with CodegenFallback {
 
-  override def hasSpatial: Boolean = true
-
   override def children: Seq[Expression] = Seq(point, point_low, point_high)
 
   override def nullable: Boolean = false
@@ -280,7 +278,6 @@ case class InCircleRange(point: Expression,
                          target: Expression,
                          r: Literal) extends Predicate with CodegenFallback {
   require(r.dataType.isInstanceOf[NumericType])
-  override def hasSpatial: Boolean = true
 
   override def children: Seq[Expression] = Seq(point, target, r)
 
