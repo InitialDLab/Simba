@@ -333,7 +333,7 @@ private[sql] abstract class SparkStrategies extends QueryPlanner[SparkPlan] {
       indexInfos.find(item => attributes.count(item.attributes.contains)
         == attributes.length).orNull
 
-    def leafNodeCanBeIndexed(expression: Expression): Expression = {
+    def mapIndexedExpression(expression: Expression): Expression = {
       val tmp_exp = expression match {
         case LessThan(left: NamedExpression, right: Literal) =>
           val attrs = Array(left.toAttribute)
@@ -389,7 +389,7 @@ private[sql] abstract class SparkStrategies extends QueryPlanner[SparkPlan] {
       val originalPredicate = predicates.reduceLeftOption(And).getOrElse(Literal(true))
       val clauses = splitDNFPredicates(originalPredicate).map(splitCNFPredicates)
       val predicateCanBeIndexed = clauses.map(clause =>
-        clause.map(leafNodeCanBeIndexed).filter(_ != null))
+        clause.map(mapIndexedExpression).filter(_ != null))
       predicateCanBeIndexed.map(pre => pre.reduceLeftOption(And).getOrElse(Literal(true)))
     }
 
@@ -397,7 +397,7 @@ private[sql] abstract class SparkStrategies extends QueryPlanner[SparkPlan] {
       case PhysicalOperation(projectList, filters, indexed: IndexedRelation) =>
         val predicatesCanBeIndexed = selectFilter(filters)
         val parentFilter = // if all predicate can be indexed, then remove the predicate
-          if (predicatesCanBeIndexed.toString
+          if (predicatesCanBeIndexed.toString // TODO ugly hack
             .compareTo(Seq(filters.reduceLeftOption(And).getOrElse(true)).toString) == 0) Seq[Expression]()
           else filters
         pruneFilterProject(
