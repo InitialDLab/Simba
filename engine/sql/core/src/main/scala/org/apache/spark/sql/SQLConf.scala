@@ -654,6 +654,7 @@ private[sql] class SQLConf extends Serializable with CatalystConf {
 
   private[spark] def transferThreshold: Long = getConf(TRANSFER_THRESHOLD)
 
+
   /** ********************** SQLConf functionality methods ************ */
 
   /** Set Spark SQL configuration properties. */

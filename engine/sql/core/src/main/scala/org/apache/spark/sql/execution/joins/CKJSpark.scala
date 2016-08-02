@@ -29,8 +29,8 @@ import org.apache.spark.sql.spatial._
   * Created by dong on 1/20/16.
   * KNN Join based on Cartesian Product
   */
-case class CKJSpark(left_keys: Seq[Expression],
-                    right_keys: Seq[Expression],
+case class CKJSpark(left_key: Expression,
+                    right_key: Expression,
                     l: Literal,
                     left: SparkPlan,
                     right: SparkPlan) extends BinaryNode {
@@ -45,12 +45,12 @@ case class CKJSpark(left_keys: Seq[Expression],
     val right_rdd = right.execute()
 
     left_rdd.map(row =>
-      (new Point(left_keys.map(x => BindReferences.bindReference(x, left.output).eval(row)
-        .asInstanceOf[Number].doubleValue()).toArray), row)
+      (BindReferences.bindReference(left_key, left.output).eval(row)
+          .asInstanceOf[Point], row)
     ).cartesian(right_rdd).map {
       case (l: (Point, InternalRow), r: InternalRow) =>
-        val tmp_point = new Point(right_keys.map(x => BindReferences.bindReference(x, right.output)
-          .eval(r).asInstanceOf[Number].doubleValue()).toArray)
+        val tmp_point = BindReferences.bindReference(right_key, right.output).eval(r)
+          .asInstanceOf[Point]
         l._2 -> List((tmp_point.minDist(l._1), r))
     }.reduceByKey {
       case (l_list: Seq[(Double, InternalRow)], r_list: Seq[(Double, InternalRow)]) =>

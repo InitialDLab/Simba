@@ -43,7 +43,7 @@ object ShapeTypeTest {
       new StructField("shape", ShapeType, nullable = true)))
 
     // Polygon test
-    val shapefilePath = "/path/to/polygon-file"
+    val shapefilePath = "/home/zhongpu/tl_2015_04_elsd.shp"
     val gf = new GeometryFactory()
     val rdd = sc.parallelize(shapefile.Parser(shapefilePath)(gf)).map(r => (r.id, r.g))
     val df = rdd.toDF().show(5)    // toDF

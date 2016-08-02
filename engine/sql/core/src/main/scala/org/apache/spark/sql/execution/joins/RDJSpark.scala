@@ -31,8 +31,8 @@ import scala.collection.mutable
   * Created by dong on 1/20/16.
   * Distance Join based on Two-Level R-Tree Structure
   */
-case class RDJSpark(left_keys: Seq[Expression],
-                    right_keys: Seq[Expression],
+case class RDJSpark(left_key: Expression,
+                    right_key: Expression,
                     l: Literal,
                     left: SparkPlan,
                     right: SparkPlan) extends BinaryNode {
@@ -42,18 +42,19 @@ case class RDJSpark(left_keys: Seq[Expression],
   final val sample_rate = sqlContext.conf.sampleRate
   final val max_entries_per_node = sqlContext.conf.maxEntriesPerNode
   final val transfer_threshold = sqlContext.conf.transferThreshold
-  final val dimension = left_keys.length
   final val r = NumberConverter.literalToDouble(l)
 
   override protected def doExecute(): RDD[InternalRow] = {
     val left_rdd = left.execute().map(row =>
-      (new Point(left_keys.map(x => BindReferences.bindReference(x, left.output).eval(row)
-        .asInstanceOf[Number].doubleValue()).toArray), row)
+      (BindReferences.bindReference(left_key, left.output).eval(row)
+        .asInstanceOf[Point], row)
     )
     val right_rdd = right.execute().map(row =>
-      (new Point(right_keys.map(x => BindReferences.bindReference(x, right.output).eval(row)
-        .asInstanceOf[Number].doubleValue()).toArray), row)
+      (BindReferences.bindReference(right_key, right.output).eval(row)
+        .asInstanceOf[Point], row)
     )
+
+    val dimension = right_rdd.first()._1.coord.length
 
     val (left_partitioned, left_mbr_bound) =
       STRPartition(left_rdd, dimension, num_partitions, sample_rate,

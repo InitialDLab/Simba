@@ -30,8 +30,8 @@ import scala.util.Random
   * Created by dong on 1/20/16.
   * Approximate kNN Join based on Z-Value
   */
-case class ZKJSpark(left_keys: Seq[Expression],
-                    right_keys: Seq[Expression],
+case class ZKJSpark(left_key: Expression,
+                    right_key: Expression,
                     kNN: Literal,
                     left: SparkPlan,
                     right: SparkPlan) extends BinaryNode {
@@ -41,8 +41,6 @@ case class ZKJSpark(left_keys: Seq[Expression],
   // Parameters that set in sqlContext.conf
   val num_partition = sqlContext.conf.numShufflePartitions
   val num_shifts = sqlContext.conf.zknnShiftTimes
-  val dimension = left_keys.length
-  val shift_vec = genRandomShiftVectors(dimension, num_shifts)
 
   private def genRandomShiftVectors(dimension : Int, shift : Int): Array[Array[Int]] = {
     val r = new Random(System.currentTimeMillis)
@@ -146,14 +144,17 @@ case class ZKJSpark(left_keys: Seq[Expression],
 
   def doExecute(): RDD[InternalRow] = {
     val left_rdd = left.execute().map(row =>
-      (new Point(left_keys.map(x => BindReferences.bindReference(x, left.output).eval(row)
-        .asInstanceOf[Number].doubleValue()).toArray), row)
+      (BindReferences.bindReference(left_key, left.output).eval(row)
+        .asInstanceOf[Point], row)
     )
 
     val right_rdd = right.execute().map(row =>
-      (new Point(right_keys.map(x => BindReferences.bindReference(x, right.output).eval(row)
-        .asInstanceOf[Number].doubleValue()).toArray), row)
+      (BindReferences.bindReference(right_key, right.output).eval(row)
+        .asInstanceOf[Point], row)
     )
+
+    val dimension = right_rdd.first._1.coord.length
+    val shift_vec = genRandomShiftVectors(dimension, num_shifts)
 
     var joined_rdd = zKNNPerIter(left_rdd, right_rdd, k, shift_vec(0))
     for (i <- 1 to num_shifts)
