@@ -54,14 +54,13 @@ object IndexExample {
     rightRDD.toDF().registerTempTable("point2")
 
     sqlContext.sql("CREATE INDEX pointIndex ON point1(x, y) USE rtree")
-    sqlContext.sql("CREATE INDEX treeMapIndex ON point2 (x) USE treemap")
-    sqlContext.sql("SHOW INDEX ON point1")
+//    sqlContext.sql("CREATE INDEX treeMapIndex ON point2 (x) USE treemap")
+//    sqlContext.sql("SHOW INDEX ON point1")
 
     println("----------------------------")
 
     val sqlQuery = "SELECT * FROM point1 " +
-      "WHERE POINT(point1.x, point1.y, point1.z) " +
-      "IN RANGE( POINT(100, 222, 222), POINT(300, 333, 333))" +
+      "WHERE x >= 100 AND x < 300 " +
       "ORDER BY x"
     val df = sqlContext.sql(sqlQuery)
     println(df.queryExecution)
