@@ -32,8 +32,8 @@ import scala.util.Random
   * Created by dong on 1/20/16.
   * Distance Join based on Block Nested Loop + Local R-Tree
   */
-case class BDJSparkR(left_keys: Seq[Expression],
-                     right_keys: Seq[Expression],
+case class BDJSparkR(left_key: Expression,
+                     right_key: Expression,
                      l: Literal,
                      left: SparkPlan,
                      right: SparkPlan) extends BinaryNode {
@@ -68,14 +68,12 @@ case class BDJSparkR(left_keys: Seq[Expression],
       while (iter.hasNext) {
         val data = iter.next()
         if (data._2._1 == 0) {
-          val tmp_point = new Point(left_keys.map(x =>
-            BindReferences.bindReference(x, left.output).eval(data._2._2)
-              .asInstanceOf[Number].doubleValue()).toArray)
+          val tmp_point = BindReferences.bindReference(left_key, left.output).eval(data._2._2).
+            asInstanceOf[Point]
           left_data += ((tmp_point, data._2._2))
         } else {
-          val tmp_point = new Point(right_keys.map(x =>
-            BindReferences.bindReference(x, right.output).eval(data._2._2)
-              .asInstanceOf[Number].doubleValue()).toArray)
+          val tmp_point = BindReferences.bindReference(right_key, right.output).eval(data._2._2).
+            asInstanceOf[Point]
           right_data += ((tmp_point, data._2._2))
         }
       }

@@ -37,16 +37,16 @@ public class ShapeSerializer {
         kryo.register(Polygon.class, new KryoShapeSerializer());
         kryo.register(Circle.class, new KryoShapeSerializer());
         kryo.register(LineSegment.class, new KryoShapeSerializer());
+        kryo.addDefaultSerializer(Shape.class, new KryoShapeSerializer());
     }
 
     public static Shape deserialize(byte[] data) {
         ByteArrayInputStream in = new ByteArrayInputStream(data);
         Input input = new Input(in);
-        return kryo.readObject(input, Polygon.class);
+        return kryo.readObject(input, Shape.class);
     }
 
     public static byte[] serialize(Shape o) {
-
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         Output output = new Output(out);
         kryo.writeObject(output, o);

@@ -35,37 +35,37 @@ private[sql] abstract class SparkStrategies extends QueryPlanner[SparkPlan] {
 
   object SpatialJoinExtractor extends Strategy with PredicateHelper{
     def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
-      case ExtractSpatialJoinKeys(leftKeys, rightKeys, k, KNNJoin, left, right) =>
+      case ExtractSpatialJoinKeys(leftKey, rightKey, k, KNNJoin, left, right) =>
         sqlContext.conf.knnJoin match {
           case "RKJSpark" =>
-            RKJSpark(leftKeys, rightKeys, k, planLater(left), planLater(right)) :: Nil
+            RKJSpark(leftKey, rightKey, k, planLater(left), planLater(right)) :: Nil
           case "CKJSpark" =>
-            CKJSpark(leftKeys, rightKeys, k, planLater(left), planLater(right)) :: Nil
+            CKJSpark(leftKey, rightKey, k, planLater(left), planLater(right)) :: Nil
           case "VKJSpark" =>
-            VKJSpark(leftKeys, rightKeys, k, planLater(left), planLater(right)) :: Nil
+            VKJSpark(leftKey, rightKey, k, planLater(left), planLater(right)) :: Nil
           case "BKJSpark" =>
-            BKJSpark(leftKeys, rightKeys, k, planLater(left), planLater(right)) :: Nil
+            BKJSpark(leftKey, rightKey, k, planLater(left), planLater(right)) :: Nil
           case "BKJSpark-R" =>
-            BKJSparkR(leftKeys, rightKeys, k, planLater(left), planLater(right)) :: Nil
+            BKJSparkR(leftKey, rightKey, k, planLater(left), planLater(right)) :: Nil
           case _ =>
-            RKJSpark(leftKeys, rightKeys, k, planLater(left), planLater(right)) :: Nil
+            RKJSpark(leftKey, rightKey, k, planLater(left), planLater(right)) :: Nil
         }
-      case ExtractSpatialJoinKeys(leftKeys, rightKeys, k, ZKNNJoin, left, right) =>
-        ZKJSpark(leftKeys, rightKeys, k, planLater(left), planLater(right)) :: Nil
-      case ExtractSpatialJoinKeys(leftKeys, rightKeys, r, DistanceJoin, left, right) =>
+      case ExtractSpatialJoinKeys(leftKey, rightKey, k, ZKNNJoin, left, right) =>
+        ZKJSpark(leftKey, rightKey, k, planLater(left), planLater(right)) :: Nil
+      case ExtractSpatialJoinKeys(leftKey, rightKey, r, DistanceJoin, left, right) =>
         sqlContext.conf.distanceJoin match {
           case "RDJSpark" =>
-            RDJSpark(leftKeys, rightKeys, r, planLater(left), planLater(right)) :: Nil
+            RDJSpark(leftKey, rightKey, r, planLater(left), planLater(right)) :: Nil
           case "DJSpark" =>
-            DJSpark(leftKeys, rightKeys, r, planLater(left), planLater(right)) :: Nil
+            DJSpark(leftKey, rightKey, r, planLater(left), planLater(right)) :: Nil
           case "CDJSpark" =>
-            CDJSpark(leftKeys, rightKeys, r, planLater(left), planLater(right)) :: Nil
+            CDJSpark(leftKey, rightKey, r, planLater(left), planLater(right)) :: Nil
           case "BDJSpark" =>
-            BDJSpark(leftKeys, rightKeys, r, planLater(left), planLater(right)) :: Nil
+            BDJSpark(leftKey, rightKey, r, planLater(left), planLater(right)) :: Nil
           case "BDJSpark-R" =>
-            BDJSparkR(leftKeys, rightKeys, r, planLater(left), planLater(right)) :: Nil
+            BDJSparkR(leftKey, rightKey, r, planLater(left), planLater(right)) :: Nil
           case _ =>
-            RDJSpark(leftKeys, rightKeys, r, planLater(left), planLater(right)) :: Nil
+            RDJSpark(leftKey, rightKey, r, planLater(left), planLater(right)) :: Nil
         }
       case _ => Nil
     }
@@ -328,100 +328,81 @@ private[sql] abstract class SparkStrategies extends QueryPlanner[SparkPlan] {
   object IndexRelationScans extends Strategy with PredicateHelper{
     import org.apache.spark.sql.catalyst.expressions._
     lazy val indexInfos = sqlContext.indexManager.getIndexInfo
-    // lookup
-    def lookupIndexInfo(attributes: Seq[Attribute]): IndexInfo = {
-      var result: IndexInfo = null
-      indexInfos.foreach(item => {
-        if (item.indexType == RTreeType){
-          val temp = item.attributes
-          var found : Boolean = true
-          if (temp.length != attributes.length) found = false
-          else {
-            for (i <- attributes.indices) {
-              if (temp(i) != attributes(i)) {
-                found = false
-              }
-            }
-          }
-          if (found) result = item
-        } else if (item.indexType == TreeMapType || item.indexType == TreapType) {
-          if (attributes.length == 1 && item.attributes.head == attributes.head){
-            result = item
-          }
-        }
-      })
-      result
-    }
 
-    def leafNodeCanBeIndexed(expression: Expression): Boolean = {
-      val indexInfo = expression match {
-        case l @ LessThan(left: NamedExpression, right: Literal) =>
-          lookupIndexInfo(Array(left.toAttribute))
-        case EqualTo(left: NamedExpression, right: Literal) =>
-          lookupIndexInfo(Array(left.toAttribute))
-        case LessThanOrEqual(left: NamedExpression, right: Literal) =>
-          lookupIndexInfo(Array(left.toAttribute))
+    def lookupIndexInfo(attributes: Seq[Attribute]): IndexInfo =
+      indexInfos.find(item => attributes.count(item.attributes.contains)
+        == attributes.length).orNull
+
+    def mapIndexedExpression(expression: Expression): Expression = {
+      val tmp_exp = expression match {
+        case LessThan(left: NamedExpression, right: Literal) =>
+          val attrs = Array(left.toAttribute)
+          if (lookupIndexInfo(attrs) != null) LessThanOrEqual(left, right)
+          else null
         case GreaterThan(left: NamedExpression, right: Literal) =>
-          lookupIndexInfo(Array(left.toAttribute))
-        case GreaterThanOrEqual(left: NamedExpression, right: Literal) =>
-          lookupIndexInfo(Array(left.toAttribute))
-
-        case InRange(point: Seq[NamedExpression], boundL, boundR) =>
-          lookupIndexInfo(point.map(x => x.toAttribute))
-        case InKNN(point: Seq[NamedExpression], target: Seq[Expression], k: Literal) =>
-          lookupIndexInfo(point.map(x => x.toAttribute))
-        case InCircleRange(point: Seq[NamedExpression], target: Seq[Expression], r: Literal) =>
-          lookupIndexInfo(point.map(x => x.toAttribute))
+          val attrs = Array(left.toAttribute)
+          if (lookupIndexInfo(attrs) != null) GreaterThanOrEqual(left, right)
+          else null
         case _ =>
           null
       }
-      indexInfo != null
-    }
 
-    def extractIndexOperation(expression: Expression): Seq[Expression] = {
-      expression match {
-        case And(l1 @ And(l2, r2), r1) =>
-          extractIndexOperation(And(l2, And(r2, r1)))
-        case And(l1, r1 @ And(l2, r2)) =>
-          val temp = extractIndexOperation(r1)
-          if (leafNodeCanBeIndexed(l1)) temp :+ l1
-          else temp
-        case And(left, right) =>
-          var ans = Seq[Expression]()
-          if (leafNodeCanBeIndexed(left)) ans = ans :+ left
-          if (leafNodeCanBeIndexed(right)) ans = ans :+ right
-          ans
-        case other =>
-          if (!leafNodeCanBeIndexed(other)) Seq[Expression]()
-          else Seq[Expression](other)
-      }
+      if (tmp_exp == null) {
+        val attrs: Seq[Attribute] = expression match {
+          case EqualTo(left: NamedExpression, right: Literal) =>
+            Array(left.toAttribute)
+          case LessThanOrEqual(left: NamedExpression, right: Literal) =>
+            Array(left.toAttribute)
+          case GreaterThanOrEqual(left: NamedExpression, right: Literal) =>
+            Array(left.toAttribute)
+
+          case InRange(point: Expression, _, _) =>
+            point match {
+              case wrapper: PointWrapperExpression =>
+                wrapper.points.map(_.asInstanceOf[NamedExpression].toAttribute)
+              case p =>
+                Array(p.asInstanceOf[NamedExpression].toAttribute)
+            }
+          case InKNN(point: Expression, target: Expression, k: Literal) =>
+            point match {
+              case wrapper: PointWrapperExpression =>
+                wrapper.points.map(_.asInstanceOf[NamedExpression].toAttribute)
+              case p =>
+                Array(p.asInstanceOf[NamedExpression].toAttribute)
+            }
+          case InCircleRange(point: Seq[NamedExpression], target: Expression, r: Literal) =>
+            point match {
+              case wrapper: PointWrapperExpression =>
+                wrapper.points.map(_.asInstanceOf[NamedExpression].toAttribute)
+              case p =>
+                Array(p.asInstanceOf[NamedExpression].toAttribute)
+            }
+          case _ =>
+            null
+        }
+        if (attrs != null && lookupIndexInfo(attrs) != null) expression
+        else null
+      } else tmp_exp
     }
 
     def selectFilter(predicates: Seq[Expression]): Seq[Expression] = {
       val originalPredicate = predicates.reduceLeftOption(And).getOrElse(Literal(true))
-      val dnf_clauses = splitDNFPredicates(originalPredicate)
-      var indexedOperations = Seq[Expression]()
-      dnf_clauses.foreach(dnf => {
-        val tempIndexedOperations = extractIndexOperation(dnf)
-        if (tempIndexedOperations.nonEmpty){
-          indexedOperations = indexedOperations :+ tempIndexedOperations.reduce{
-            (a, b) => {
-              if (a == null) b
-              else if (b == null) a
-              else And(a, b)
-            }
-          }
-        }
-      })
-      indexedOperations
+      val clauses = splitDNFPredicates(originalPredicate).map(splitCNFPredicates)
+      val predicateCanBeIndexed = clauses.map(clause =>
+        clause.map(mapIndexedExpression).filter(_ != null))
+      predicateCanBeIndexed.map(pre => pre.reduceLeftOption(And).getOrElse(Literal(true)))
     }
 
     def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
       case PhysicalOperation(projectList, filters, indexed: IndexedRelation) =>
         val predicatesCanBeIndexed = selectFilter(filters)
+        val parentFilter = // if all predicate can be indexed, then remove the predicate
+          if (predicatesCanBeIndexed.toString // TODO ugly hack
+            .compareTo(Seq(filters.reduceLeftOption(And).getOrElse(true)).toString) == 0) Seq[Expression]()
+          else filters
         pruneFilterProject(
           projectList,
-          filters,   // the parent Filter node of IndexRelationSca
+          parentFilter,
           identity[Seq[Expression]],
           IndexedRelationScan(_, predicatesCanBeIndexed, indexed)) :: Nil
       case _ => Nil
