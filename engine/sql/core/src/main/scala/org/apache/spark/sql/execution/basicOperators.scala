@@ -86,22 +86,6 @@ case class Filter(condition: Expression, child: SparkPlan) extends UnaryNode {
     sparkContext.parallelize(rdd.map(_.copy())
       .takeOrdered(k)(new DistanceOrdering(point, target)), 1)
 
-  def range(rdd: RDD[InternalRow], point: Expression,
-            point_low: Point, point_high: Point): RDD[InternalRow] =
-    rdd.filter(row => {
-      val eval_point = BindReferences.bindReference(point, child.output).eval(row).
-        asInstanceOf[Point]
-      MBR(point_low, point_high).contains(eval_point)
-    })
-
-  def circleRange(rdd: RDD[InternalRow], point: Expression,
-                  target: Point, r: Double): RDD[InternalRow] =
-    rdd.filter(row => {
-      val eval_point = BindReferences.bindReference(point, child.output).eval(row).
-        asInstanceOf[Point]
-      Circle(target, r).contains(eval_point)
-    })
-
   def applyCondition(rdd: RDD[InternalRow],
                      condition: Expression,
                      rootRDD: RDD[InternalRow]): RDD[InternalRow] = {
