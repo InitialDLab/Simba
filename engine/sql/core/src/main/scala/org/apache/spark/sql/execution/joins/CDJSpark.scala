@@ -28,8 +28,8 @@ import org.apache.spark.sql.spatial._
   * Created by dong on 1/20/16.
   * Distance Join based on Cartesian Product
   */
-case class CDJSpark(left_keys: Seq[Expression],
-                    right_keys: Seq[Expression],
+case class CDJSpark(left_key: Expression,
+                    right_key: Expression,
                     l: Literal,
                     left: SparkPlan,
                     right: SparkPlan) extends BinaryNode {
@@ -43,11 +43,11 @@ case class CDJSpark(left_keys: Seq[Expression],
     left.execute().cartesian(right.execute()).mapPartitions { iter =>
       val joinedRow = new JoinedRow
       iter.filter { row =>
-        val point1 = left_keys.map(x => BindReferences.bindReference(x, right.output).eval(row._2)
-          .asInstanceOf[Number].doubleValue).toArray
-        val point2 = right_keys.map(x => BindReferences.bindReference(x, left.output).eval(row._1)
-          .asInstanceOf[Number].doubleValue).toArray
-        new Point(point1).minDist(new Point(point2)) <= r
+        val point1 = BindReferences.bindReference(left_key, left.output).eval(row._1).
+          asInstanceOf[Point]
+        val point2 = BindReferences.bindReference(right_key, right.output).eval(row._2).
+          asInstanceOf[Point]
+        point1.minDist(point2) <= r
       }.map(row => joinedRow(row._1, row._2))
     }
 }

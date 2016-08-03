@@ -32,8 +32,8 @@ import scala.util.control.Breaks
   * Created by dong on 1/20/16.
   * KNN Join based on Voronoi Partitioning
   */
-case class VKJSpark(left_keys: Seq[Expression],
-                    right_keys: Seq[Expression],
+case class VKJSpark(left_key: Expression,
+                    right_key: Expression,
                     kNN: Literal,
                     left: SparkPlan,
                     right: SparkPlan)
@@ -45,7 +45,6 @@ case class VKJSpark(left_keys: Seq[Expression],
   final val num_of_pivot_sets = sqlContext.conf.voronoiPivotSetSize
   final val num_of_pivots = num_partitions * sqlContext.conf.thetaBoost
   final val k = kNN.toString.toInt
-  final val dimension = left_keys.length
 
   case class LeftMetaInfo(pid: Int, upperBound: Double, var theta : Double = Double.MaxValue)
   case class RightMetaInfo(pid: Int, upperBound: Double, knnOfPivot: Array[Double])
@@ -236,13 +235,13 @@ case class VKJSpark(left_keys: Seq[Expression],
 
   override def doExecute(): RDD[InternalRow] = {
     val left_rdd = left.execute().map(row =>
-      (new Point(left_keys.map(x => BindReferences.bindReference(x, left.output).eval(row)
-        .asInstanceOf[Number].doubleValue()).toArray), row)
+      (BindReferences.bindReference(left_key, left.output).eval(row)
+        .asInstanceOf[Point], row)
     )
 
     val right_rdd = right.execute().map(row =>
-      (new Point(right_keys.map(x => BindReferences.bindReference(x, right.output).eval(row)
-        .asInstanceOf[Number].doubleValue()).toArray), row)
+      (BindReferences.bindReference(right_key, right.output).eval(row)
+        .asInstanceOf[Point], row)
     )
 
     val pivots = generatePivots(left_rdd.map(_._1).union(right_rdd.map(_._1)), num_of_pivots)

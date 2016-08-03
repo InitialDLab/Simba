@@ -36,7 +36,7 @@ case class TreapNode[K: Ordering: ClassTag](key: K, var data: Array[Int],
   def update(): Unit = {
     val left_size = if (left != null) left.size else 0
     val right_size = if (right != null) right.size else 0
-    size = left_size + right_size + 1
+    size = left_size + right_size + count
   }
 }
 
@@ -46,6 +46,8 @@ case class Treap[K: Ordering: ClassTag](var root: TreapNode[K]) extends Index wi
   def this() = this(null)
 
   private def calcInterval(p: TreapNode[K]): Unit = {
+    if (p == null) return
+
     var min: K = {
       if (p.left != null) {
         calcInterval(p.left)
@@ -115,7 +117,10 @@ case class Treap[K: Ordering: ClassTag](var root: TreapNode[K]) extends Index wi
   private def rank(p: TreapNode[K], key: K): Int = {
     if (p == null) 0
     else if (ordering.lt(key, p.key)) rank(p.left, key)
-    else p.left.size + p.count + rank(p.right, key)
+    else {
+      val tmp_size = if (p.left == null) 0 else p.left.size
+      tmp_size + p.count + rank(p.right, key)
+    }
   }
 
   def rank(key: K): Int = rank(root, key)
@@ -142,9 +147,9 @@ case class Treap[K: Ordering: ClassTag](var root: TreapNode[K]) extends Index wi
     if (p == null) Array()
     else {
       var ans = mutable.ArrayBuffer[Int]()
-      if (ordering.lt(low, p.key)) ans ++= range(p.left, low, p.key)
+      if (ordering.lt(low, p.key)) ans ++= range(p.left, low, high)
       if (ordering.lteq(low, p.key) && ordering.lteq(p.key, high)) ans ++= p.data
-      if (ordering.lt(p.key, high)) ans ++= range(p.right, p.key, high)
+      if (ordering.lt(p.key, high)) ans ++= range(p.right, low, high)
       ans.toArray
     }
   }
