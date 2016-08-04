@@ -67,7 +67,9 @@ private[sql] case class IndexedRelationScan(attributes: Seq[Attribute],
   }
 
   override protected def doExecute(): RDD[InternalRow] = {
-    relation match {
+    if (predicates.size == 1 && predicates.head.toString == "true"){
+      relation._indexedRDD.flatMap(_.data)
+    } else relation match {
       case treemap @ TreeMapIndexedRelation(_, _, _, column_keys, _) =>
         if (predicates.nonEmpty) {
           val intervals = predicates.map(Interval.conditionToInterval(_, column_keys)._1)
@@ -226,6 +228,22 @@ private[sql] case class IndexedRelationScan(attributes: Seq[Attribute],
             }
           }.reduce((a, b) => a.union(b)).map(_.copy()).distinct()
         } else rtree._indexedRDD.flatMap(_.data)
+      case qtree @ QuadTreeIndexedRelation(_, _, _, column_keys, _) =>
+        if (predicates.nonEmpty){
+          predicates.map{ predicate =>
+            val (intervals, exps) = Interval.conditionToInterval(predicate, column_keys)
+            val queryMBR = new MBR(new Point(intervals.map(_.min._1)),
+              new Point(intervals.map(_.max._1)))
+            val global_part = qtree.global_index.range(queryMBR, searchMBR = true).map(_._2).toSeq
+            val pruned = new PartitionPruningRDD(qtree._indexedRDD, global_part.contains)
+
+            pruned.flatMap{packed =>
+              val index = packed.index.asInstanceOf[QuadTree]
+              if (index != null) index.range(queryMBR).map(x => packed.data(x._2)).iterator
+              else Iterator[InternalRow]()
+            }
+          }.reduce(_ union _).map(_.copy()).distinct()
+        } else qtree._indexedRDD.flatMap(_.data)
       case other =>
         other.indexedRDD.flatMap(_.data)
     }

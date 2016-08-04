@@ -37,10 +37,10 @@ case class QuadTreeNode(x_low: Double, y_low: Double, x_high: Double, y_high: Do
 
   def makeChildren(): Unit = {
     children = Array(
-      QuadTreeNode(x_low, y_low, center_x, center_y, null, Array()),
-      QuadTreeNode(center_x, y_low, x_high, center_y, null, Array()),
-      QuadTreeNode(x_low, center_y, center_x, y_high, null, Array()),
-      QuadTreeNode(center_x, center_y, x_high, y_high, null, Array())
+      QuadTreeNode(x_low, y_low, center_x, center_y, null, null),
+      QuadTreeNode(center_x, y_low, x_high, center_y, null, null),
+      QuadTreeNode(x_low, center_y, center_x, y_high, null, null),
+      QuadTreeNode(center_x, center_y, x_high, y_high, null, null)
     )
   }
   def makeChildren(grouped: Map[Int, Array[(Double, Double, Int)]]): Unit = {
@@ -67,18 +67,36 @@ case class QuadTree(root: QuadTreeNode) extends Index with Serializable{
     root
   }
 
-  def range(x_min: Double, y_min: Double,
-            x_max: Double, y_max: Double): Array[(Double, Double, Int)] = {
+  def range(x_min: Double, y_min: Double, x_max: Double, y_max: Double,
+            searchMBR: Boolean): Array[(Double, Double, Int)] = {
     val res = new mutable.ArrayBuffer[(Double, Double, Int)]()
-    res ++= searchRecur(root, x_min, y_min, x_max, y_max)
+    if (!searchMBR) res ++= searchRecur(root, x_min, y_min, x_max, y_max)
+    else res ++= searchMBRRecur(root, x_min, y_min, x_max, y_max)
     res.toArray
   }
 
   // interface same with RTree
-  def range(query: MBR): Array[(Point, Int)] = {
+  def range(query: MBR, searchMBR: Boolean = false): Array[(Point, Int)] = {
     val temp_result = this.range(query.low.coord(0), query.low.coord(1),
-      query.high.coord(0), query.high.coord(1))
+      query.high.coord(0), query.high.coord(1), searchMBR)
     temp_result.map(item => (Point(Array(item._1, item._2)), item._3))
+  }
+
+  def searchMBRRecur(node: QuadTreeNode, x_min: Double, y_min: Double,
+                     x_max: Double, y_max: Double): mutable.ArrayBuffer[(Double, Double, Int)] = {
+    val res = new mutable.ArrayBuffer[(Double, Double, Int)]()
+    if (node.objects == null) {
+      if (node.children != null) for (child <- node.children) res ++= searchMBRRecur(child,
+          x_min: Double, y_min: Double, x_max: Double, y_max: Double)
+    }
+    else {
+      def valueInrange(v: Double, min: Double, max: Double) = (v <= max) && (v >= min)
+      if ((valueInrange(node.x_low, x_min, x_max) || valueInrange(x_min, node.x_low, node.x_high))
+        && (valueInrange(node.y_low, y_min, y_max) || valueInrange(y_min, node.y_low, node.y_high))){
+        res ++= node.objects.head :: Nil
+      }
+    }
+    res
   }
 
   def searchRecur(node: QuadTreeNode, x_min: Double, y_min: Double,

@@ -35,7 +35,7 @@ private[sql] case class QuadTreeIndexedRelation(
      table_name: Option[String],
      column_keys: List[Attribute],
      index_name: String)(var _indexedRDD: IndexRDD = null,
-                         var global_index: RTree = null)
+                         var global_index: QuadTree = null)
   extends IndexedRelation with MultiInstanceRelation {
   private def checkKeys: Boolean = {
     for (i <- column_keys.indices)
@@ -64,7 +64,7 @@ private[sql] case class QuadTreeIndexedRelation(
     })
 
     val dimension = column_keys.length
-    val (partitionedRDD, tmp_bounds) = QuadTreePartitioner(dataRDD, dimension,
+    val (partitionedRDD, global_qtree) = QuadTreePartitioner(dataRDD, dimension,
       numShufflePartitions, sampleRate, tranferThreshold)
 
     val indexed = partitionedRDD.mapPartitions { iter =>
@@ -77,9 +77,9 @@ private[sql] case class QuadTreeIndexedRelation(
 
     val partitionSize = indexed.mapPartitions(iter => iter.map(_.data.length)).collect()
 
-    global_index = RTree(tmp_bounds.zip(partitionSize).map(x => (x._1._1, x._1._2, x._2)), 10)
     indexed.setName(table_name.map(name => s"$name $index_name").getOrElse(child.toString))
     _indexedRDD = indexed
+    global_index = global_qtree
   }
 
   override def newInstance(): IndexedRelation = {
