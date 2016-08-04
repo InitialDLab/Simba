@@ -16,17 +16,17 @@
 
 package org.apache.spark.sql.index
 
-import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.IndexRDD
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.analysis.MultiInstanceRelation
-import org.apache.spark.sql.catalyst.expressions.{Attribute, BindReferences}
+import org.apache.spark.sql.catalyst.expressions.{Attribute, BindReferences, GenericInternalRow}
 import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, Statistics}
+import org.apache.spark.sql.catalyst.util.GenericArrayData
 import org.apache.spark.sql.execution.SparkPlan
 import org.apache.spark.sql.partitioner._
-import org.apache.spark.sql.spatial.Point
-import org.apache.spark.sql.types.{DoubleType, IntegerType, NumericType}
+import org.apache.spark.sql.types.{DoubleType, IntegerType, NumericType, StructType}
 import org.apache.spark.storage.StorageLevel
+import org.apache.spark.sql.util.FetchPointUtils
 
 /**
  * Created by dong on 1/15/16.

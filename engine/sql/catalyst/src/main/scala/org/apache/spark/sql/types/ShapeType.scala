@@ -26,7 +26,7 @@ class ShapeType private() extends DataType{
 
   override def asNullable: DataType = this
 
-  override def defaultSize: Int = 4096
+  override def defaultSize: Int = 16
 
   override def simpleString: String = "Shape"
 }

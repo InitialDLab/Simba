@@ -22,19 +22,20 @@ import org.apache.spark.sql.catalyst.expressions.{Attribute, BindReferences}
 import org.apache.spark.sql.catalyst.plans.logical.Statistics
 import org.apache.spark.sql.execution.SparkPlan
 import org.apache.spark.sql.partitioner.RangePartition
-import org.apache.spark.sql.types.NumericType
 import org.apache.spark.storage.StorageLevel
+import org.apache.spark.sql.spatial.Point
+import org.apache.spark.sql.types.NumericType
 
 /**
   * Created by gefei on 16-6-21.
   */
 private[sql] case class TreeMapIndexedRelation(
-      output: Seq[Attribute],
-      child: SparkPlan,
-      table_name: Option[String],
-      column_keys: List[Attribute],
-      index_name: String)(var _indexedRDD: IndexRDD = null,
-                          var range_bounds: Array[Double] = null)
+  output: Seq[Attribute],
+  child: SparkPlan,
+  table_name: Option[String],
+  column_keys: List[Attribute],
+  index_name: String)(var _indexedRDD: IndexRDD = null,
+                      var range_bounds: Array[Double] = null)
   extends IndexedRelation with MultiInstanceRelation {
   require(column_keys.length == 1)
   require(column_keys.head.dataType.isInstanceOf[NumericType])
@@ -47,9 +48,9 @@ private[sql] case class TreeMapIndexedRelation(
     val numShufflePartitions = child.sqlContext.conf.numShufflePartitions
 
     val dataRDD = child.execute().map(row => {
-      val key = BindReferences.bindReference(column_keys.head, child.output).eval(row)
-        .asInstanceOf[Number].doubleValue
-      (key, row)
+      val eval_key = BindReferences.bindReference(column_keys.head, child.output).eval(row)
+        .asInstanceOf[Double]
+      (eval_key, row)
     })
 
     val (partitionedRDD, tmp_bounds) = RangePartition.rowPartition(dataRDD, numShufflePartitions)
