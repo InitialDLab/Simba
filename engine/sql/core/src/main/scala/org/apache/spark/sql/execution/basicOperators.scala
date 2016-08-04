@@ -59,14 +59,6 @@ case class Project(projectList: Seq[NamedExpression], child: SparkPlan) extends 
 
 case class Filter(condition: Expression, child: SparkPlan) extends UnaryNode {
 
-val getCoord = (row: InternalRow, point: Expression) => point match {
-    case p: PointWrapperExpression => p.points.toArray.map(BindReferences.
-      bindReference(_, child.output).eval(row).asInstanceOf[Number].doubleValue())
-    case e => BindReferences.bindReference(e, child.output).eval(row)
-      .asInstanceOf[GenericInternalRow].values(0)
-      .asInstanceOf[GenericArrayData].array.map(x => x.asInstanceOf[Double])
-  }
-
   override def output: Seq[Attribute] = child.output
 
   // NOTE: we remove metrics in filter. Should be back somewhere
@@ -93,22 +85,6 @@ val getCoord = (row: InternalRow, point: Expression) => point match {
           target: Point, k: Int): RDD[InternalRow] =
     sparkContext.parallelize(rdd.map(_.copy())
       .takeOrdered(k)(new DistanceOrdering(point, target)), 1)
-
-  def range(rdd: RDD[InternalRow], point: Expression,
-            point_low: Point, point_high: Point): RDD[InternalRow] =
-    rdd.filter(row => {
-      val eval_point = BindReferences.bindReference(point, child.output).eval(row).
-        asInstanceOf[Point]
-      MBR(point_low, point_high).contains(eval_point)
-    })
-
-  def circleRange(rdd: RDD[InternalRow], point: Expression,
-                  target: Point, r: Double): RDD[InternalRow] =
-    rdd.filter(row => {
-      val eval_point = BindReferences.bindReference(point, child.output).eval(row).
-        asInstanceOf[Point]
-      Circle(target, r).contains(eval_point)
-    })
 
   def applyCondition(rdd: RDD[InternalRow],
                      condition: Expression,
@@ -147,14 +123,6 @@ val getCoord = (row: InternalRow, point: Expression) => point match {
       case InKNN(point, target, k) =>
         val _target = target.asInstanceOf[Literal].value.asInstanceOf[Point]
         knn(rootRDD, point, _target, k.value.asInstanceOf[Number].intValue())
-      case InRange(point, point_low, point_high) =>
-        val _point_low = point_low.asInstanceOf[Literal].value.asInstanceOf[Point]
-        val _point_high = point_high.asInstanceOf[Literal].value.asInstanceOf[Point]
-        range(rootRDD, point, _point_low, _point_high)
-      case InCircleRange(point, target, r) =>
-        val _target = target.asInstanceOf[Literal].value.asInstanceOf[Point]
-        val _r = r.asInstanceOf[Literal].value.asInstanceOf[Number].doubleValue()
-        circleRange(rootRDD, point, _target, _r)
     }
   }
 
