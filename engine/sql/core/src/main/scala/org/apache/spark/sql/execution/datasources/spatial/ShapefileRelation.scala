@@ -34,10 +34,12 @@ class ShapefileRelation(path: String)(@transient val sqlContext: SQLContext)
 
   override def buildScan(requiredColumns: Array[String], filters: Array[Filter]): RDD[Row] = {
     val indices = requiredColumns.map(attr => schema.fieldIndex(attr))
-    val numFields = indices.size
     val gf = new GeometryFactory()
+    val shapes = ShapeFile.Parser(path)(gf)
+//    shapes.foreach(shape => println(shape.g))
+//    println("-------------------------")
     val shapefileRdd = sqlContext.sparkContext
-      .parallelize(ShapeFile.Parser(path)(gf)).map(_.g match {
+      .parallelize(shapes).map(_.g match {
       case p: Polygon => org.apache.spark.sql.spatial.Polygon(p)
       case p: Point => org.apache.spark.sql.spatial.Point(p)
 //      case _ => ???

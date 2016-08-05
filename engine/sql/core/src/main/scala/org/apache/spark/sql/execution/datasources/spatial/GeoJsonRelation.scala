@@ -62,7 +62,8 @@ class GeoJsonRelation(path: String)(@transient val sqlContext: SQLContext)
     }
   }
   override def buildScan(requiredColumns: Array[String], filters: Array[Filter]): RDD[Row] = {
-    sqlContext.sparkContext.parallelize(parseShapeWithMeta(path)).map(Row(_))
+    val shapes = parseShapeWithMeta(path)
+    sqlContext.sparkContext.parallelize(shapes).map(Row(_))
   }
 
   private def parseShapeWithMeta(path: String) = {
