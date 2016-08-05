@@ -21,8 +21,10 @@ import org.apache.spark.sql.{Row, SQLContext}
 import org.apache.spark.sql.sources.{BaseRelation, Filter, PrunedFilteredScan}
 import org.apache.spark.sql.spatial.{Point, Polygon}
 import org.apache.spark.sql.types.{ShapeType, StructField, StructType}
-import org.json4s._
-import org.json4s.jackson.JsonMethods._
+import play.api.libs.json._
+
+import scala.collection.mutable.ListBuffer
+import scala.io.Source
 
 /**
   * Created by gefei on 16-8-1.
@@ -33,41 +35,45 @@ class GeoJsonRelation(path: String)(@transient val sqlContext: SQLContext)
     StructType(StructField("shape", ShapeType, true) :: Nil)
   }
 
-  override def buildScan(requiredColumns: Array[String], filters: Array[Filter]): RDD[Row] = {
-    sqlContext.sparkContext.parallelize(parseShapeWithMeta()).map(Row.fromTuple)
-  }
-
-  private def parseShapeWithMeta() = {
-    val tree = parse(path)
-    implicit val formats = org.json4s.DefaultFormats
-    val result = tree.extract[GeoJSON]
-    result.features.map(_.geometry.shape)
-  }
-
-  private case class Geometry(`type`: String, coordinates: JValue){
-    def extractPoints(p: List[JValue]): List[Point] = {p.map{
-      case JArray(List(JDouble(x), JDouble(y))) => Point(Array(x, y))}
+  case class GeoJSon(`type`: String, features: List[Feature])
+  case class Feature(`type`: String, properties: Option[Map[String, String]], geometry: Geometry)
+  case class Geometry(`type`: String, coordinates: JsValue) {
+    private def extractPoints(p: List[JsValue]) = {
+      p.map {
+        case (JsArray(ListBuffer(JsNumber(x), JsNumber(y)))) =>
+          Point(Array(x.toDouble, y.toDouble))
+      }
     }
+
     val shape = {
       `type` match {
         case "Point" => {
-          val JArray(List(JDouble(x), JDouble(y))) = coordinates
-          Point(Array(x, y))
+          val JsArray(ListBuffer(JsNumber(x), JsNumber(y))) = coordinates
+          Point(Array(x.toDouble, y.toDouble))
         }
-//        case "Polygon" => {
-//          val JArray(p) = coordinates.asInstanceOf[JArray]
-//          val rings = p.map { case JArray(q) => extractPoints(q)}
-//          Polygon(rings.flatten.toArray)
-//        }
-        case _ => Point(Array(0.0, 0.0))
+        case "Polygon" => {
+          val JsArray(p) = coordinates.asInstanceOf[JsArray]
+          val rings = p.map { case JsArray(q) => extractPoints(q.toList)}
+          Polygon(rings.flatten.toArray)
+        }
+        case _ =>
+          Point(Array(0.0, 0.0))
       }
     }
   }
-  private case class Feature(`type`: String,
-                             properties: Option[Map[String, String]],
-                             geometry: Geometry)
+  override def buildScan(requiredColumns: Array[String], filters: Array[Filter]): RDD[Row] = {
+    sqlContext.sparkContext.parallelize(parseShapeWithMeta(path)).map(Row(_))
+  }
 
-  private case class CRS(`type`: String, properties: Option[Map[String, String]])
+  private def parseShapeWithMeta(path: String) = {
+    val json = Source.fromFile(path).mkString
+    implicit val geometryFormat = Json.format[Geometry]
+    implicit val featureFormat = Json.format[Feature]
+    implicit val modelFormat = Json.format[GeoJSon]
+    val parsed = Json.parse(json)
+    val result = Json.fromJson[GeoJSon](parsed).getOrElse(null)
+    if (result == null) throw new Exception("geojson input file format error.")
+    result.features.map(_.geometry.shape)
+  }
 
-  private case class GeoJSON(`type`: String, crs: Option[CRS], features: List[Feature])
 }

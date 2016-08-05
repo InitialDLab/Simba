@@ -18,6 +18,8 @@ package org.apache.spark.examples.sql
 
 import org.apache.spark.sql.SQLContext
 import org.apache.spark.{SparkConf, SparkContext}
+
+
 /**
   * Created by gefei on 16-7-25.
   */
@@ -32,7 +34,7 @@ object DataSourceTest {
 
     val df = sqlContext.read.format("org.apache.spark.sql.execution.datasources.spatial")
           .option("type", "geojson")
-      .load("./resources/custom.geo.json")
+      .load("./examples/src/main/resources/example.geo.json")
     df.show()
   }
 }
