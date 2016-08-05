@@ -34,7 +34,7 @@ object DataSourceTest {
 
 
     val df1 = sqlContext.read.format("org.apache.spark.sql.execution.datasources.spatial")
-      .option("type", "shapefile").load("/home/gefei/data/geo_data/tl_2015_04_elsd.shp")
+      .option("type", "shapefile").load("./examples/src/main/resources/map.shp")
     df1.show()
 
     val df2 = sqlContext.read.format("org.apache.spark.sql.execution.datasources.spatial")

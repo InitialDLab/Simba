@@ -36,8 +36,6 @@ class ShapefileRelation(path: String)(@transient val sqlContext: SQLContext)
     val indices = requiredColumns.map(attr => schema.fieldIndex(attr))
     val gf = new GeometryFactory()
     val shapes = ShapeFile.Parser(path)(gf)
-//    shapes.foreach(shape => println(shape.g))
-//    println("-------------------------")
     val shapefileRdd = sqlContext.sparkContext
       .parallelize(shapes).map(_.g match {
       case p: Polygon => org.apache.spark.sql.spatial.Polygon(p)

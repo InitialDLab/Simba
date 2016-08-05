@@ -52,7 +52,6 @@ class OSMRelation(path: String)(@transient val sqlContext: SQLContext)
     val xml = XML.loadFile(path)
     val tmp_nodes = xml \ "node"
     val nodes = tmp_nodes.map(nodeConverter).map(node => node.pos)
-    nodes.foreach(println)
     val temp = sqlContext.sparkContext.parallelize(nodes)
     temp.map(Row(_))
   }
