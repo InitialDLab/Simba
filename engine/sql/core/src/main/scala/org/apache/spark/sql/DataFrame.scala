@@ -39,6 +39,7 @@ import org.apache.spark.sql.sources.HadoopFsRelation
 import org.apache.spark.sql.types._
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.util.Utils
+import org.apache.spark.sql.spatial.Point
 
 import scala.language.implicitConversions
 import scala.reflect.ClassTag
@@ -1203,8 +1204,9 @@ class DataFrame private[sql](
     */
   def range(keys: PointFromColumn, point1: PointFromCoords, point2: PointFromCoords): DataFrame =
     withPlan {
-      Filter(InRange(keys.cols.map(_.expr), point1.coords.map(Literal(_)),
-        point2.coords.map(Literal(_))), logicalPlan)
+      Filter(InRange(PointWrapperExpression(keys.cols.map(_.expr)),
+        Literal(new Point(point1.coords.toArray)),
+        Literal(new Point(point2.coords.toArray))), logicalPlan)
     }
 
   /**
@@ -1219,12 +1221,53 @@ class DataFrame private[sql](
       val attrs = getAttributes(keys)
       attrs.foreach(attr => assert(attr != null, "column not found"))
 
-      Filter(InRange(attrs, point1.map(Literal(_)), point2.map(Literal(_))), logicalPlan)
+      Filter(InRange(PointWrapperExpression(attrs),
+        Literal(new Point(point1)),
+        Literal(new Point(point2))), logicalPlan)
     }
 
+  /**
+    * Spatial operation, range query
+    * {{{
+    *   point.range(p, Point(1.0, 1.0), Point(2.0, 2.0))
+    * }}}
+    */
+  def range(key: String, point1: PointFromCoords, point2: PointFromCoords): DataFrame =
+    withPlan {
+      val attrs = getAttributes(Array(key))
+      assert(attrs.head != null, "column not found")
+
+      Filter(InRange(attrs.head,
+        Literal(new Point(point1.coords.toArray)),
+        Literal(new Point(point2.coords.toArray))), logicalPlan)
+    }
+
+  /**
+    * Spatial operation, range query
+    * {{{
+    *   point.range(p, Array(10, 10), Array(20, 20))
+    * }}}
+    */
+  def range(key: String, point1: Array[Double], point2: Array[Double]): DataFrame =
+    withPlan {
+      val attrs = getAttributes(Array(key))
+      assert(attrs.head != null, "column not found")
+
+      Filter(InRange(attrs.head,
+        Literal(new Point(point1)),
+        Literal(new Point(point2))), logicalPlan)
+    }
+
+  /**
+    * Spatial operation circle range query
+    * {{{
+    *   point.circleRange(Point(point1("x"), point1("y")), Point(10, 10), 5)
+    * }}}
+    */
   def circleRange(keys: PointFromColumn, point: PointFromCoords, r: Double): DataFrame =
     withPlan {
-      Filter(InCircleRange(keys.cols.map(_.expr), point.coords.map(Literal(_)),
+      Filter(InCircleRange(PointWrapperExpression(keys.cols.map(_.expr)),
+        Literal(new Point(point.coords.toArray)),
         Literal(r)), logicalPlan)
     }
 
@@ -1238,7 +1281,39 @@ class DataFrame private[sql](
   def circleRange(keys: Array[String], point: Array[Double], r: Double): DataFrame = withPlan {
     val attrs = getAttributes(keys)
     attrs.foreach(attr => assert(attr != null, "column not found"))
-    Filter(InCircleRange(attrs, point.map(Literal(_)), Literal(r)), logicalPlan)
+    Filter(InCircleRange(PointWrapperExpression(attrs),
+      Literal(new Point(point)),
+      Literal(r)), logicalPlan)
+  }
+
+  /**
+    * Spatial operation circle range query
+    * {{{
+    *   point.circleRange(p, Point(10, 10), 5)
+    * }}}
+    */
+  def circleRange(key: String, point: PointFromCoords, r: Double): DataFrame = withPlan {
+    val attrs = getAttributes(Array(key))
+    assert(attrs.head != null, "column not found")
+
+    Filter(InCircleRange(attrs.head,
+      Literal(new Point(point.coords.toArray)),
+      Literal(r)), logicalPlan)
+  }
+
+  /**
+    * Spatial operation circle range query
+    * {{{
+    *   point.circleRange(p, Array(10, 10), 5)
+    * }}}
+    */
+  def circleRange(key: String, point: Array[Double], r: Double): DataFrame = withPlan {
+    val attrs = getAttributes(Array(key))
+    assert(attrs.head != null, "column not found")
+
+    Filter(InCircleRange(attrs.head,
+      Literal(new Point(point)),
+      Literal(r)), logicalPlan)
   }
 
   /**
@@ -1248,11 +1323,27 @@ class DataFrame private[sql](
   def knn(keys: Array[String], point: Array[Double], k: Int): DataFrame = withPlan{
     val attrs = getAttributes(keys)
     attrs.foreach(attr => assert(attr != null, "column not found"))
-    Filter(InKNN(attrs, point.map(Literal(_)), Literal(k)), logicalPlan)
+    Filter(InKNN(PointWrapperExpression(attrs),
+      Literal(new Point(point)), Literal(k)), logicalPlan)
   }
 
   def knn(keys: PointFromColumn, point: PointFromCoords, k: Int): DataFrame = withPlan {
-    Filter(InKNN(keys.cols.map(_.expr), point.coords.map(Literal(_)), Literal(k)), logicalPlan)
+    Filter(InKNN(PointWrapperExpression(keys.cols.map(_.expr)),
+      Literal(new Point(point.coords.toArray)), Literal(k)), logicalPlan)
+  }
+
+  def knn(key: String, point: Array[Double], k: Int): DataFrame = withPlan{
+    val attrs = getAttributes(Array(key))
+    assert(attrs.head != null, "column not found")
+    Filter(InKNN(attrs.head,
+      Literal(new Point(point)), Literal(k)), logicalPlan)
+  }
+
+  def knn(key: String, point: PointFromCoords, k: Int): DataFrame = withPlan{
+    val attrs = getAttributes(Array(key))
+    assert(attrs.head != null, "column not found")
+    Filter(InKNN(attrs.head,
+      Literal(new Point(point.coords.toArray)), Literal(k)), logicalPlan)
   }
 
   /**
@@ -1263,13 +1354,26 @@ class DataFrame private[sql](
     val leftAttrs = getAttributes(leftKeys)
     val rightAttrs = getAttributes(rightKeys, right.queryExecution.analyzed.output)
     Join(this.logicalPlan, right.logicalPlan, DistanceJoin,
-      Some(InCircleRange(rightAttrs, leftAttrs, Literal(r))))
+      Some(InCircleRange(PointWrapperExpression(rightAttrs),
+        PointWrapperExpression(leftAttrs),
+        Literal(r))))
   }
 
   def distanceJoin(right: DataFrame, leftKeys: PointFromColumn,
                    rightKeys: PointFromColumn, r: Double): DataFrame = withPlan {
     Join(this.logicalPlan, right.logicalPlan, DistanceJoin,
-      Some(InCircleRange(rightKeys.cols.map(_.expr), leftKeys.cols.map(_.expr), Literal(r))))
+      Some(InCircleRange(PointWrapperExpression(rightKeys.cols.map(_.expr)),
+        PointWrapperExpression(leftKeys.cols.map(_.expr)), Literal(r))))
+  }
+
+  def distanceJoin(right: DataFrame, leftKey: String,
+                   rightKey: String, r: Double) : DataFrame = withPlan {
+    val leftAttrs = getAttributes(Array(leftKey))
+    val rightAttrs = getAttributes(Array(rightKey), right.queryExecution.analyzed.output)
+    Join(this.logicalPlan, right.logicalPlan, DistanceJoin,
+      Some(InCircleRange(rightAttrs.head,
+        leftAttrs.head,
+        Literal(r))))
   }
 
   /**
@@ -1280,13 +1384,25 @@ class DataFrame private[sql](
     val leftAttrs = getAttributes(leftKeys)
     val rightAttrs = getAttributes(rightKeys, right.queryExecution.analyzed.output)
     Join(this.logicalPlan, right.logicalPlan, KNNJoin,
-      Some(InKNN(rightAttrs, leftAttrs, Literal(k))))
+      Some(InKNN(PointWrapperExpression(rightAttrs),
+        PointWrapperExpression(leftAttrs), Literal(k))))
   }
 
   def knnJoin(right: DataFrame, leftKeys: PointFromColumn,
               rightKeys: PointFromColumn, k: Int): DataFrame = withPlan {
     Join(this.logicalPlan, right.logicalPlan, KNNJoin,
-      Some(InKNN(rightKeys.cols.map(_.expr), leftKeys.cols.map(_.expr), Literal(k))))
+      Some(InKNN(PointWrapperExpression(rightKeys.cols.map(_.expr)),
+        PointWrapperExpression(leftKeys.cols.map(_.expr)),
+        Literal(k))))
+  }
+
+  def knnJoin(right: DataFrame, leftKey: String,
+              rightKey: String, k : Int) : DataFrame = withPlan {
+    val leftAttrs = getAttributes(Array(leftKey))
+    val rightAttrs = getAttributes(Array(rightKey), right.queryExecution.analyzed.output)
+    Join(this.logicalPlan, right.logicalPlan, KNNJoin,
+      Some(InKNN(rightAttrs.head,
+        leftAttrs.head, Literal(k))))
   }
 
   /**

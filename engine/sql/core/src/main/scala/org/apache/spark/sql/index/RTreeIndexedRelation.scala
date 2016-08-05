@@ -18,35 +18,48 @@ package org.apache.spark.sql.index
 
 import org.apache.spark.sql._
 import org.apache.spark.sql.catalyst.analysis.MultiInstanceRelation
-import org.apache.spark.sql.catalyst.expressions.{Attribute, BindReferences}
+import org.apache.spark.sql.catalyst.expressions.Attribute
 import org.apache.spark.sql.catalyst.plans.logical.Statistics
 import org.apache.spark.sql.execution.SparkPlan
-import org.apache.spark.sql.partitioner.STRPartition
-import org.apache.spark.sql.spatial.Point
-import org.apache.spark.sql.types.{DoubleType, IntegerType}
+import org.apache.spark.sql.partitioner.{KDTreePartitioner, QuadTreePartitioner, STRPartition}
+import org.apache.spark.sql.types._
+import org.apache.spark.sql.util.FetchPointUtils
 import org.apache.spark.storage.StorageLevel
 
 /**
   * Created by gefei on 16-6-21.
   */
 private[sql] case class RTreeIndexedRelation(
-      output: Seq[Attribute],
-      child: SparkPlan,
-      table_name: Option[String],
-      column_keys: List[Attribute],
-      index_name: String)(var _indexedRDD: IndexRDD = null,
-                          var global_rtree: RTree = null)
+  output: Seq[Attribute],
+  child: SparkPlan,
+  table_name: Option[String],
+  column_keys: List[Attribute],
+  index_name: String)(var _indexedRDD: IndexRDD = null,
+                      var global_rtree: RTree = null)
   extends IndexedRelation with MultiInstanceRelation {
+
+  var isPoint = false
+
   private def checkKeys: Boolean = {
-    for (i <- column_keys.indices)
-      if (!(column_keys(i).dataType.isInstanceOf[DoubleType] ||
-        column_keys(i).dataType.isInstanceOf[IntegerType])) {
-        return false
+    if (column_keys.length > 1) {
+      for (i <- column_keys.indices)
+        if (!column_keys(i).dataType.isInstanceOf[NumericType]) {
+          return false
+        }
+      true
+    } else { // length = 1; we do not support one dimension R-tree
+      column_keys.head.dataType match {
+        case t: ShapeType =>
+          isPoint = true
+          true
+        case _ => false
       }
-    true
+    }
   }
   require(checkKeys)
 
+  val dimension = FetchPointUtils.getFromRow(child.execute().first(), column_keys, child, isPoint)
+    .coord.length
 
   if (_indexedRDD == null) {
     buildIndex()
@@ -57,19 +70,20 @@ private[sql] case class RTreeIndexedRelation(
     val maxEntriesPerNode = child.sqlContext.conf.maxEntriesPerNode
     val sampleRate = child.sqlContext.conf.sampleRate
     val transferThreshold = child.sqlContext.conf.transferThreshold
-
     val dataRDD = child.execute().map(row => {
-      val now = column_keys.map(x =>
-        BindReferences.bindReference(x, child.output).eval(row).asInstanceOf[Number].doubleValue()
-      ).toArray
-      (new Point(now), row)
+      (FetchPointUtils.getFromRow(row, column_keys, child, isPoint), row)
     })
 
-    val dimension = column_keys.length
     val max_entries_per_node = maxEntriesPerNode
-    val (partitionedRDD, mbr_bounds) = STRPartition(dataRDD, dimension, numShufflePartitions,
-      sampleRate, transferThreshold, max_entries_per_node)
-
+    val (partitionedRDD, mbr_bounds) = child.sqlContext.conf.partitionMethod match {
+      case "KDTreeParitioner" => KDTreePartitioner(dataRDD, dimension, numShufflePartitions,
+        sampleRate, transferThreshold)
+      case "QuadTreePartitioner" => QuadTreePartitioner(dataRDD, dimension, numShufflePartitions,
+        sampleRate, transferThreshold)
+      // only RTree needs max_entries_per_node parameter
+      case _ => STRPartition (dataRDD, dimension, numShufflePartitions,
+        sampleRate, transferThreshold, max_entries_per_node)// default
+    }
 
     val indexed = partitionedRDD.mapPartitions { iter =>
       val data = iter.toArray

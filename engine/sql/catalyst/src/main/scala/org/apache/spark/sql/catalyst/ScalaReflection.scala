@@ -657,6 +657,8 @@ trait ScalaReflection {
       case t if t <:< localTypeOf[Option[_]] =>
         val TypeRef(_, _, Seq(optType)) = t
         Schema(schemaFor(optType).dataType, nullable = true)
+      case t if t <:< localTypeOf[org.apache.spark.sql.spatial.Point] =>
+        Schema(ShapeType, nullable = true)
       case t if t <:< localTypeOf[Array[Byte]] => Schema(BinaryType, nullable = true)
       case t if t <:< localTypeOf[Array[_]] =>
         val TypeRef(_, _, Seq(elementType)) = t
@@ -707,8 +709,10 @@ trait ScalaReflection {
       case t if t <:< localTypeOf[java.lang.Short] => Schema(ShortType, nullable = true)
       case t if t <:< localTypeOf[java.lang.Byte] => Schema(ByteType, nullable = true)
       case t if t <:< localTypeOf[java.lang.Boolean] => Schema(BooleanType, nullable = true)
-      case t if t <:< localTypeOf[com.vividsolutions.jts.geom.Geometry] => Schema(ShapeType, nullable = true)
-      case t if t <:< localTypeOf[org.apache.spark.sql.spatial.Shape] => Schema(ShapeType, nullable = true)
+      case t if t <:< localTypeOf[com.vividsolutions.jts.geom.Geometry] =>
+        Schema(ShapeType, nullable = true)
+      case t if t <:< localTypeOf[org.apache.spark.sql.spatial.Shape] =>
+        Schema(ShapeType, nullable = true)
       case t if t <:< definitions.IntTpe => Schema(IntegerType, nullable = false)
       case t if t <:< definitions.LongTpe => Schema(LongType, nullable = false)
       case t if t <:< definitions.DoubleTpe => Schema(DoubleType, nullable = false)

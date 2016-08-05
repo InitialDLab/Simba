@@ -22,8 +22,7 @@ import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.util.NumberConverter
 import org.apache.spark.sql.execution.LeafNode
 import org.apache.spark.sql.spatial._
-
-import scala.collection.mutable
+import org.apache.spark.sql.util.FetchPointUtils
 
 /**
   * Created by dong on 1/20/16.
@@ -39,38 +38,27 @@ private[sql] case class IndexedRelationScan(attributes: Seq[Attribute],
   private val s_threshold = sqlContext.conf.indexSelectivityThreshold
   private val index_threshold = sqlContext.conf.indexSizeThreshold
 
-  class DisOrdering(origin: Point, column_keys: List[Attribute]) extends Ordering[InternalRow] {
+  class DisOrdering(origin: Point, column_keys: List[Attribute], isPoint: Boolean)
+    extends Ordering[InternalRow] {
     def compare(a: InternalRow, b: InternalRow): Int = {
-      var dis_a = 0.0
-      var dis_b = 0.0
-      for (i <- column_keys.indices) {
-        val tmp_a = BindReferences.bindReference(column_keys(i), relation.output).eval(a)
-          .asInstanceOf[Number].doubleValue()
-        val tmp_b = BindReferences.bindReference(column_keys(i), relation.output).eval(b)
-          .asInstanceOf[Number].doubleValue()
-        dis_a += (tmp_a - origin.coord(i)) * (tmp_a - origin.coord(i))
-        dis_b += (tmp_b - origin.coord(i)) * (tmp_b - origin.coord(i))
-      }
-      dis_a.compare(dis_b)
+      val a_point = FetchPointUtils.getFromRow(a, column_keys, relation, isPoint)
+      val b_point = FetchPointUtils.getFromRow(b, column_keys, relation, isPoint)
+      origin.minDist(a_point).compare(origin.minDist(b_point))
     }
   }
 
   // Tool function: Distance between row and point
-  def evalDist(row: InternalRow, origin: Point, column_keys: List[Attribute]): Double = {
-    var dis = 0.0
-    for (i <- column_keys.indices) {
-      val tmp = BindReferences.bindReference(column_keys(i), relation.output).eval(row)
-        .asInstanceOf[Number].doubleValue()
-      dis += (tmp - origin.coord(i)) * (tmp - origin.coord(i))
-    }
-    Math.sqrt(dis)
+  def evalDist(row: InternalRow, origin: Point, column_keys: List[Attribute],
+               isPoint: Boolean): Double = {
+    origin.minDist(FetchPointUtils.getFromRow(row, column_keys, relation, isPoint))
   }
 
   override protected def doExecute(): RDD[InternalRow] = {
     relation match {
       case treemap @ TreeMapIndexedRelation(_, _, _, column_keys, _) =>
         if (predicates.nonEmpty) {
-          val intervals = predicates.map(Interval.conditionToInterval(_, column_keys)._1)
+          // for treemap, the length of column_keys is 1
+          val intervals = predicates.map(Interval.conditionToInterval(_, column_keys, 1)._1)
 
           // global index
           val bounds = treemap.range_bounds
@@ -100,7 +88,7 @@ private[sql] case class IndexedRelationScan(attributes: Seq[Attribute],
         }
       case treap @ TreapIndexedRelation(_, _, _, column_keys, _) =>
         if (predicates.nonEmpty) {
-          val intervals = predicates.map(Interval.conditionToInterval(_, column_keys)._1)
+          val intervals = predicates.map(Interval.conditionToInterval(_, column_keys, 1)._1)
 
           // global index
           val bounds = treap.range_bounds
@@ -129,16 +117,17 @@ private[sql] case class IndexedRelationScan(attributes: Seq[Attribute],
       case rtree @ RTreeIndexedRelation(_, _, _, column_keys, _) =>
         if (predicates.nonEmpty) {
           predicates.map { predicate =>
-            val (intervals, exps) = Interval.conditionToInterval(predicate, column_keys)
+            val (intervals, exps) = Interval.conditionToInterval(predicate, column_keys,
+              rtree.dimension)
             val queryMBR = new MBR(new Point(intervals.map(_.min._1)),
               new Point(intervals.map(_.max._1)))
             var cir_ranges = Array[(Point, Double)]()
             var knn_res: Array[InternalRow] = null
 
             exps.foreach {
-              case InKNN(point: Seq[NamedExpression], target: Seq[Literal], l: Literal) =>
-                val query_point = new Point(target.map(NumberConverter.literalToDouble).toArray)
-                val ord = new DisOrdering(query_point, column_keys)
+              case InKNN(point: Expression, target: Literal, l: Literal) =>
+                val query_point = target.value.asInstanceOf[Point]
+                val ord = new DisOrdering(query_point, column_keys, rtree.isPoint)
                 val k = l.value.asInstanceOf[Number].intValue()
 
                 def knnGlobalPrune(global_part: Seq[Int]): Array[InternalRow] = {
@@ -154,20 +143,21 @@ private[sql] case class IndexedRelationScan(attributes: Seq[Attribute],
                 }
 
                 // first prune, get k partitions, but partitions may not be final partitions
-                val global_part1 = rtree.global_rtree.kNN(query_point, {(a: Point, b: MBR) => b.maxDist(a)},
-                  k, keepSame = false).map(_._2).toSeq
+                val global_part1 = rtree.global_rtree.kNN(query_point,
+                  {(a: Point, b: MBR) => b.maxDist(a)}, k, keepSame = false).map(_._2).toSeq
                 val tmp_ans = knnGlobalPrune(global_part1) // to get a safe and tighter bound
-                val theta = evalDist(tmp_ans.last, query_point, column_keys)
+                val theta = evalDist(tmp_ans.last, query_point, column_keys, rtree.isPoint)
 
                 // second prune, with the safe bound theta, to get the final global result
-                val global_part2 = (rtree.global_rtree.circleRange(query_point, theta).map(_._2) diff global_part1).toSeq
+                val global_part2 = (rtree.global_rtree.circleRange(query_point, theta).
+                  map(_._2) diff global_part1).toSeq
                 val tmp_knn_res = if (global_part2.isEmpty) tmp_ans
                 else knnGlobalPrune(global_part2).union(tmp_ans).sorted(ord).take(k)
 
                 if (knn_res == null) knn_res = tmp_knn_res
-                else knn_res = knn_res.intersect(tmp_knn_res) // for multiple knn predicate
-              case InCircleRange(point: Seq[NamedExpression], target: Seq[Literal], l: Literal) =>
-                val query_point = new Point(target.map(NumberConverter.literalToDouble).toArray)
+                else knn_res = knn_res.intersect(tmp_knn_res)
+              case InCircleRange(point: Expression, target: Literal, l: Literal) =>
+                val query_point = target.value.asInstanceOf[Point]
                 val r = NumberConverter.literalToDouble(l)
                 cir_ranges = cir_ranges :+ (query_point, r)
             }
@@ -195,10 +185,9 @@ private[sql] case class IndexedRelationScan(attributes: Seq[Attribute],
                     val range_res = if (selectivity_enabled) {
                       val res = index.range(queryMBR, s_level_limit, s_threshold)
                       if (res.isEmpty) { // full scan
-                        packed.data.filter(row => queryMBR.intersects(new Point(
-                          column_keys.map(x => BindReferences.bindReference(x, relation.output)
-                            .eval(row).asInstanceOf[Number].doubleValue()).toArray
-                        )))
+                        packed.data.filter(row => queryMBR.intersects(
+                          FetchPointUtils.getFromRow(row, column_keys, relation, rtree.isPoint)
+                        ))
                       } else res.get.map(x => packed.data(x._2))
                     } else index.range(queryMBR).map(x => packed.data(x._2))
                     if (cir_ranges.nonEmpty) { // circle range processing
@@ -214,11 +203,8 @@ private[sql] case class IndexedRelationScan(attributes: Seq[Attribute],
               else tmp_rdd
             } else {
               val final_res = knn_res.filter {row =>
-                val tmp_point = new Point(
-                  column_keys.map(x => BindReferences.bindReference(x, relation.output)
-                    .eval(row).asInstanceOf[Number].doubleValue()).toArray
-                )
-
+                val tmp_point = FetchPointUtils.getFromRow(row, column_keys, relation,
+                  rtree.isPoint)
                 val contain = cir_ranges.forall(x => tmp_point.minDist(x._1) <= x._2)
                 contain && queryMBR.contains(tmp_point)
               }
