@@ -32,9 +32,17 @@ object DataSourceTest {
     val sc = new SparkContext(sparkConf)
     val sqlContext = new SQLContext(sc)
 
-    val df = sqlContext.read.format("org.apache.spark.sql.execution.datasources.spatial")
-          .option("type", "geojson")
-      .load("./examples/src/main/resources/example.geo.json")
-    df.show()
+
+    val df1 = sqlContext.read.format("org.apache.spark.sql.execution.datasources.spatial")
+      .option("type", "shapefile").load("/home/gefei/data/geo_data/tl_2015_04_elsd.shp")
+    df1.show()
+
+    val df2 = sqlContext.read.format("org.apache.spark.sql.execution.datasources.spatial")
+          .option("type", "osm").load("./examples/src/main/resources/myosmfile.osm")
+    df2.show()
+
+    val df3 = sqlContext.read.format("org.apache.spark.sql.execution.datasources.spatial")
+      .option("type", "geojson").load("./examples/src/main/resources/example.geo.json")
+    df3.show()
   }
 }
