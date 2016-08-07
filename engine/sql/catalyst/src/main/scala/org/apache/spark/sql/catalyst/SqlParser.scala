@@ -22,7 +22,7 @@ import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.aggregate._
 import org.apache.spark.sql.catalyst.plans._
 import org.apache.spark.sql.catalyst.plans.logical._
-import org.apache.spark.sql.catalyst.util.DataTypeParser
+import org.apache.spark.sql.catalyst.util.{NumberConverter, DataTypeParser}
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.types.CalendarInterval
 import org.apache.spark.sql.spatial.Point
@@ -379,7 +379,7 @@ object SqlParser extends AbstractSparkSQLParser with DataTypeParser {
   protected lazy val pointLiteral: Parser[Literal] =
    (POINT ~ "(" ~> repsep(numericLiteral, ",") <~ ")") ^^
   {case points => Literal(new Point(points.toArray.map(x =>
-    x.value.asInstanceOf[Number].doubleValue())))}
+    NumberConverter.literalToDouble(x))))}
 
   protected lazy val unsignedFloat: Parser[String] =
     ( "." ~> numericLit ^^ { u => "0." + u }

@@ -155,7 +155,7 @@ object ExtractSpatialJoinKeys extends Logging with PredicateHelper {
         val right_key = children.head
         val left_key = children(1)
         val k = children.last.asInstanceOf[Literal]
-        Some((left_key, right_key, k, ZKNNJoin, left, right))
+        Some((left_key, right_key, k, DistanceJoin, left, right))
       case _ => None
     }
   }
