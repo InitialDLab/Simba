@@ -64,7 +64,7 @@ private[sql] case class QuadTreeIndexedRelation(
     })
 
     val dimension = column_keys.length
-    val (partitionedRDD, global_qtree) = QuadTreePartitioner(dataRDD, dimension,
+    val (partitionedRDD, _, global_qtree) = QuadTreePartitioner(dataRDD, dimension,
       numShufflePartitions, sampleRate, tranferThreshold)
 
     val indexed = partitionedRDD.mapPartitions { iter =>

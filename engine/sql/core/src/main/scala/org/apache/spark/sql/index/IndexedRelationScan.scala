@@ -236,12 +236,14 @@ private[sql] case class IndexedRelationScan(attributes: Seq[Attribute],
               val index = packed.index.asInstanceOf[QuadTree]
               if (index != null){
                 val range_res = index.range(queryMBR)
-                val circle_res = circle_ranges.map{cir =>
-                  index.circleRange(cir._1, cir._2)
-                }.reduce((a, b) => a.union(b))
-                range_res.intersect(circle_res).map(x => packed.data(x._2)).iterator
-              }
-              else Iterator[InternalRow]()
+                val temp = if (circle_ranges.nonEmpty) {
+                  val circle_res = circle_ranges.map{cir =>
+                    index.circleRange(cir._1, cir._2)
+                  }.reduce((a, b) => a.union(b))
+                  range_res.intersect(circle_res)
+                } else range_res
+                temp.map(x => packed.data(x._2)).iterator
+              } else Iterator[InternalRow]()
             }
           }.reduce(_ union _).map(_.copy()).distinct()
         } else qtree._indexedRDD.flatMap(_.data)

@@ -78,8 +78,10 @@ private[sql] case class RTreeIndexedRelation(
     val (partitionedRDD, mbr_bounds) = child.sqlContext.conf.partitionMethod match {
       case "KDTreeParitioner" => KDTreePartitioner(dataRDD, dimension, numShufflePartitions,
         sampleRate, transferThreshold)
-//      case "QuadTreePartitioner" => QuadTreePartitioner(dataRDD, dimension, numShufflePartitions,
-//        sampleRate, transferThreshold)
+      case "QuadTreePartitioner" =>
+        val temp = QuadTreePartitioner(dataRDD, dimension, numShufflePartitions,
+              sampleRate, transferThreshold)
+        (temp._1, temp._2)
       // only RTree needs max_entries_per_node parameter
       case _ => STRPartition (dataRDD, dimension, numShufflePartitions,
         sampleRate, transferThreshold, max_entries_per_node)// default

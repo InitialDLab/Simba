@@ -36,7 +36,7 @@ object QuadTreePartitioner {
 
   def apply(origin: RDD[(Point, InternalRow)], dimension: Int, est_partition: Int,
             sample_rate: Double, transfer_threshold: Long)
-  : (RDD[(Point, InternalRow)], QuadTree) = {
+  : (RDD[(Point, InternalRow)], Array[(MBR, Int)], QuadTree) = {
     val rdd = if (sortBasedShuffleOn) {
       origin.mapPartitions { iter => iter.map(row => (row._1, row._2.copy())) }
     } else {
@@ -50,7 +50,7 @@ object QuadTreePartitioner {
       transfer_threshold, rdd)
     val shuffled = new ShuffledRDD[Point, InternalRow, InternalRow](rdd, part)
     shuffled.setSerializer(new SparkSqlSerializer(new SparkConf(false)))
-    (shuffled, part.global_index)
+    (shuffled, part.mbrBound, part.global_index)
   }
 }
 
