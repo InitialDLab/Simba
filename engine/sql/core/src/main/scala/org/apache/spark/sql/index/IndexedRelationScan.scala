@@ -217,15 +217,30 @@ private[sql] case class IndexedRelationScan(attributes: Seq[Attribute],
       case qtree @ QuadTreeIndexedRelation(_, _, _, column_keys, _) =>
         if (predicates.nonEmpty){
           predicates.map{ predicate =>
-            val (intervals, exps) = Interval.conditionToInterval(predicate, column_keys)
-            val queryMBR = new MBR(new Point(intervals.map(_.min._1)),
-              new Point(intervals.map(_.max._1)))
-            val global_part = qtree.global_index.range(queryMBR, searchMBR = true).map(_._2).toSeq
-            val pruned = new PartitionPruningRDD(qtree._indexedRDD, global_part.contains)
+            val (intervals, exps) = Interval.conditionToInterval(predicate, column_keys, 2)
+            val queryMBR = MBR(Point(intervals.map(_.min._1)),
+              Point(intervals.map(_.max._1)))
+            var global_part = qtree.global_index.range(queryMBR, searchMBR = true).map(_._2).toSeq
+            var circle_ranges = Array[(Point, Double)]()
+            exps.foreach { // InCircleRange global pruning
+              case InCircleRange(point: Expression, target: Literal, l: Literal) =>
+                val query_point = target.value.asInstanceOf[Point]
+                val r = NumberConverter.literalToDouble(l)
+                circle_ranges = circle_ranges :+ (query_point -> r)
+                global_part = global_part.intersect(
+                  qtree.global_index.circleRange(query_point, r, searchMBR = true))
+            }
 
+            val pruned = new PartitionPruningRDD(qtree._indexedRDD, global_part.contains)
             pruned.flatMap{packed =>
               val index = packed.index.asInstanceOf[QuadTree]
-              if (index != null) index.range(queryMBR).map(x => packed.data(x._2)).iterator
+              if (index != null){
+                val range_res = index.range(queryMBR)
+                val circle_res = circle_ranges.map{cir =>
+                  index.circleRange(cir._1, cir._2)
+                }.reduce((a, b) => a.union(b))
+                range_res.intersect(circle_res).map(x => packed.data(x._2)).iterator
+              }
               else Iterator[InternalRow]()
             }
           }.reduce(_ union _).map(_.copy()).distinct()

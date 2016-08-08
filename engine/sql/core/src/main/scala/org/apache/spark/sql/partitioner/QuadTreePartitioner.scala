@@ -101,7 +101,8 @@ class QuadTreePartitioner(est_partition: Int,
     }
 
     var count = 0
-    val tmp_qtree = QuadTree(sampled.zipWithIndex)
+    val tmp_qtree = QuadTree(sampled.zipWithIndex,
+      (data_bounds.min.head, data_bounds.min(1), data_bounds.max.head, data_bounds.max(1)))
 
     def searchMBROnQuadTree(node: QuadTreeNode): Array[(MBR, Int)] = {
       val ans = mutable.ArrayBuffer[(MBR, Int)]()

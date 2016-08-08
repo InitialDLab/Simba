@@ -61,7 +61,7 @@ object IndexExample {
 
     val sqlQuery = "SELECT * FROM point1 " +
       "WHERE POINT(point1.x, point1.y) " +
-      "IN RANGE( POINT(100, 222), POINT(300, 333))" +
+      "IN CIRCLERANGE( POINT(100, 100), 1.5 )" +
       "ORDER BY x"
     val df = sqlContext.sql(sqlQuery)
     println(df.queryExecution)

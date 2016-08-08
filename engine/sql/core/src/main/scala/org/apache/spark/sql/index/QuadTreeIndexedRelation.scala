@@ -75,8 +75,6 @@ private[sql] case class QuadTreeIndexedRelation(
       Array(IPartition(data.map(_._2), index)).iterator
     }.persist(StorageLevel.MEMORY_AND_DISK_SER)
 
-    val partitionSize = indexed.mapPartitions(iter => iter.map(_.data.length)).collect()
-
     indexed.setName(table_name.map(name => s"$name $index_name").getOrElse(child.toString))
     _indexedRDD = indexed
     global_index = global_qtree

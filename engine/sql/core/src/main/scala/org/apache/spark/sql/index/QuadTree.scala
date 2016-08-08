@@ -82,12 +82,55 @@ case class QuadTree(root: QuadTreeNode) extends Index with Serializable{
     temp_result.map(item => (Point(Array(item._1, item._2)), item._3))
   }
 
+  def circleRange(x: Double, y: Double, r: Double,
+                  searchMBR: Boolean): Array[(Double, Double, Int)] = {
+    val res = new mutable.ArrayBuffer[(Double, Double, Int)]()
+    if (!searchMBR) res ++= searchRecurCircle(root, x, y, r)
+    else res ++= searchMBRRecurCircle(root, x, y, r)
+    null
+  }
+
+  // interface same with RTree
+  def circleRange(queryPoint: Point, r: Double, searchMBR: Boolean = false): Array[(Point, Int)] = {
+    val temp_result = circleRange(queryPoint.coord.head, queryPoint.coord(1), r, searchMBR)
+    temp_result.map(item => (Point(Array(item._1, item._2)), item._3))
+  }
+
+  private def distance(x1: Double, y1: Double, x2: Double, y2: Double) =
+    Math.sqrt((x1 - x2) *(x1 - x2) + (y1 - y2) * (y1 - y2))
+
+  def searchRecurCircle(node: QuadTreeNode, x: Double, y: Double,
+                         r: Double): mutable.ArrayBuffer[(Double, Double, Int)] = {
+    val res = new mutable.ArrayBuffer[(Double, Double, Int)]()
+    if (node.objects == null) for (child <- node.children)
+      res ++= searchRecurCircle(child, x, y, r)
+    else res ++= node.objects.filter(item => distance(item._1, item._2, x, y) <= r)
+    res
+  }
+
+  def searchMBRRecurCircle(node: QuadTreeNode, x: Double, y: Double,
+                           r: Double): mutable.ArrayBuffer[(Double, Double, Int)] = {
+    val res = new mutable.ArrayBuffer[(Double, Double, Int)]()
+    if (node.objects == null){
+      if (node.children != null) for (child <- node.children)
+        res ++ searchMBRRecurCircle(child, x, y, r)
+    } else {
+      if (distance(node.x_low, node.y_low, x, y) <= r ||
+        distance(node.x_low, node.y_high, x, y) <= r ||
+        distance(node.x_high, node.y_low, x, y) <= r ||
+        distance(node.x_high, node.y_high, x, y) <= r){
+        res ++= node.objects.head :: Nil
+      }
+    }
+    res
+  }
+
   def searchMBRRecur(node: QuadTreeNode, x_min: Double, y_min: Double,
                      x_max: Double, y_max: Double): mutable.ArrayBuffer[(Double, Double, Int)] = {
     val res = new mutable.ArrayBuffer[(Double, Double, Int)]()
     if (node.objects == null) {
-      if (node.children != null) for (child <- node.children) res ++= searchMBRRecur(child,
-          x_min: Double, y_min: Double, x_max: Double, y_max: Double)
+      if (node.children != null) for (child <- node.children)
+        res ++= searchMBRRecur(child, x_min, y_min, x_max, y_max)
     }
     else {
       def valueInrange(v: Double, min: Double, max: Double) = (v <= max) && (v >= min)
@@ -102,8 +145,8 @@ case class QuadTree(root: QuadTreeNode) extends Index with Serializable{
   def searchRecur(node: QuadTreeNode, x_min: Double, y_min: Double,
                   x_max: Double, y_max: Double): mutable.ArrayBuffer[(Double, Double, Int)] = {
     val res = new mutable.ArrayBuffer[(Double, Double, Int)]()
-    if (node.objects == null) for (child <- node.children) res ++= searchRecur(child,
-      x_min: Double, y_min: Double, x_max: Double, y_max: Double)
+    if (node.objects == null) for (child <- node.children)
+      res ++= searchRecur(child, x_min, y_min, x_max, y_max)
     else {
       res ++= node.objects.filter(item => item._1 >= x_min
         && item._1 <= x_max && item._2 >= y_min && item._2 <= y_max)
@@ -113,18 +156,25 @@ case class QuadTree(root: QuadTreeNode) extends Index with Serializable{
 }
 
 object QuadTree{
+  def apply(entries: Array[(Point, Int)],
+            boundary: (Double, Double, Double, Double)): QuadTree = {
+    this(entries.map(item => (item._1.coord(0), item._1.coord(1), item._2)), boundary)
+  }
   def apply(entries: Array[(Point, Int)]): QuadTree = {
-    this(entries.map(item => (item._1.coord(0), item._1.coord(1), item._2)))
+    this(entries.map(item => (item._1.coord(0), item._1.coord(1), item._2)), null)
   }
 
-  def apply(entries: Array[(Double, Double, Int)]): QuadTree = {
+  def apply(entries: Array[(Double, Double, Int)],
+            boundary: (Double, Double, Double, Double) = null): QuadTree = {
     // collect the border of the total entries
-    val (x_min, y_min, x_max, y_max) = entries.aggregate(
-      (Double.MaxValue, Double.MaxValue, Double.MinValue, Double.MinValue)
-    )((a: (Double, Double, Double, Double), b: (Double, Double, Int)) =>
-      (math.min(a._1, b._1), math.min(a._2, b._2), math.max(a._3, b._1), math.max(a._4, b._2)),
-      (a: (Double, Double, Double, Double), b: (Double, Double, Double, Double)) =>
-      (math.min(a._1, b._1), math.min(a._2, b._2), math.max(a._3, b._3), math.max(a._4, b._4)))
+    val (x_min, y_min, x_max, y_max) =
+      if (boundary == null) entries.aggregate(
+        (Double.MaxValue, Double.MaxValue, Double.MinValue, Double.MinValue)
+        )((a: (Double, Double, Double, Double), b: (Double, Double, Int)) =>
+        (math.min(a._1, b._1), math.min(a._2, b._2), math.max(a._3, b._1), math.max(a._4, b._2)),
+        (a: (Double, Double, Double, Double), b: (Double, Double, Double, Double)) =>
+        (math.min(a._1, b._1), math.min(a._2, b._2), math.max(a._3, b._3), math.max(a._4, b._4)))
+      else boundary
     val root = new QuadTreeNode(x_min, y_min, x_max, y_max, null, entries)
     val quadTree = new QuadTree(root)
     quadTree.bulkload()
