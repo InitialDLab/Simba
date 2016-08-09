@@ -54,7 +54,9 @@ private[sql] case class IndexedRelationScan(attributes: Seq[Attribute],
   }
 
   override protected def doExecute(): RDD[InternalRow] = {
-    relation match {
+    if (predicates.size == 1 && predicates.head.toString == "true"){
+      relation._indexedRDD.flatMap(_.data)
+    } else relation match {
       case treemap @ TreeMapIndexedRelation(_, _, _, column_keys, _) =>
         if (predicates.nonEmpty) {
           // for treemap, the length of column_keys is 1
@@ -212,6 +214,39 @@ private[sql] case class IndexedRelationScan(attributes: Seq[Attribute],
             }
           }.reduce((a, b) => a.union(b)).map(_.copy()).distinct()
         } else rtree._indexedRDD.flatMap(_.data)
+      case qtree @ QuadTreeIndexedRelation(_, _, _, column_keys, _) =>
+        if (predicates.nonEmpty){
+          predicates.map{ predicate =>
+            val (intervals, exps) = Interval.conditionToInterval(predicate, column_keys, 2)
+            val queryMBR = MBR(Point(intervals.map(_.min._1)),
+              Point(intervals.map(_.max._1)))
+            var global_part = qtree.global_index.range(queryMBR, searchMBR = true).map(_._2).toSeq
+            var circle_ranges = Array[(Point, Double)]()
+            exps.foreach { // InCircleRange global pruning
+              case InCircleRange(point: Expression, target: Literal, l: Literal) =>
+                val query_point = target.value.asInstanceOf[Point]
+                val r = NumberConverter.literalToDouble(l)
+                circle_ranges = circle_ranges :+ (query_point -> r)
+                global_part = global_part.intersect(
+                  qtree.global_index.circleRange(query_point, r, searchMBR = true))
+            }
+
+            val pruned = new PartitionPruningRDD(qtree._indexedRDD, global_part.contains)
+            pruned.flatMap{packed =>
+              val index = packed.index.asInstanceOf[QuadTree]
+              if (index != null){
+                val range_res = index.range(queryMBR)
+                val temp = if (circle_ranges.nonEmpty) {
+                  val circle_res = circle_ranges.map{cir =>
+                    index.circleRange(cir._1, cir._2)
+                  }.reduce((a, b) => a.union(b))
+                  range_res.intersect(circle_res)
+                } else range_res
+                temp.map(x => packed.data(x._2)).iterator
+              } else Iterator[InternalRow]()
+            }
+          }.reduce(_ union _).map(_.copy()).distinct()
+        } else qtree._indexedRDD.flatMap(_.data)
       case other =>
         other.indexedRDD.flatMap(_.data)
     }

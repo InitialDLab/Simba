@@ -28,6 +28,7 @@ object IndexType {
     case "treemap" => TreeMapType
     case "hashmap" => HashMapType
     case "treap" => TreapType
+    case "quadtree" => QuadTreeType
     case _ => null
   }
 }
@@ -38,3 +39,4 @@ case object RTreeType extends IndexType
 case object TreeMapType extends IndexType
 case object HashMapType extends IndexType
 case object TreapType extends IndexType
+case object QuadTreeType extends IndexType
