@@ -16,18 +16,18 @@
 
 package org.apache.spark.sql.index
 
+import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.spatial.{MBR, Point}
-import org.scalatest.FunSuite
 
 /**
   * Created by Zhihao Bai on 16-8-3.
   */
-class QuadTreeSuite extends FunSuite{
+class QuadTreeSuite extends SparkFunSuite{
   var entries = new Array[(Point, Int)](221)
   var cnt = 0
   for (i <- -10 to 10){
-    for(j <- -10 to 10){
-      if(Math.abs(i) + Math.abs(j) <= 10) {
+    for (j <- -10 to 10){
+      if (Math.abs(i) + Math.abs(j) <= 10) {
         entries(cnt) = (new Point(Array(i, j)), i + j)
         cnt = cnt + 1
       }
@@ -35,29 +35,30 @@ class QuadTreeSuite extends FunSuite{
   }
   val quadtree = QuadTree.apply(entries)
 
-  def legal(x: (Double,Double, Int)): Boolean = {
+  def legal(x: (Double, Double, Int)): Boolean = {
     val a = x._1.toInt
     val b = x._2.toInt
     if(a < 0 || a > 10) false
-    else if(b < 0 || b > 10) false
-    else if(Math.abs(a) + Math.abs(b) > 10) false
-    else if(a + b != x._3) false
+    else if (b < 0 || b > 10) false
+    else if (Math.abs(a) + Math.abs(b) > 10) false
+    else if (a + b != x._3) false
     else true
   }
 
   def legal(x: (Point, Int)): Boolean = legal(x._1.coord(0), x._1.coord(1), x._2)
 
   test("QuadTree: range(doubles)"){
-    val range = quadtree.range(0.0, 0.0, 9.0, 9.0)
+    val range = quadtree.range(0.0, 0.0, 9.0, 9.0, searchMBR = false)
 
     range.foreach(x => assert(legal(x)))
 
     var count = 0
     for (i <- -10 to 10){
-      for(j <- -10 to 10){
-        if(Math.abs(i) + Math.abs(j) <= 10) {
-          if(i >= 0 && j >= 0 && i <= 9 && j <= 9)
+      for (j <- -10 to 10){
+        if (Math.abs(i) + Math.abs(j) <= 10) {
+          if (i >= 0 && j >= 0 && i <= 9 && j <= 9){
             count = count + 1
+          }
         }
       }
     }
@@ -74,10 +75,11 @@ class QuadTreeSuite extends FunSuite{
 
     var count = 0;
     for (i <- -10 to 10){
-      for(j <- -10 to 10){
-        if(Math.abs(i) + Math.abs(j) <= 10) {
-          if(i >= 0 && j >= 0 && i <= 9 && j <= 9)
+      for (j <- -10 to 10){
+        if (Math.abs(i) + Math.abs(j) <= 10) {
+          if (i >= 0 && j >= 0 && i <= 9 && j <= 9) {
             count = count + 1
+          }
         }
       }
     }
