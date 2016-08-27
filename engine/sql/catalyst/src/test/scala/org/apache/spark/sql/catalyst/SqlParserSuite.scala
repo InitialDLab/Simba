@@ -662,9 +662,8 @@ class SqlParserSuite extends PlanTest {
   }
 
   test("test primary with comparison operations") {
-    testBinop("SELECT x[y]", UnresolvedExtractValue)
 
-/*    var parsed3 = SqlParser.parse("SELECT x.y")
+    var parsed3 = SqlParser.parse("SELECT (x).y")
     var expected3 = Project(
       UnresolvedAlias(
         UnresolvedExtractValue(
@@ -677,8 +676,8 @@ class SqlParserSuite extends PlanTest {
     println(parsed3)
     println(expected3)
     comparePlans(parsed3, expected3)
-*/
 
+    testBinop("SELECT x[y]", UnresolvedExtractValue)
     testUnop("SELECT (x)", x => x)
     testUnop("SELECT ~x", BitwiseNot)
     testUnop("SELECT x", x => x)
