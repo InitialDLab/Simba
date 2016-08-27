@@ -17,12 +17,13 @@
 
 package org.apache.spark.sql.catalyst
 
-import org.apache.spark.sql.catalyst.analysis.{UnresolvedAlias, UnresolvedAttribute, UnresolvedExtractValue, UnresolvedFunction, UnresolvedRelation, UnresolvedStar}
+import org.apache.spark.sql.catalyst.analysis._
 import org.apache.spark.sql.catalyst.expressions.aggregate.{AggregateExpression, Complete, Count, HyperLogLogPlusPlus}
-import org.apache.spark.sql.catalyst.expressions.{Add, Alias, And, Ascending, Attribute, BitwiseAnd, BitwiseNot, BitwiseOr, BitwiseXor, CaseKeyWhen, CaseWhen, Cast, Descending, Divide, EqualNullSafe, EqualTo, Expression, GreaterThan, GreaterThanOrEqual, In, InCircleRange, InKNN, InRange, IsNotNull, IsNull, LessThan, LessThanOrEqual, Like, Literal, Multiply, Not, Or, PointWrapperExpression, RLike, Remainder, SortOrder, Subtract, UnaryMinus, aggregate}
-import org.apache.spark.sql.catalyst.plans._
-import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, _}
+import org.apache.spark.sql.catalyst.expressions._
+import org.apache.spark.sql.catalyst.plans.{JoinType, _}
+import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.spatial.Point
+import org.apache.spark.sql.types.DecimalType.Expression
 import org.apache.spark.sql.types.{BooleanType, IntegerType, NullType, StringType}
 import org.apache.spark.unsafe.types.CalendarInterval
 
@@ -153,20 +154,21 @@ class SqlParserSuite extends PlanTest {
 
   /* Following tests are written by Zhihao Bai*/
 
+  def test(sql: String, expected: LogicalPlan): Unit = comparePlans(SqlParser.parse(sql), expected)
+
   def expr(ident: String) = UnresolvedAttribute.quoted(ident)
   def proj(ident: String) = Project(UnresolvedAlias(expr(ident)) :: Nil,OneRowRelation)
   def rela(ident: String) = UnresolvedRelation(TableIdentifier(ident, None), None)
-  def test(sql: String, expected: LogicalPlan): Unit = {
-    val parsed = SqlParser.parse(sql)
-    comparePlans(parsed, expected)
-  }
 
   test("test start1 with comparison operations") {
+    def testHelper(sql: String, Op: (LogicalPlan, LogicalPlan) => LogicalPlan): Unit =
+      test(sql, Op(proj("x"), proj("y")))
+
     test("SELECT x", proj("x"))
-    test("(SELECT x) UNION ALL (SELECT y)", Union(proj("x"), proj("y")))
-    test("(SELECT x) INTERSECT (SELECT y)", Intersect(proj("x"), proj("y")))
-    test("(SELECT x) EXCEPT (SELECT y)", Except(proj("x"), proj("y")))
-    test("(SELECT x) UNION (SELECT y)", Distinct(Union(proj("x"), proj("y"))))
+    testHelper("(SELECT x) UNION ALL  (SELECT y)", Union)
+    testHelper("(SELECT x) INTERSECT  (SELECT y)", Intersect)
+    testHelper("(SELECT x) EXCEPT     (SELECT y)", Except)
+    testHelper("(SELECT x) UNION      (SELECT y)", (x, y) => Distinct(Union(x, y)))
   }
 
   test("test select with comparison operations") {
@@ -198,21 +200,18 @@ class SqlParserSuite extends PlanTest {
   }
 
   test("test insert with comparison operations") {
-    val expectedOverwrite = InsertIntoTable(
-      rela("t"),
-      Map.empty[String, Option[String]],
-      proj("x"),
-      true,
-      false)
-    test("INSERT OVERWRITE TABLE t SELECT x", expectedOverwrite)
+    def testHelper(sql: String, OverOrInto:Boolean): Unit = {
+      val expected = InsertIntoTable(
+        rela("t"),
+        Map.empty[String, Option[String]],
+        proj("x"),
+        OverOrInto,
+        false)
+      test(sql, expected)
+    }
 
-    val expectedInto = InsertIntoTable(
-      rela("t"),
-      Map.empty[String, Option[String]],
-      proj("x"),
-      false,
-      false)
-    test("INSERT INTO TABLE t SELECT x", expectedInto)
+    testHelper("INSERT OVERWRITE  TABLE t SELECT x", true)
+    testHelper("INSERT INTO       TABLE t SELECT x", false)
   }
 
   test("test cte with comparison operations") {
@@ -266,15 +265,15 @@ class SqlParserSuite extends PlanTest {
   test("test joinConditions with comparison operations") {
     testRelations("SELECT x FROM y JOIN z ON POINT(0, 0) IN KNN (POINT(1, 1), 2)",
       Join(rela("y"), rela("z"), Inner,
-        Some(InKNN(PointWrapperExpression(Seq(Literal(0), Literal(0))),
-          PointWrapperExpression(Seq(Literal(1), Literal(1))),
+        Some(InKNN(Seq(Literal(0), Literal(0)),
+          Seq(Literal(1), Literal(1)),
           Literal(2))))
     )
 
     testRelations("SELECT x FROM y JOIN z ON POINT(0, 0) IN CIRCLERANGE (POINT(1, 1), 2)",
       Join(rela("y"), rela("z"), Inner,
-        Some(InCircleRange(PointWrapperExpression(Seq(Literal(0), Literal(0))),
-          PointWrapperExpression(Seq(Literal(1), Literal(1))),
+        Some(InCircleRange(Seq(Literal(0), Literal(0)),
+          Seq(Literal(1), Literal(1)),
           Literal(2))))
     )
 
@@ -285,53 +284,22 @@ class SqlParserSuite extends PlanTest {
   }
 
   test("test joinType with comparison operations") {
-    testRelations("SELECT x FROM y INNER JOIN z",
-      Join(rela("y"), rela("z"),
-        Inner,
-        None)
-    )
+    def testHelper(sql: String, t: JoinType):Unit =
+      testRelations(
+        sql,
+        Join(rela("y"), rela("z"),
+          t,
+          None)
+      )
 
-    testRelations("SELECT x FROM y LEFT SEMI JOIN z",
-      Join(rela("y"), rela("z"),
-        LeftSemi,
-        None)
-    )
-
-    testRelations("SELECT x FROM y LEFT OUTER JOIN z",
-      Join(rela("y"), rela("z"),
-        LeftOuter,
-        None)
-    )
-
-    testRelations("SELECT x FROM y RIGHT OUTER JOIN z",
-      Join(rela("y"), rela("z"),
-        RightOuter,
-        None)
-    )
-
-    testRelations("SELECT x FROM y FULL OUTER JOIN z",
-      Join(rela("y"), rela("z"),
-        FullOuter,
-        None)
-    )
-
-    testRelations("SELECT x FROM y KNN JOIN z",
-      Join(rela("y"), rela("z"),
-        KNNJoin,
-        None)
-    )
-
-    testRelations("SELECT x FROM y ZKNN JOIN z",
-      Join(rela("y"), rela("z"),
-        ZKNNJoin,
-        None)
-    )
-
-    testRelations("SELECT x FROM y DISTANCE JOIN z",
-      Join(rela("y"), rela("z"),
-        DistanceJoin,
-        None)
-    )
+    testHelper("SELECT x FROM y INNER       JOIN z", Inner)
+    testHelper("SELECT x FROM y LEFT SEMI   JOIN z", LeftSemi)
+    testHelper("SELECT x FROM y LEFT OUTER  JOIN z", LeftOuter)
+    testHelper("SELECT x FROM y RIGHT OUTER JOIN z", RightOuter)
+    testHelper("SELECT x FROM y FULL OUTER  JOIN z", FullOuter)
+    testHelper("SELECT x FROM y KNN         JOIN z", KNNJoin)
+    testHelper("SELECT x FROM y ZKNN        JOIN z", ZKNNJoin)
+    testHelper("SELECT x FROM y DISTANCE    JOIN z", DistanceJoin)
   }
 
   def testSort(sql: String, orders: Seq[SortOrder], orderOrSort: Boolean): Unit = {
@@ -348,7 +316,6 @@ class SqlParserSuite extends PlanTest {
       Seq(SortOrder(expr("y"), Ascending)),
       true
     )
-
     testSort("SELECT x SORT BY y ASC",
       Seq(SortOrder(expr("y"), Ascending)),
       false
@@ -369,17 +336,34 @@ class SqlParserSuite extends PlanTest {
       Seq(SortOrder(expr("y"), Ascending)),
       true
     )
-
     testSort("SELECT x ORDER BY y DESC",
       Seq(SortOrder(expr("y"), Descending)),
       true
     )
   }
 
-  def testExpr(sql: String, e: Expression): Unit = {
+  def testBinop(sql: String, Op: (Expression, Expression) => Expression): Unit = {
     val expected = Project(
       UnresolvedAlias(
-        e
+        Op(expr("x"), expr("y"))
+      ) :: Nil,
+      OneRowRelation
+    )
+    test(sql, expected)
+  }
+  def testBinopSeq(sql: String, Op: (Expression, Seq[Expression]) => Expression): Unit = {
+    val expected = Project(
+      UnresolvedAlias(
+        Op(expr("x"), Seq(expr("y")))
+      ) :: Nil,
+      OneRowRelation
+    )
+    test(sql, expected)
+  }
+  def testUnop(sql: String, Op: Expression => Expression): Unit = {
+    val expected = Project(
+      UnresolvedAlias(
+        Op(expr("x"))
       ) :: Nil,
       OneRowRelation
     )
@@ -387,176 +371,100 @@ class SqlParserSuite extends PlanTest {
   }
 
   test("test orExpression with comparison operations") {
-    testExpr("SELECT x OR y",
-      Or(expr("x"), expr("y"))
-    )
+    testBinop("SELECT x OR y", Or)
   }
 
   test("test andExpression with comparison operations") {
-    testExpr("SELECT x AND y",
-      And(expr("x"), expr("y"))
-    )
+    testBinop("SELECT x AND y", And)
   }
 
   test("test notExpression with comparison operations") {
-    testExpr("SELECT NOT x",
-      Not(expr("x"))
-    )
+    testUnop("SELECT NOT x", Not)
   }
 
   test("test comparisonExpression with comparison operations") {
-    val parsed1 = SqlParser.parse("SELECT POINT(0, 1) IN RANGE (POINT(0, 0), POINT(1, 1) )")
     val expected1 = Project(
       UnresolvedAlias(
-        InRange(PointWrapperExpression(Seq(Literal(0), Literal(1))),
-          Literal(Point(Array(0, 0))),
-          Literal(Point(Array(1, 1))))
+        InRange(Seq(Literal(0), Literal(1)),
+          Seq(Literal(0), Literal(0)),
+          Seq(Literal(1), Literal(1)))
       ) :: Nil,
       OneRowRelation
     )
-    assert(parsed1.toString == expected1.toString)
+    test("SELECT POINT(0, 1) IN RANGE (POINT(0, 0), POINT(1, 1) )", expected1)
 
-    val parsed2 = SqlParser.parse("SELECT POINT(0, 1) IN KNN (POINT(0, 0), 1 )")
     val expected2 = Project(
       UnresolvedAlias(
-        InKNN(PointWrapperExpression(Seq(Literal(0), Literal(1))),
-          Literal(Point(Array(0, 0))),
+        InKNN(Seq(Literal(0), Literal(1)),
+          Seq(Literal(0), Literal(0)),
           Literal(1))
       ) :: Nil,
       OneRowRelation
     )
-    assert(parsed2.toString == expected2.toString)
+    test("SELECT POINT(0, 1) IN KNN (POINT(0, 0), 1 )", expected2)
 
-    val parsed3 = SqlParser.parse("SELECT POINT(0, 1) IN CIRCLERANGE (POINT(0, 0), 1 )")
     val expected3 = Project(
       UnresolvedAlias(
-        InCircleRange(PointWrapperExpression(Seq(Literal(0), Literal(1))),
-          Literal(Point(Array(0, 0))),
+        InCircleRange(Seq(Literal(0), Literal(1)),
+          Seq(Literal(0), Literal(0)),
           Literal(1))
       ) :: Nil,
       OneRowRelation
     )
-    assert(parsed3.toString == expected3.toString)
+    test("SELECT POINT(0, 1) IN CIRCLERANGE (POINT(0, 0), 1 )", expected3)
 
-    testExpr("SELECT x = y",
-      EqualTo(expr("x"), expr("y"))
+    val expected12 = Project(
+      UnresolvedAlias(
+        Not(And(
+          GreaterThanOrEqual(expr("x"), expr("y")),
+          LessThanOrEqual(expr("x"), expr("z"))
+        ))
+      ) :: Nil,
+      OneRowRelation
     )
+    test("SELECT x NOT BETWEEN y AND z", expected12)
 
-    testExpr("SELECT x < y",
-      LessThan(expr("x"), expr("y"))
-    )
-
-    testExpr("SELECT x <= y",
-      LessThanOrEqual(expr("x"), expr("y"))
-    )
-
-    testExpr("SELECT x > y",
-      GreaterThan(expr("x"), expr("y"))
-    )
-
-    testExpr("SELECT x >= y",
-      GreaterThanOrEqual(expr("x"), expr("y"))
-    )
-
-    testExpr("SELECT x != y",
-      Not(EqualTo(expr("x"), expr("y")))
-    )
-
-    testExpr("SELECT x <> y",
-      Not(EqualTo(expr("x"), expr("y")))
-    )
-
-    testExpr("SELECT x <=> y",
-      EqualNullSafe(expr("x"), expr("y"))
-    )
-
-    testExpr("SELECT x NOT BETWEEN y AND z",
-      Not(And(
-        GreaterThanOrEqual(expr("x"), expr("y")),
-        LessThanOrEqual(expr("x"), expr("z"))
-      ))
-    )
-
-    testExpr("SELECT x RLIKE y",
-      RLike(expr("x"), expr("y"))
-    )
-
-    testExpr("SELECT x REGEXP y",
-      RLike(expr("x"), expr("y"))
-    )
-
-    testExpr("SELECT x LIKE y",
-      Like(expr("x"), expr("y"))
-    )
-
-    testExpr("SELECT x NOT LIKE y",
-      Not(Like(expr("x"), expr("y")))
-    )
-
-    testExpr("SELECT x IN(y)",
-      In(expr("x"), Seq(expr("y")))
-    )
-
-    testExpr("SELECT x NOT IN(y)",
-      Not(In(expr("x"), Seq(expr("y"))))
-    )
-
-    testExpr("SELECT x IS NULL",
-      IsNull(expr("x"))
-    )
-
-    testExpr("SELECT x IS NOT NULL",
-      IsNotNull(expr("x"))
-    )
+    testBinop("SELECT x = y", EqualTo)
+    testBinop("SELECT x < y", LessThan)
+    testBinop("SELECT x <= y", LessThanOrEqual)
+    testBinop("SELECT x > y", GreaterThan)
+    testBinop("SELECT x >= y", GreaterThanOrEqual)
+    testBinop("SELECT x != y", (x:Expression, y:Expression) => Not(EqualTo(x, y)))
+    testBinop("SELECT x <> y", (x:Expression, y:Expression) => Not(EqualTo(x, y)))
+    testBinop("SELECT x <=> y", EqualNullSafe)
+    testBinop("SELECT x RLIKE y", RLike)
+    testBinop("SELECT x REGEXP y", RLike)
+    testBinop("SELECT x LIKE y", Like)
+    testBinop("SELECT x NOT LIKE y", (x:Expression, y:Expression) => Not(Like(x, y)))
+    testBinopSeq("SELECT x IN(y)", In)
+    testBinopSeq("SELECT x NOT IN(y)", (x:Expression, y:Seq[Expression]) => Not(In(x, y)))
+    testUnop("SELECT x IS NULL", IsNull)
+    testUnop("SELECT x IS NOT NULL", IsNotNull)
   }
 
   test("test termExpression with comparison operations") {
-    testExpr("SELECT x + y",
-      Add(expr("x"),expr("y"))
-    )
-
-    testExpr("SELECT x - y",
-      Subtract(expr("x"),expr("y"))
-    )
+    testBinop("SELECT x + y", Add)
+    testBinop("SELECT x - y", Subtract)
   }
 
   test("test productExpression with comparison operations") {
-    testExpr("SELECT x * y",
-      Multiply(expr("x"),expr("y"))
-    )
-
-    testExpr("SELECT x / y",
-      Divide(expr("x"),expr("y"))
-    )
-
-    testExpr("SELECT x % y",
-      Remainder(expr("x"),expr("y"))
-    )
-
-    testExpr("SELECT x & y",
-      BitwiseAnd(expr("x"),expr("y"))
-    )
-
-    testExpr("SELECT x | y",
-      BitwiseOr(expr("x"),expr("y"))
-    )
-
-    testExpr("SELECT x ^ y",
-      BitwiseXor(expr("x"),expr("y"))
-    )
+    testBinop("SELECT x * y", Multiply)
+    testBinop("SELECT x / y", Divide)
+    testBinop("SELECT x % y", Remainder)
+    testBinop("SELECT x & y", BitwiseAnd)
+    testBinop("SELECT x | y", BitwiseOr)
+    testBinop("SELECT x ^ y", BitwiseXor)
   }
 
   test("test function with comparison operations") {
-    val parsed1 = SqlParser.parse("SELECT count(*)")
     val expected1 = Project(
       UnresolvedAlias(
         AggregateExpression(Count(Literal(1)), mode = Complete, isDistinct = false)
       ) :: Nil,
       OneRowRelation
     )
-    comparePlans(parsed1, expected1)
+    test("SELECT count(*)", expected1)
 
-    val parsed2 = SqlParser.parse("SELECT f(x, y)")
     val expected2 = Project(
       UnresolvedAlias(
         UnresolvedFunction(
@@ -566,9 +474,8 @@ class SqlParserSuite extends PlanTest {
       ) :: Nil,
       OneRowRelation
     )
-    comparePlans(parsed2, expected2)
+    test("SELECT f(x, y)", expected2)
 
-    val parsed3 = SqlParser.parse("SELECT f(DISTINCT x, y)")
     val expected3 = Project(
       UnresolvedAlias(
         UnresolvedFunction(
@@ -578,9 +485,8 @@ class SqlParserSuite extends PlanTest {
       ) :: Nil,
       OneRowRelation
     )
-    comparePlans(parsed3, expected3)
+    test("SELECT f(DISTINCT x, y)", expected3)
 
-    val parsed4 = SqlParser.parse("SELECT APPROXIMATE count(DISTINCT x)")
     val expected4 = Project(
       UnresolvedAlias(
         AggregateExpression(
@@ -590,9 +496,8 @@ class SqlParserSuite extends PlanTest {
       ) :: Nil,
       OneRowRelation
     )
-    comparePlans(parsed4, expected4)
+    test("SELECT APPROXIMATE count(DISTINCT x)", expected4)
 
-    val parsed5 = SqlParser.parse("SELECT APPROXIMATE (0.1) count (DISTINCT x)")
     val expected5 = Project(
       UnresolvedAlias(
         AggregateExpression(
@@ -602,9 +507,8 @@ class SqlParserSuite extends PlanTest {
       ) :: Nil,
       OneRowRelation
     )
-    comparePlans(parsed5, expected5)
+    test("SELECT APPROXIMATE (0.1) count (DISTINCT x)", expected5)
 
-    val parsed6 = SqlParser.parse("SELECT CASE WHEN x THEN y ELSE z END")
     val expected6 = Project(
       UnresolvedAlias(
         CaseWhen(Seq(
@@ -614,9 +518,8 @@ class SqlParserSuite extends PlanTest {
       ) :: Nil,
       OneRowRelation
     )
-    comparePlans(parsed6, expected6)
+    test("SELECT CASE WHEN x THEN y ELSE z END", expected6)
 
-    val parsed7 = SqlParser.parse("SELECT CASE k WHEN x THEN y ELSE z END")
     val expected7 = Project(
       UnresolvedAlias(
         CaseKeyWhen(
@@ -628,7 +531,7 @@ class SqlParserSuite extends PlanTest {
       ) :: Nil,
       OneRowRelation
     )
-    comparePlans(parsed7, expected7)
+    test("SELECT CASE k WHEN x THEN y ELSE z END", expected7)
   }
 
   test("test whenThenElse with comparison operations") {
@@ -718,18 +621,6 @@ class SqlParserSuite extends PlanTest {
     comparePlans(parsedFloat, expectedFloat)
   }
 
-  test("test pointLiteral with comparison operations") {
-    val parsed = SqlParser.parse("SELECT POINT(0, 1, 2)")
-    val expected = Project(
-      UnresolvedAlias(
-        Literal(Point(Array(0, 1, 2)))
-      ) :: Nil,
-      OneRowRelation
-    )
-    assert("" + parsed == "" + expected)
-//    comparePlans(parsed, expected)
-  }
-
   test("test baseExpression with comparison operations") {
     val parsed1 = SqlParser.parse("SELECT *")
     val expected1 = Project(
@@ -771,20 +662,9 @@ class SqlParserSuite extends PlanTest {
   }
 
   test("test primary with comparison operations") {
-    val parsed2 = SqlParser.parse("SELECT x[y]")
-    val expected2 = Project(
-      UnresolvedAlias(
-        UnresolvedExtractValue(
-          expr("x"),
-          expr("y")
-        )
-      ) :: Nil,
-      OneRowRelation
-    )
-    comparePlans(parsed2, expected2)
+    testBinop("SELECT x[y]", UnresolvedExtractValue)
 
-/*
-    var parsed3 = SqlParser.parse("SELECT x.y")
+/*    var parsed3 = SqlParser.parse("SELECT x.y")
     var expected3 = Project(
       UnresolvedAlias(
         UnresolvedExtractValue(
@@ -799,32 +679,9 @@ class SqlParserSuite extends PlanTest {
     comparePlans(parsed3, expected3)
 */
 
-    val parsed5 = SqlParser.parse("SELECT (x)")
-    val expected5 = Project(
-      UnresolvedAlias(
-        expr("x")
-      ) :: Nil,
-      OneRowRelation
-    )
-    comparePlans(parsed5, expected5)
-
-    val parsed9 = SqlParser.parse("SELECT ~x")
-    val expected9 = Project(
-      UnresolvedAlias(
-        BitwiseNot(expr("x"))
-      ) :: Nil,
-      OneRowRelation
-    )
-    comparePlans(parsed9, expected9)
-
-    val parsed10 = SqlParser.parse("SELECT x")
-    val expected10 = Project(
-      UnresolvedAlias(
-        expr("x")
-      ) :: Nil,
-      OneRowRelation
-    )
-    comparePlans(parsed10, expected10)
+    testUnop("SELECT (x)", x => x)
+    testUnop("SELECT ~x", BitwiseNot)
+    testUnop("SELECT x", x => x)
   }
 
   test("test dotExpressionHeader with comparison operations") {
