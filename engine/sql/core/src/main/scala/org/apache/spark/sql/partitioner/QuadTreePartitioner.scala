@@ -21,7 +21,7 @@ import org.apache.spark.rdd.{RDD, ShuffledRDD}
 import org.apache.spark.shuffle.sort.SortShuffleManager
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.SparkSqlSerializer
-import org.apache.spark.sql.index.RTree
+import org.apache.spark.sql.index.{QuadTree, QuadTreeNode, RTree}
 import org.apache.spark.sql.spatial.{MBR, Point, Shape}
 import org.apache.spark.util.{MutablePair, SizeEstimator}
 
@@ -36,7 +36,7 @@ object QuadTreePartitioner {
 
   def apply(origin: RDD[(Point, InternalRow)], dimension: Int, est_partition: Int,
             sample_rate: Double, transfer_threshold: Long)
-  : (RDD[(Point, InternalRow)], Array[(MBR, Int)]) = {
+  : (RDD[(Point, InternalRow)], Array[(MBR, Int)], QuadTree) = {
     val rdd = if (sortBasedShuffleOn) {
       origin.mapPartitions { iter => iter.map(row => (row._1, row._2.copy())) }
     } else {
@@ -50,7 +50,7 @@ object QuadTreePartitioner {
       transfer_threshold, rdd)
     val shuffled = new ShuffledRDD[Point, InternalRow, InternalRow](rdd, part)
     shuffled.setSerializer(new SparkSqlSerializer(new SparkConf(false)))
-    (shuffled, part.mbrBound)
+    (shuffled, part.mbrBound, part.global_index)
   }
 }
 
@@ -64,7 +64,9 @@ class QuadTreePartitioner(est_partition: Int,
 
   require(dimension == 2, "Only two dimensions are supported for a QuadTree")
 
-  var (mbrBound, partitions) = {
+//  val root_qtree_node: QuadTreeNode = null
+
+  var (mbrBound, partitions, global_index) = {
     val (data_bounds, total_size, num_of_records) = {
       rdd.aggregate[(Bounds, Long, Int)]((null, 0, 0))((bound, data) => {
         val new_bound = if (bound._1 == null) {
@@ -98,36 +100,24 @@ class QuadTreePartitioner(est_partition: Int,
       rdd.sample(withReplacement = true, transfer_threshold / total_size, seed).map(_._1).collect()
     }
 
-    def recursiveGroupPoint(entries: Array[Point],
-                            low_bound: Seq[Double], high_bound: Seq[Double]): Array[MBR] = {
-      val center: Seq[Double] = low_bound.zip(high_bound).map(a => (a._1 + a._2) / 2.0)
-      var ans = mutable.ArrayBuffer[MBR]()
-      val grouped = entries.groupBy(p => {
-        if (p.coord(0) < center.head && p.coord(1) < center(1)) 0
-        else if (p.coord(0) >= center.head && p.coord(1) < center(1)) 1
-        else if (p.coord(0) < center.head && p.coord(1) >= center(1)) 2
-        else 3
-      })
-      for (item <- grouped) {
-        if (item._2.length > max_entries_per_node) { // split node
-          // extract the boundary count from the quadrant_number
-          val (new_low, new_high) = item._1 match {
-            case 0 => (Array(low_bound.head, low_bound(1)), Array(center.head, center(1)))
-            case 1 => (Array(center.head, low_bound(1)), Array(high_bound.head, center(1)))
-            case 2 => (Array(low_bound.head, center(1)), Array(center.head, high_bound(1)))
-            case 3 => (Array(center.head, center(1)), Array(high_bound.head, high_bound(1)))
-          }
-          ans ++= recursiveGroupPoint(item._2, new_low, new_high)
-        } else {
-          ans += new MBR(new Point(low_bound.toArray.clone()),
-            new Point(high_bound.toArray.clone()))
-        }
-      }
+    var count = 0
+    val tmp_qtree = QuadTree(sampled.zipWithIndex,
+      (data_bounds.min.head, data_bounds.min(1), data_bounds.max.head, data_bounds.max(1)))
+
+    def searchMBROnQuadTree(node: QuadTreeNode): Array[(MBR, Int)] = {
+      val ans = mutable.ArrayBuffer[(MBR, Int)]()
+      if (node.children == null){
+        val mbr = new MBR(Point(Array(node.x_low, node.y_low)),
+          Point(Array(node.x_high, node.y_high)))
+        ans += (mbr -> count)
+        node.objects = Array((mbr.centroid.coord(0), mbr.centroid.coord(1), count))
+        count += 1
+      } else for (child <- node.children) ans ++= searchMBROnQuadTree(child)
       ans.toArray
     }
 
-    val mbrs = recursiveGroupPoint(sampled, data_bounds.min, data_bounds.max)
-    (mbrs.zipWithIndex, mbrs.length)
+    val mbrs = searchMBROnQuadTree(tmp_qtree.root)
+    (mbrs, mbrs.length, tmp_qtree)
   }
 
   val rt = RTree(mbrBound.map(x => (x._1, x._2, 1)), 25) // use the default value is fine

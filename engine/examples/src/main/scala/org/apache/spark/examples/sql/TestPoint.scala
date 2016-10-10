@@ -38,10 +38,10 @@ object TestPoint {
 
     import sqlContext.implicits._
 
-    val rdd = sc.parallelize(1 to 100 map {i => PointItem(i, Point(Array(i, i)))})
+    val rdd = sc.parallelize(1 to 100 map {i => PointItem(i, new Point(Array(i, i)))})
     rdd.toDF().registerTempTable("Point1")
 
-    val rdd2 = sc.parallelize(1 to 100 map {i => PointItem(i, Point(Array(i, i)))})
+    val rdd2 = sc.parallelize(1 to 100 map {i => PointItem(i, new Point(Array(i, i)))})
     rdd2.toDF().registerTempTable("Point2")
 
     val sqlQuery = "SELECT * FROM Point2"
