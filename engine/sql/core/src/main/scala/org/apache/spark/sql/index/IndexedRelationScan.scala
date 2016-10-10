@@ -54,7 +54,7 @@ private[sql] case class IndexedRelationScan(attributes: Seq[Attribute],
   }
 
   override protected def doExecute(): RDD[InternalRow] = {
-    if (predicates.size == 1 && predicates.head.toString == "true"){
+    val after_filter = if (predicates.size == 1 && predicates.head.toString == "true"){
       relation._indexedRDD.flatMap(_.data)
     } else relation match {
       case treemap @ TreeMapIndexedRelation(_, _, _, column_keys, _) =>
@@ -250,7 +250,13 @@ private[sql] case class IndexedRelationScan(attributes: Seq[Attribute],
       case other =>
         other.indexedRDD.flatMap(_.data)
     }
+    after_filter.mapPartitionsInternal {
+      iter =>
+        val project = UnsafeProjection.create(attributes, relation.output,
+          subexpressionEliminationEnabled)
+        iter.map { row => project(row) }
+    }
   }
 
-  override def output: Seq[Attribute] = relation.output
+  override def output: Seq[Attribute] = attributes
 }
