@@ -132,7 +132,7 @@ private[sql] case class IndexedRelationScan(attributes: Seq[Attribute],
                 val ord = new DisOrdering(query_point, column_keys, rtree.isPoint)
                 val k = l.value.asInstanceOf[Number].intValue()
 
-                def knnGlobalPrune(global_part: Seq[Int]): Array[InternalRow] = {
+                def knnGlobalPrune(global_part: Set[Int]): Array[InternalRow] = {
                   val pruned = new PartitionPruningRDD(rtree._indexedRDD, global_part.contains)
                   pruned.flatMap{ packed =>
                     var tmp_ans = Array[(Shape, Int)]()
@@ -145,16 +145,26 @@ private[sql] case class IndexedRelationScan(attributes: Seq[Attribute],
                 }
 
                 // first prune, get k partitions, but partitions may not be final partitions
-                val global_part1 = rtree.global_rtree.kNN(query_point,
-                  {(a: Point, b: MBR) => b.maxDist(a)}, k, keepSame = false).map(_._2).toSeq
+                val global_part1 = {
+                  val cur_part = rtree.global_rtree.circleRangeCnt(query_point, 0.0)
+                  if (cur_part.nonEmpty && cur_part.head._3 > k) {
+                    //println("I'm here!!!")
+                    Array(cur_part.head._2).toSet
+                  } else {
+                    rtree.global_rtree.kNN(query_point,
+                      {(a: Point, b: MBR) => b.maxDist(a)}, k, keepSame = false).map(_._2).toSet
+                  }
+                }
                 val tmp_ans = knnGlobalPrune(global_part1) // to get a safe and tighter bound
                 val theta = evalDist(tmp_ans.last, query_point, column_keys, rtree.isPoint)
+                //println(global_part1.size)
 
                 // second prune, with the safe bound theta, to get the final global result
-                val global_part2 = (rtree.global_rtree.circleRange(query_point, theta).
-                  map(_._2) diff global_part1).toSeq
+                val global_part2 = rtree.global_rtree.circleRange(query_point, theta).
+                  map(_._2).toSet -- global_part1
                 val tmp_knn_res = if (global_part2.isEmpty) tmp_ans
                 else knnGlobalPrune(global_part2).union(tmp_ans).sorted(ord).take(k)
+                //println(global_part2.size)
 
                 if (knn_res == null) knn_res = tmp_knn_res
                 else knn_res = knn_res.intersect(tmp_knn_res)
