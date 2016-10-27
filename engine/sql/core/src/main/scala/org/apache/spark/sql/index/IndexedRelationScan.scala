@@ -118,7 +118,7 @@ private[sql] case class IndexedRelationScan(attributes: Seq[Attribute],
         }
       case rtree @ RTreeIndexedRelation(_, _, _, column_keys, _) =>
         if (predicates.nonEmpty) {
-          predicates.map { predicate =>
+          val res_rdds = predicates.map { predicate =>
             val (intervals, exps) = Interval.conditionToInterval(predicate, column_keys,
               rtree.dimension)
             val queryMBR = new MBR(new Point(intervals.map(_.min._1)),
@@ -145,26 +145,15 @@ private[sql] case class IndexedRelationScan(attributes: Seq[Attribute],
                 }
 
                 // first prune, get k partitions, but partitions may not be final partitions
-                val global_part1 = {
-                  val cur_part = rtree.global_rtree.circleRangeCnt(query_point, 0.0)
-                  if (cur_part.nonEmpty && cur_part.head._3 > k) {
-                    //println("I'm here!!!")
-                    Array(cur_part.head._2).toSet
-                  } else {
-                    rtree.global_rtree.kNN(query_point,
-                      {(a: Point, b: MBR) => b.maxDist(a)}, k, keepSame = false).map(_._2).toSet
-                  }
-                }
+                val global_part1 = rtree.global_rtree.kNN(query_point, k, keepSame = false).map(_._2).toSet
                 val tmp_ans = knnGlobalPrune(global_part1) // to get a safe and tighter bound
                 val theta = evalDist(tmp_ans.last, query_point, column_keys, rtree.isPoint)
-                //println(global_part1.size)
 
                 // second prune, with the safe bound theta, to get the final global result
                 val global_part2 = rtree.global_rtree.circleRange(query_point, theta).
                   map(_._2).toSet -- global_part1
                 val tmp_knn_res = if (global_part2.isEmpty) tmp_ans
                 else knnGlobalPrune(global_part2).union(tmp_ans).sorted(ord).take(k)
-                //println(global_part2.size)
 
                 if (knn_res == null) knn_res = tmp_knn_res
                 else knn_res = knn_res.intersect(tmp_knn_res)
@@ -222,7 +211,9 @@ private[sql] case class IndexedRelationScan(attributes: Seq[Attribute],
               }
               sparkContext.parallelize(final_res, 1)
             }
-          }.reduce((a, b) => a.union(b)).map(_.copy()).distinct()
+          }
+          if (predicates.length > 1) res_rdds.reduce((a, b) => a.union(b)).map(_.copy()).distinct()
+          else res_rdds.head
         } else rtree._indexedRDD.flatMap(_.data)
       case qtree @ QuadTreeIndexedRelation(_, _, _, column_keys, _) =>
         if (predicates.nonEmpty){
@@ -260,6 +251,7 @@ private[sql] case class IndexedRelationScan(attributes: Seq[Attribute],
       case other =>
         other.indexedRDD.flatMap(_.data)
     }
+
     after_filter.mapPartitionsInternal {
       iter =>
         val project = UnsafeProjection.create(attributes, relation.output,

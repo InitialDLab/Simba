@@ -35,10 +35,7 @@ object IndexExample {
     val sqlContext = new SQLContext(sc)
 
     import sqlContext.implicits._
-    sqlContext.setConf("spark.sql.index.threshold", 2.toString)
     sqlContext.setConf("spark.sql.shuffle.partitions", 100.toString)
-//    sqlContext.setConf("spark.sql.partition.method", "KDTreeParitioner")
-//    sqlContext.setConf("spark.sql.partition.method", "QuadTreePartitioner")
 
     var leftData = ListBuffer[PointData]()
     var rightData = ListBuffer[PointData]()
