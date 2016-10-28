@@ -376,17 +376,17 @@ class SQLContext private[sql](
    */
   def clearCache(): Unit = cacheManager.clearCache()
 
-  private def tableWithoutName(name: String): DataFrame = {
-    DataFrame(this, catalog.lookupRelation(SqlParser.parseTableIdentifier(name))
-      .asInstanceOf[Subquery].child)
-  }
+//  private def tableWithoutName(name: String): DataFrame = {
+//    DataFrame(this, catalog.lookupRelation(SqlParser.parseTableIdentifier(name))
+//      .asInstanceOf[Subquery].child)
+//  }
 
   def hasIndex(tableName: String, indexName: String): Boolean =
-    indexManager.lookupIndexedData(tableWithoutName(tableName), indexName).nonEmpty
+    indexManager.lookupIndexedData(table(tableName), indexName).nonEmpty
 
   def indexTable(tableName: String, indexType: IndexType,
                  indexName: String, column: List[Attribute]): Unit =
-    indexManager.createIndexQuery(tableWithoutName(tableName), indexType,
+    indexManager.createIndexQuery(table(tableName), indexType,
       indexName, column, Some(tableName))
 
   def showIndex(tableName: String): Unit = indexManager.showQuery(this, tableName)
@@ -398,7 +398,7 @@ class SQLContext private[sql](
     indexManager.loadIndex(this, indexName, fileName)
 
   def dropIndexTableByName(tableName: String, indexName: String): Unit =
-    indexManager.dropIndexByNameQuery(tableWithoutName(tableName), indexName)
+    indexManager.dropIndexByNameQuery(table(tableName), indexName)
 
   def clearIndex(): Unit = indexManager.clearIndex()
 

@@ -196,7 +196,8 @@ case class AttributeReference(
   override def equals(other: Any): Boolean = other match {
     case ar: AttributeReference =>
       name == ar.name && dataType == ar.dataType && nullable == ar.nullable &&
-        metadata == ar.metadata && exprId == ar.exprId && qualifiers == ar.qualifiers
+        metadata == ar.metadata && exprId == ar.exprId &&
+        (qualifiers.isEmpty || ar.qualifiers.isEmpty || qualifiers == ar.qualifiers)
     case _ => false
   }
 
