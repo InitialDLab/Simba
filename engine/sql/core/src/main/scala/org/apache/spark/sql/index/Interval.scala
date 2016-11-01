@@ -74,7 +74,8 @@ object Interval extends PredicateHelper{
     }
   }
   def conditionToInterval(condition: Expression, column: List[Attribute], dimension: Int)
-  : (Array[Interval], Array[Expression]) = {
+  : (Array[Interval], Array[Expression], Boolean) = {
+    var all_knn_flag = true
     val leaf_nodes = splitConjunctivePredicates(condition) // split AND expression
     val intervals: Array[Interval] = new Array[Interval](dimension)
     for (i <- 0 until dimension)
@@ -87,6 +88,7 @@ object Interval extends PredicateHelper{
           if (column.indexOf(tmp_interval._2) == i) {
             intervals(i) = intervals(i).intersect(tmp_interval._1)
           }
+          all_knn_flag = false
       } else {
         now match {
           case range @ InRange(point: Expression, point_low, point_high) =>
@@ -95,15 +97,18 @@ object Interval extends PredicateHelper{
             for (i <- 0 until dimension) {
               intervals(i) = intervals(i).intersect(new Interval(low(i), high(i)))
             }
+            all_knn_flag = false
           case knn @ InKNN(point: Expression, target, k: Literal) =>
             ans += knn
           case cr @ InCircleRange(point: Expression, target, r: Literal) =>
             ans += cr
+            all_knn_flag = false
           case _ =>
+            all_knn_flag = false
         }
       }
     }
-    (intervals, ans.toArray)
+    (intervals, ans.toArray, all_knn_flag)
   }
 
   def getBoundNumberForInterval(interval: Interval,

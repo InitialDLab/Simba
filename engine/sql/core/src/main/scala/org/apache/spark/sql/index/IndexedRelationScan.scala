@@ -119,7 +119,7 @@ private[sql] case class IndexedRelationScan(attributes: Seq[Attribute],
       case rtree @ RTreeIndexedRelation(_, _, _, column_keys, _) =>
         if (predicates.nonEmpty) {
           val res_rdds = predicates.map { predicate =>
-            val (intervals, exps) = Interval.conditionToInterval(predicate, column_keys,
+            val (intervals, exps, flag) = Interval.conditionToInterval(predicate, column_keys,
               rtree.dimension)
             val queryMBR = new MBR(new Point(intervals.map(_.min._1)),
               new Point(intervals.map(_.max._1)))
@@ -163,7 +163,7 @@ private[sql] case class IndexedRelationScan(attributes: Seq[Attribute],
                 cir_ranges = cir_ranges :+ (query_point, r)
             }
 
-            if (knn_res == null || knn_res.length > index_threshold) { // too large
+            if (knn_res == null || (!flag && knn_res.length > index_threshold)) { // too large
               var global_part = rtree.global_rtree.range(queryMBR).map(_._2).toSeq
               if (cir_ranges.nonEmpty){ // circle range
                 global_part = global_part.intersect(
@@ -218,7 +218,7 @@ private[sql] case class IndexedRelationScan(attributes: Seq[Attribute],
       case qtree @ QuadTreeIndexedRelation(_, _, _, column_keys, _) =>
         if (predicates.nonEmpty){
           predicates.map{ predicate =>
-            val (intervals, exps) = Interval.conditionToInterval(predicate, column_keys, 2)
+            val (intervals, exps, flag) = Interval.conditionToInterval(predicate, column_keys, 2)
             val queryMBR = MBR(Point(intervals.map(_.min._1)),
               Point(intervals.map(_.max._1)))
             var global_part = qtree.global_index.range(queryMBR, searchMBR = true).map(_._2).toSeq
