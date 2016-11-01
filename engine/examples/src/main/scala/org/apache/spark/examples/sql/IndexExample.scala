@@ -35,9 +35,7 @@ object IndexExample {
     val sqlContext = new SQLContext(sc)
 
     import sqlContext.implicits._
-    sqlContext.setConf("spark.sql.index.threshold", 2.toString)
-//    sqlContext.setConf("spark.sql.partition.method", "KDTreeParitioner")
-    sqlContext.setConf("spark.sql.partition.method", "QuadTreePartitioner")
+    sqlContext.setConf("spark.sql.shuffle.partitions", 100.toString)
 
     var leftData = ListBuffer[PointData]()
     var rightData = ListBuffer[PointData]()
@@ -53,18 +51,14 @@ object IndexExample {
     leftRDD.toDF().registerTempTable("point1")
     rightRDD.toDF().registerTempTable("point2")
 
-    sqlContext.sql("CREATE INDEX pointIndex ON point1(x, y) USE quadtree")
+    sqlContext.sql("CREATE INDEX pointIndex ON point1(x, y) USE rtree")
 //    sqlContext.sql("CREATE INDEX treeMapIndex ON point2 (x) USE treemap")
     sqlContext.sql("SHOW INDEX ON point1")
 
     println("----------------------------")
 
     val sqlQuery = "SELECT * FROM point1 " +
-      "WHERE POINT(point1.x, point1.y) IN CIRCLERANGE( POINT(100, 100), 142 ) " +
-      "AND POINT(point1.x, point1.y) IN CIRCLERANGE(POINT(200, 200), 20) " +
-      "AND POINT(point1.x, point1.y) IN RANGE(POINT(190, 190), POINT(210, 210)) " +
-      "AND x >= 195 AND y < 199 " +
-      "ORDER BY x"
+      "WHERE POINT(point1.x, point1.y) IN KNN( POINT(100, 100), 10 )"
     val df = sqlContext.sql(sqlQuery)
     println(df.queryExecution)
 

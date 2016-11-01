@@ -91,7 +91,8 @@ class STRPartitioner(est_partition: Int,
     val sampled = if (total_size * sample_rate <= transfer_threshold) {
       rdd.sample(withReplacement = false, sample_rate, seed).map(_._1).collect()
     } else {
-      rdd.sample(withReplacement = false, transfer_threshold / total_size, seed).map(_._1).collect()
+      rdd.sample(withReplacement = false, transfer_threshold.toDouble / total_size, seed)
+        .map(_._1).collect()
     }
 
     val dim = new Array[Int](dimension)

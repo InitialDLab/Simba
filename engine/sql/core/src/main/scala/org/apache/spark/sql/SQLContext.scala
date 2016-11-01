@@ -30,7 +30,7 @@ import org.apache.spark.sql.catalyst.encoders.encoderFor
 import org.apache.spark.sql.catalyst.errors.DialectException
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.optimizer.{DefaultOptimizer, Optimizer}
-import org.apache.spark.sql.catalyst.plans.logical.{LocalRelation, LogicalPlan}
+import org.apache.spark.sql.catalyst.plans.logical.{LocalRelation, LogicalPlan, Subquery}
 import org.apache.spark.sql.catalyst.rules.RuleExecutor
 import org.apache.spark.sql.catalyst.{InternalRow, ParserDialect, _}
 import org.apache.spark.sql.execution._
@@ -376,12 +376,18 @@ class SQLContext private[sql](
    */
   def clearCache(): Unit = cacheManager.clearCache()
 
+//  private def tableWithoutName(name: String): DataFrame = {
+//    DataFrame(this, catalog.lookupRelation(SqlParser.parseTableIdentifier(name))
+//      .asInstanceOf[Subquery].child)
+//  }
+
   def hasIndex(tableName: String, indexName: String): Boolean =
     indexManager.lookupIndexedData(table(tableName), indexName).nonEmpty
 
   def indexTable(tableName: String, indexType: IndexType,
                  indexName: String, column: List[Attribute]): Unit =
-    indexManager.createIndexQuery(table(tableName), indexType, indexName, column, Some(tableName))
+    indexManager.createIndexQuery(table(tableName), indexType,
+      indexName, column, Some(tableName))
 
   def showIndex(tableName: String): Unit = indexManager.showQuery(this, tableName)
 

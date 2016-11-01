@@ -20,7 +20,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock
 
 import org.apache.spark.Logging
 import org.apache.spark.sql.catalyst.expressions.Attribute
-import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
+import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, Subquery}
 import org.apache.spark.sql.index._
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.storage.StorageLevel._
@@ -70,11 +70,31 @@ private[sql] class IndexManager extends Logging {
   }
 
   private[sql] def lookupIndexedData(query: DataFrame): Option[IndexedData] = readLock {
-    indexedData.find(cd => query.queryExecution.analyzed.sameResult(cd.plan))
+    val tmp_res = indexedData.find(cd => query.queryExecution.analyzed.sameResult(cd.plan))
+    if (tmp_res.nonEmpty) return tmp_res
+    else {
+      indexedData.find(cd => {
+        cd.plan match {
+          case tmp_plan: Subquery =>
+            query.queryExecution.analyzed.sameResult(tmp_plan.child)
+          case _ => false
+        }
+      })
+    }
   }
 
   private[sql] def lookupIndexedData(plan: LogicalPlan): Option[IndexedData] = readLock {
-    indexedData.find(cd => plan.sameResult(cd.plan))
+    val tmp_res = indexedData.find(cd => plan.sameResult(cd.plan))
+    if (tmp_res.nonEmpty) return tmp_res
+    else {
+      indexedData.find(cd => {
+        cd.plan match {
+          case tmp_plan: Subquery =>
+            plan.sameResult(tmp_plan.child)
+          case _ => false
+        }
+      })
+    }
   }
 
   private[sql] def lookupIndexedData(query: DataFrame, indexName: String): Option[IndexedData] =
@@ -84,7 +104,17 @@ private[sql] class IndexManager extends Logging {
 
   private[sql] def lookupIndexedData(plan: LogicalPlan, indexName: String): Option[IndexedData] =
     readLock {
-      indexedData.find(cd => plan.sameResult(cd.plan) && cd.name.equals(indexName))
+      val tmp_res = indexedData.find(cd => plan.sameResult(cd.plan) && cd.name.equals(indexName))
+      if (tmp_res.nonEmpty) return tmp_res
+      else {
+        indexedData.find(cd => {
+          cd.plan match {
+            case tmp_plan: Subquery =>
+              plan.sameResult(tmp_plan.child) && cd.name.equals(indexName)
+            case _ => false
+          }
+        })
+      }
     }
 
 

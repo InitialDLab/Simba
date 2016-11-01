@@ -370,7 +370,7 @@ private[sql] abstract class SparkStrategies extends QueryPlanner[SparkPlan] {
               case p =>
                 Array(p.asInstanceOf[NamedExpression].toAttribute)
             }
-          case InCircleRange(point: Seq[NamedExpression], target: Expression, r: Literal) =>
+          case InCircleRange(point: Expression, target: Expression, r: Literal) =>
             point match {
               case wrapper: PointWrapperExpression =>
                 wrapper.points.map(_.asInstanceOf[NamedExpression].toAttribute)
