@@ -77,7 +77,7 @@ final case class Point(coord: Array[Double]) extends Shape {
     s + ")"
   }
 
-  def getMBR: MBR = new MBR(this, this)
+  def getMBR: MBR = MBR(this, this)
 }
 
 object Point{

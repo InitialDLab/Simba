@@ -16,7 +16,7 @@
 
 package edu.utah.cs.simba.spatial
 
-import com.vividsolutions.jts.geom.{Polygon => JTSPolygon, LineSegment => JTSLineSegment}
+import com.vividsolutions.jts.geom.{Polygon => JTSPolygon}
 import com.vividsolutions.jts.geom.{Coordinate, Envelope, GeometryFactory}
 import com.vividsolutions.jts.io.{WKBWriter, WKBReader, WKTWriter}
 
