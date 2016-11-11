@@ -26,6 +26,8 @@ import com.vividsolutions.jts.io.{WKBWriter, WKBReader, WKTWriter}
   * Note: Only support up to 2 dimension
   */
 case class Polygon(content: JTSPolygon) extends Shape {
+  override val dimensions = 2
+
   def this() = {
     this(null)
   }

@@ -21,6 +21,8 @@ package edu.utah.cs.simba.spatial
   * Created by dong on 3/16/16.
   */
 case class Circle(center: Point, radius: Double) extends Shape {
+  override val dimensions: Int = center.dimensions
+
   override def intersects(other: Shape): Boolean = {
     other match {
       case p: Point => contains(p)

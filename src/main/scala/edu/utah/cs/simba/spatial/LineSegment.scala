@@ -23,7 +23,9 @@ package edu.utah.cs.simba.spatial
   * Note: Currently, we only support 2D line segments.
   */
 case class LineSegment(start: Point, end: Point) extends Shape {
-  require(start.coord.length == 2 && end.coord.length == 2)
+  require(start.dimensions == 2 && end.dimensions == 2)
+
+  override val dimensions: Int = start.dimensions
 
   override def intersects(other: Shape): Boolean = {
     other match {

@@ -14,26 +14,23 @@
  *  limitations under the License.
  */
 
-package edu.utah.cs.simba.spatial
+package edu.utah.cs.simba
 
-import com.vividsolutions.jts.geom.{Geometry, Polygon => JTSPolygon}
+import org.apache.spark.sql.types.DataType
+
+import edu.utah.cs.simba.spatial.Shape
 
 /**
-  * Created by dong on 3/16/16.
+  * Created by dongx on 11/10/16.
   */
-abstract class Shape extends Serializable {
-  def minDist(other: Shape): Double
+class ShapeType private() extends DataType {
+  private[simba] type InternalType = Shape
 
-  def intersects(other: Shape): Boolean
+  override def defaultSize: Int = 16
 
-  def getMBR: MBR
+  override def asNullable: DataType = this
 
-  val dimensions: Int
+  override def simpleString: String = "Shape"
 }
 
-object Shape {
-  final def apply(g: Geometry): Shape = g match {
-    case jtsPolygon : JTSPolygon => new Polygon(jtsPolygon)
-    case _ => null
-  }
-}
+case object ShapeType extends ShapeType

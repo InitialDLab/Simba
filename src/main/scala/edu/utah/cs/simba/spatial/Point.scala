@@ -21,6 +21,8 @@ package edu.utah.cs.simba.spatial
  * Multi-Dimensional Point
  */
 final case class Point(coord: Array[Double]) extends Shape {
+  override val dimensions: Int = coord.length
+
   def this() = this(Array())
 
   override def intersects(other: Shape): Boolean = {

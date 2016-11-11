@@ -21,8 +21,10 @@ package edu.utah.cs.simba.spatial
  * Multi-Dimensional Minimum Bounding Box
  */
 case class MBR(low: Point, high: Point) extends Shape {
-  require(low.coord.length == high.coord.length)
+  require(low.dimensions == high.dimensions)
   require(low <= high)
+
+  override val dimensions: Int = low.dimensions
 
   override def intersects(other: Shape): Boolean = {
     other match {
