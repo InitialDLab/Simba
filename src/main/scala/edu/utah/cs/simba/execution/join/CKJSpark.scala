@@ -15,8 +15,9 @@
  *
  */
 
-package edu.utah.cs.simba.execution
+package edu.utah.cs.simba.execution.join
 
+import edu.utah.cs.simba.execution.SimbaPlan
 import edu.utah.cs.simba.spatial.Point
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow

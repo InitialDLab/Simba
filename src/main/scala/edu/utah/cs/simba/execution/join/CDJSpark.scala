@@ -15,7 +15,7 @@
  *
  */
 
-package edu.utah.cs.simba.execution
+package edu.utah.cs.simba.execution.join
 
 import edu.utah.cs.simba.spatial.Point
 import edu.utah.cs.simba.util.NumberUtil

@@ -15,8 +15,9 @@
  *
  */
 
-package edu.utah.cs.simba.execution
+package edu.utah.cs.simba.execution.join
 
+import edu.utah.cs.simba.execution.SimbaPlan
 import edu.utah.cs.simba.index.RTree
 import edu.utah.cs.simba.partitioner.{MapDPartition, STRPartition}
 import edu.utah.cs.simba.spatial.{MBR, Point}
@@ -78,17 +79,15 @@ case class RKJSpark(left_key: Expression, right_key: Expression, l: Literal,
           val len = entries.length.toDouble
           val grouped = entries.sortWith(_.coord(cur_dim) < _.coord(cur_dim))
             .grouped(Math.ceil(len / dim(cur_dim)).toInt).toArray
-          if (cur_dim < until_dim) {
-            grouped.map(now => recursiveGroupPoint(now, cur_dim + 1, until_dim))
-              .flatMap(list => list)
-          } else grouped.map {list =>
+          if (cur_dim < until_dim) grouped.flatMap(now => recursiveGroupPoint(now, cur_dim + 1, until_dim))
+          else grouped.map {list =>
             val min = new Array[Double](dimension).map(x => Double.MaxValue)
             val max = new Array[Double](dimension).map(x => Double.MinValue)
             list.foreach { now =>
               for (i <- min.indices) min(i) = Math.min(min(i), now.coord(i))
               for (i <- max.indices) max(i) = Math.max(max(i), now.coord(i))
             }
-            val mbr = new MBR(new Point(min), new Point(max))
+            val mbr = MBR(new Point(min), new Point(max))
             var cur_max = 0.0
             list.foreach(now => {
               val cur_dis = mbr.centroid.minDist(now)

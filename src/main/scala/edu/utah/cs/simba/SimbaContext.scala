@@ -22,7 +22,9 @@ import java.util.concurrent.atomic.AtomicReference
 
 import org.apache.spark.SparkContext
 import org.apache.spark.api.java.JavaSparkContext
-import org.apache.spark.sql.SQLContext
+import org.apache.spark.sql.{SQLContext, execution => sparkexecution}
+import org.apache.spark.sql.catalyst.optimizer.{DefaultOptimizer, Optimizer}
+import org.apache.spark.sql.execution.CacheManager
 
 import scala.collection.JavaConverters._
 import scala.collection.immutable
@@ -30,11 +32,19 @@ import scala.collection.immutable
 /**
   * Created by dongx on 11/11/16.
   */
-class SimbaContext(sc: SparkContext) extends SQLContext(sc) {
+class SimbaContext private[simba](@transient val sc: SparkContext,
+                                  @transient protected[simba] val indexManager: IndexManager) extends SQLContext(sc) {
   self =>
+  def this(sparkContext: SparkContext) = {
+    this(sparkContext, new IndexManager)
+  }
   def this(sparkContext: JavaSparkContext) = this(sparkContext.sc)
 
   protected[simba] lazy val simbaConf = new SimbaConf
+
+  protected[simba] lazy val simbaOptimizer: Optimizer = DefaultOptimizer(conf)
+
+  protected[simba] val simbaPlanner: sparkexecution.SparkPlanner = new sparkexecution.SparkPlanner(this)
 
   override def setConf(props: Properties): Unit = {
     props.asScala.foreach { case (k, v) => setConf(k, v) }
@@ -57,6 +67,10 @@ class SimbaContext(sc: SparkContext) extends SQLContext(sc) {
 
   override def getAllConfs: immutable.Map[String, String] = {
     conf.getAllConfs ++ simbaConf.getAllConfs
+  }
+
+  override def newSession(): SimbaContext = {
+    new SimbaContext(sc = sc, indexManager = indexManager)
   }
 }
 

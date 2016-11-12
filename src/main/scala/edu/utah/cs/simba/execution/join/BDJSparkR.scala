@@ -15,11 +15,13 @@
  *
  */
 
-package edu.utah.cs.simba.execution
+package edu.utah.cs.simba.execution.join
 
+import edu.utah.cs.simba.execution.SimbaPlan
 import edu.utah.cs.simba.index.RTree
 import edu.utah.cs.simba.partitioner.MapDPartition
 import edu.utah.cs.simba.spatial.Point
+import edu.utah.cs.simba.util.NumberUtil
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.{Attribute, BindReferences, Expression, JoinedRow, Literal}
@@ -30,27 +32,22 @@ import scala.util.Random
 
 /**
   * Created by dong on 1/20/16.
-  * KNN Join based on Block Nested Loop + Local R-Tree
+  * Distance Join based on Block Nested Loop + Local R-Tree
   */
-case class BKJSparkR(left_key: Expression, right_key: Expression, l: Literal,
+case class BDJSparkR(left_key: Expression, right_key: Expression, l: Literal,
                      left: SparkPlan, right: SparkPlan) extends SimbaPlan {
   override def output: Seq[Attribute] = left.output ++ right.output
 
   final val num_partitions = simbaContext.simbaConf.joinPartitions
+  final val r = NumberUtil.literalToDouble(l)
   final val max_entries_per_node = simbaContext.simbaConf.maxEntriesPerNode
-  final val k = l.value.asInstanceOf[Number].intValue()
-
-  private class DisOrdering extends Ordering[(InternalRow, Double)] {
-    override def compare(x : (InternalRow, Double), y: (InternalRow, Double)): Int =
-      -x._2.compare(y._2)
-  }
 
   override protected def doExecute(): RDD[InternalRow] = {
     val tot_rdd = left.execute().map((0, _)).union(right.execute().map((1, _)))
 
     val tot_dup_rdd = tot_rdd.flatMap {x =>
       val rand_no = new Random().nextInt(num_partitions)
-      val ans = mutable.ListBuffer[(Int, (Int, InternalRow))]()
+      var ans = mutable.ListBuffer[(Int, (Int, InternalRow))]()
       if (x._1 == 0) {
         val base = rand_no * num_partitions
         for (i <- 0 until num_partitions)
@@ -70,29 +67,26 @@ case class BKJSparkR(left_key: Expression, right_key: Expression, l: Literal,
       while (iter.hasNext) {
         val data = iter.next()
         if (data._2._1 == 0) {
-          val tmp = BindReferences.bindReference(left_key, left.output).eval(data._2._2).
+          val tmp_point = BindReferences.bindReference(left_key, left.output).eval(data._2._2).
             asInstanceOf[Point]
-          left_data += ((tmp, data._2._2))
+          left_data += ((tmp_point, data._2._2))
         } else {
-          val tmp = BindReferences.bindReference(right_key, right.output).eval(data._2._2).
+          val tmp_point = BindReferences.bindReference(right_key, right.output).eval(data._2._2).
             asInstanceOf[Point]
-          right_data += ((tmp, data._2._2))
+          right_data += ((tmp_point, data._2._2))
         }
       }
 
-      val joined_ans = mutable.ListBuffer[(InternalRow, Array[(InternalRow, Double)])]()
+      val joined_ans = mutable.ListBuffer[InternalRow]()
 
       if (right_data.nonEmpty) {
         val right_rtree = RTree(right_data.map(_._1).zipWithIndex.toArray, max_entries_per_node)
-        left_data.foreach(left =>
-          joined_ans += ((left._2, right_rtree.kNN(left._1, k, keepSame = false)
-            .map(x => (right_data(x._2)._2, x._1.minDist(left._1)))))
-        )
+        left_data.foreach(left => right_rtree.circleRange(left._1, r)
+          .foreach(x => joined_ans += new JoinedRow(left._2, right_data(x._2)._2)))
       }
 
       joined_ans.iterator
-    }.reduceByKey((left, right) => (left ++ right).sortWith(_._2 < _._2).take(k), num_partitions)
-      .flatMap { now => now._2.map(x => new JoinedRow(now._1, x._1)) }
+    }
   }
 
   override def children: Seq[SparkPlan] = Seq(left, right)
