@@ -17,11 +17,15 @@
 
 package edu.utah.cs.simba
 
+import java.util.Properties
 import java.util.concurrent.atomic.AtomicReference
 
 import org.apache.spark.SparkContext
 import org.apache.spark.api.java.JavaSparkContext
 import org.apache.spark.sql.SQLContext
+
+import scala.collection.JavaConverters._
+import scala.collection.immutable
 
 /**
   * Created by dongx on 11/11/16.
@@ -31,6 +35,29 @@ class SimbaContext(sc: SparkContext) extends SQLContext(sc) {
   def this(sparkContext: JavaSparkContext) = this(sparkContext.sc)
 
   protected[simba] lazy val simbaConf = new SimbaConf
+
+  override def setConf(props: Properties): Unit = {
+    props.asScala.foreach { case (k, v) => setConf(k, v) }
+  }
+
+  override def setConf(key: String, value: String): Unit = {
+    if (key.startsWith("simba.")) simbaConf.setConfString(key, value)
+    else conf.setConfString(key, value)
+  }
+
+  override def getConf(key: String): String = {
+    if (key.startsWith("simba.")) simbaConf.getConfString(key)
+    else conf.getConfString(key)
+  }
+
+  override def getConf(key: String, defaultValue: String): String = {
+    if (key.startsWith("simba.")) conf.getConfString(key, defaultValue)
+    else conf.getConfString(key, defaultValue)
+  }
+
+  override def getAllConfs: immutable.Map[String, String] = {
+    conf.getAllConfs ++ simbaConf.getAllConfs
+  }
 }
 
 object SimbaContext {

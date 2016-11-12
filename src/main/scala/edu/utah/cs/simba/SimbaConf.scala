@@ -49,7 +49,7 @@ private[simba] object SimbaConf {
                          stringConverter: T => String, doc: String, isPublic: Boolean): SimbaConfEntry[T] =
       simbaConfEntries.synchronized {
         if (simbaConfEntries.containsKey(key)) {
-          throw new IllegalArgumentException(s"Duplicate SQLConfEntry. $key has been registered")
+          throw new IllegalArgumentException(s"Duplicate SimbaConfEntry. $key has been registered")
         }
         val entry =
           new SimbaConfEntry[T](key, defaultValue, valueConverter, stringConverter, doc, isPublic)
@@ -185,7 +185,7 @@ private[simba] class SimbaConf extends Serializable {
     require(value != null, s"value cannot be null for key: $key")
     val entry = simbaConfEntries.get(key)
     if (entry != null) {
-      // Only verify configs in the SQLConf object
+      // Only verify configs in the SimbaConf object
       entry.valueConverter(value)
     }
     settings.put(key, value)
@@ -221,7 +221,7 @@ private[simba] class SimbaConf extends Serializable {
   def getConfString(key: String, defaultValue: String): String = {
     val entry = simbaConfEntries.get(key)
     if (entry != null && defaultValue != "<undefined>") {
-      // Only verify configs in the SQLConf object
+      // Only verify configs in the SimbaConf object
       entry.valueConverter(defaultValue)
     }
     Option(settings.get(key)).getOrElse(defaultValue)
