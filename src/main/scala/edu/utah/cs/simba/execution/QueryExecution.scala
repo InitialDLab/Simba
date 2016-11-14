@@ -10,6 +10,9 @@ import org.apache.spark.sql.execution.{SparkPlan, QueryExecution => SQLQueryExec
   */
 class QueryExecution(val simbaContext: SimbaContext, val simbaLogical: LogicalPlan)
   extends SQLQueryExecution(simbaContext, simbaLogical) {
+
+  def this(plan: LogicalPlan) = this(SimbaContext.getActive.orNull, plan)
+
   lazy val withIndexedData: LogicalPlan = {
     assertAnalyzed()
     simbaContext.indexManager.useIndexedData(withCachedData)

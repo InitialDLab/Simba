@@ -29,7 +29,7 @@ import edu.utah.cs.simba.spatial.Point
 /**
   * Created by gefei on 16-7-30.
   */
-private[sql] case class QuadTreeIndexedRelation(output: Seq[Attribute], child: SparkPlan, table_name: Option[String],
+private[simba] case class QuadTreeIndexedRelation(output: Seq[Attribute], child: SparkPlan, table_name: Option[String],
    column_keys: List[Attribute], index_name: String)(var _indexedRDD: IndexedRDD = null, var global_index: QuadTree = null)
   extends IndexedRelation with MultiInstanceRelation {
   private def checkKeys: Boolean = {
@@ -46,7 +46,7 @@ private[sql] case class QuadTreeIndexedRelation(output: Seq[Attribute], child: S
     buildIndex()
   }
 
-  private[sql] def buildIndex(): Unit = {
+  private[simba] def buildIndex(): Unit = {
     val numShufflePartitions = simbaContext.simbaConf.indexPartitions
     val sampleRate = simbaContext.simbaConf.sampleRate
     val tranferThreshold = simbaContext.simbaConf.transferThreshold

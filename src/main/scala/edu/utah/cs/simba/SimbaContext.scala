@@ -21,10 +21,13 @@ import java.util.Properties
 import java.util.concurrent.atomic.AtomicReference
 
 import edu.utah.cs.simba.execution.SimbaPlanner
+import edu.utah.cs.simba.execution.QueryExecution
+
 import org.apache.spark.SparkContext
 import org.apache.spark.api.java.JavaSparkContext
 import org.apache.spark.sql.{SQLContext, execution => sparkexecution}
 import org.apache.spark.sql.catalyst.optimizer.{DefaultOptimizer, Optimizer}
+import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.execution.CacheManager
 
 import scala.collection.JavaConverters._
@@ -75,6 +78,8 @@ class SimbaContext private[simba](@transient val sc: SparkContext,
   override def newSession(): SimbaContext = {
     new SimbaContext(sc = sc, indexManager = indexManager)
   }
+  override def executePlan(plan: LogicalPlan): execution.QueryExecution =
+    new execution.QueryExecution(plan)
 }
 
 object SimbaContext {
@@ -126,4 +131,5 @@ object SimbaContext {
   private[simba] def getActive: Option[SimbaContext] = {
     Option(activeContext.get())
   }
+
 }
