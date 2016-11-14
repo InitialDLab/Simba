@@ -94,6 +94,16 @@
       <scope>test</scope>
     </dependency>
     <dependency>
+      <groupId>org.bdgenomics.adam</groupId>
+      <artifactId>adam-core_2.10</artifactId>
+      <version>0.19.0</version>
+    </dependency>
+    <dependency>
+      <groupId>org.bdgenomics.adam</groupId>
+      <artifactId>adam-cli_2.10</artifactId>
+      <version>0.19.0</version>
+    </dependency>
+    <dependency>
       <groupId>org.postgresql</groupId>
       <artifactId>postgresql</artifactId>
       <scope>test</scope>
