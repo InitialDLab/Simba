@@ -20,6 +20,7 @@ package edu.utah.cs.simba
 import java.util.Properties
 import java.util.concurrent.atomic.AtomicReference
 
+import edu.utah.cs.simba.execution.SimbaPlanner
 import org.apache.spark.SparkContext
 import org.apache.spark.api.java.JavaSparkContext
 import org.apache.spark.sql.{SQLContext, execution => sparkexecution}
@@ -46,7 +47,7 @@ class SimbaContext private[simba](@transient val sc: SparkContext,
 
   protected[simba] lazy val simbaOptimizer: SimbaOptimizer = new SimbaOptimizer
 
-  protected[simba] val simbaPlanner: sparkexecution.SparkPlanner = new sparkexecution.SparkPlanner(this)
+  protected[simba] val simbaPlanner: sparkexecution.SparkPlanner = new SimbaPlanner(this)
 
   override def setConf(props: Properties): Unit = {
     props.asScala.foreach { case (k, v) => setConf(k, v) }
