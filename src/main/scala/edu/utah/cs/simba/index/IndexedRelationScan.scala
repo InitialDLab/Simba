@@ -1,5 +1,6 @@
 package edu.utah.cs.simba.index
 
+import edu.utah.cs.simba.execution.SimbaPlan
 import edu.utah.cs.simba.expression.{InCircleRange, InKNN}
 import edu.utah.cs.simba.spatial.{Dist, MBR, Point, Shape}
 import edu.utah.cs.simba.util.{NumberUtil, PointUtils}
@@ -15,14 +16,14 @@ import org.apache.spark.sql.execution.SparkPlan
 private[simba] case class IndexedRelationScan(attributes: Seq[Attribute],
                                                predicates: Seq[Expression],
                                                relation: IndexedRelation)
-  extends SparkPlan with PredicateHelper{
-  private def simbaContext: SimbaContext = SimbaContext.getActive.orNull
-  private def simbaConf: SimbaConf = simbaContext.simbaConf
+  extends SimbaPlan with PredicateHelper{
 
-  private val selectivity_enabled = simbaConf.indexSelectivityEnable
-  private val s_level_limit = simbaConf.indexSelectivityLevel
-  private val s_threshold = simbaConf.indexSelectivityThreshold
-  private val index_threshold = simbaConf.indexSizeThreshold
+  private val selectivity_enabled = simbaContext.simbaConf.indexSelectivityEnable
+  private val s_level_limit = simbaContext.simbaConf.indexSelectivityLevel
+  private val s_threshold = simbaContext.simbaConf.indexSelectivityThreshold
+  private val index_threshold = simbaContext.simbaConf.indexSizeThreshold
+
+  override def children:Seq[SparkPlan] = Nil // for UnaryNode
 
   class DisOrdering(origin: Point, column_keys: List[Attribute], isPoint: Boolean)
     extends Ordering[InternalRow] {
@@ -32,8 +33,6 @@ private[simba] case class IndexedRelationScan(attributes: Seq[Attribute],
       origin.minDist(a_point).compare(origin.minDist(b_point))
     }
   }
-
-  override def children:Seq[SparkPlan] = Nil // An hacker to LeafNode in SparkPlan
 
   // Tool function: Distance between row and point
   def evalDist(row: InternalRow, origin: Point, column_keys: List[Attribute],

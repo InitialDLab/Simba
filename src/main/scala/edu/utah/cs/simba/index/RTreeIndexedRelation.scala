@@ -17,7 +17,7 @@
 package edu.utah.cs.simba.index
 
 import edu.utah.cs.simba.ShapeType
-import edu.utah.cs.simba.partitioner.STRPartition
+import edu.utah.cs.simba.partitioner.{KDTreePartitioner, QuadTreePartitioner, STRPartition}
 import edu.utah.cs.simba.util.PointUtils
 import org.apache.spark.sql.catalyst.analysis.MultiInstanceRelation
 import org.apache.spark.sql.catalyst.expressions.Attribute
@@ -63,13 +63,24 @@ private[simba] case class RTreeIndexedRelation(output: Seq[Attribute], child: Sp
     val maxEntriesPerNode = simbaContext.simbaConf.maxEntriesPerNode
     val sampleRate = simbaContext.simbaConf.sampleRate
     val transferThreshold = simbaContext.simbaConf.transferThreshold
+    val partitionMethod = simbaContext.simbaConf.partitionMethod
+
     val dataRDD = child.execute().map(row => {
       (PointUtils.getFromRow(row, column_keys, child, isPoint), row)
     })
 
     val max_entries_per_node = maxEntriesPerNode
-    val (partitionedRDD, mbr_bounds) =
-      STRPartition(dataRDD, dimension, numShufflePartitions, sampleRate, transferThreshold, max_entries_per_node)
+    val (partitionedRDD, mbr_bounds) = partitionMethod match {
+      case "KDTreeParitioner" => KDTreePartitioner(dataRDD, dimension, numShufflePartitions,
+        sampleRate, transferThreshold)
+      case "QuadTreePartitioner" =>
+        val temp = QuadTreePartitioner(dataRDD, dimension, numShufflePartitions,
+          sampleRate, transferThreshold)
+        (temp._1, temp._2)
+      // only RTree needs max_entries_per_node parameter
+      case _ => STRPartition (dataRDD, dimension, numShufflePartitions,
+        sampleRate, transferThreshold, max_entries_per_node)// default
+    }
 
     val indexed = partitionedRDD.mapPartitions { iter =>
       val data = iter.toArray
