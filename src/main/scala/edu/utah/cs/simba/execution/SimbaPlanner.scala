@@ -20,13 +20,11 @@ import edu.utah.cs.simba.SimbaContext
 import edu.utah.cs.simba.execution.join._
 import edu.utah.cs.simba.plans._
 import org.apache.spark.Logging
-import org.apache.spark.sql.{Strategy, execution}
-import org.apache.spark.sql.catalyst.expressions.{Expression, IntegerLiteral, Literal, PredicateHelper}
-import org.apache.spark.sql.catalyst.planning.Unions
+import org.apache.spark.sql.Strategy
+import org.apache.spark.sql.catalyst.expressions.{Expression, Literal, PredicateHelper}
 import org.apache.spark.sql.catalyst.plans.logical
-import org.apache.spark.sql.catalyst.plans.logical.{BroadcastHint, LogicalPlan}
-import org.apache.spark.sql.catalyst.plans.physical.{HashPartitioning, RoundRobinPartitioning}
-import org.apache.spark.sql.execution._
+import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
+import org.apache.spark.sql.execution.{SparkPlan, SparkPlanner}
 
 /**
   * Created by dongx on 11/13/2016.
@@ -120,7 +118,7 @@ class SimbaPlanner(val simbaContext: SimbaContext) extends SparkPlanner(simbaCon
   object SimbaFilter extends Strategy {
     def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
       case logical.Filter(condition, child) =>
-        execution.Filter(condition, planLater(child)) :: Nil
+        Filter(condition, planLater(child)) :: Nil
       case _ => Nil
     }
   }
