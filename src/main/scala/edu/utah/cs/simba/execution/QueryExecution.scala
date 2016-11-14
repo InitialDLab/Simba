@@ -15,7 +15,9 @@ class QueryExecution(val simbaContext: SimbaContext, val simbaLogical: LogicalPl
     simbaContext.indexManager.useIndexedData(withCachedData)
   }
 
-  override lazy val optimizedPlan: LogicalPlan = simbaContext.simbaOptimizer.execute(withIndexedData)
+  override lazy val optimizedPlan: LogicalPlan = {
+    simbaContext.simbaOptimizer.execute(simbaContext.getSQLOptimizer.execute(withIndexedData))
+  }
 
   override lazy val sparkPlan: SparkPlan = {
     SQLContext.setActive(sqlContext)

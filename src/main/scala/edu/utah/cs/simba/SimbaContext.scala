@@ -42,7 +42,9 @@ class SimbaContext private[simba](@transient val sc: SparkContext,
 
   protected[simba] lazy val simbaConf = new SimbaConf
 
-  protected[simba] lazy val simbaOptimizer: Optimizer = DefaultOptimizer(conf)
+  protected[simba] def getSQLOptimizer = optimizer
+
+  protected[simba] lazy val simbaOptimizer: SimbaOptimizer = new SimbaOptimizer
 
   protected[simba] val simbaPlanner: sparkexecution.SparkPlanner = new sparkexecution.SparkPlanner(this)
 
