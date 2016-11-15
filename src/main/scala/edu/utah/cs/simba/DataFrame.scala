@@ -18,12 +18,14 @@ package edu.utah.cs.simba
 
 import edu.utah.cs.simba.execution.QueryExecution
 import edu.utah.cs.simba.expression._
+import edu.utah.cs.simba.index.IndexType
 import edu.utah.cs.simba.plans.{DistanceJoin, KNNJoin, SpatialJoin}
 import edu.utah.cs.simba.spatial.Point
 import edu.utah.cs.simba.util.{LiteralUtil, PointFromCoords}
 import org.apache.spark.sql.{DataFrame => SQLDataFrame}
 import org.apache.spark.sql.catalyst.expressions.Attribute
 import org.apache.spark.sql.catalyst.plans.logical.{Filter, LogicalPlan}
+import org.apache.spark.storage.StorageLevel
 
 /**
   * Created by dongx on 11/14/2016.
@@ -48,6 +50,7 @@ class DataFrame private[simba](
       qe
     })
   }
+
   /**
     * Spatial operation, range query.
     * {{{
@@ -55,7 +58,6 @@ class DataFrame private[simba](
     *   point.filter($"x" >= 10 && $"x" <= 20 && $"y" >= 10 && $"y" <= 20)
     * }}}
     */
-
   def range(keys: Array[String], point1: Array[Double], point2: Array[Double]): DataFrame = withPlan {
     val attrs = getAttributes(keys)
     attrs.foreach(attr => assert(attr != null, "column not found"))
@@ -180,6 +182,63 @@ class DataFrame private[simba](
       else null
     })
   }
+
+  /////////////////////////////////////////////////////////////////////////////
+  // Index operations
+  /////////////////////////////////////////////////////////////////////////////
+  /**
+    * @group extended
+    */
+  def index(indexType: IndexType, indexName: String, column: List[Attribute]): this.type = {
+    simbaContext.indexManager.createIndexQuery(this, indexType, indexName, column)
+    this
+  }
+
+  /**
+    * @group extended
+    */
+  def setStorageLevel(indexName: String, level: StorageLevel): this.type = {
+    simbaContext.indexManager.setStorageLevel(this, indexName, level)
+    this
+  }
+
+  /**
+    * @group extended
+    */
+  def dropIndex(blocking: Boolean): this.type = {
+    simbaContext.indexManager.tryDropIndexQuery(this, blocking)
+    this
+  }
+
+  /**
+    * @group extended
+    */
+  def dropIndex(): this.type = dropIndex(blocking = false)
+
+  /**
+    * @group extended
+    */
+  def dropIndexByName(indexName : String) : this.type = {
+    simbaContext.indexManager.tryDropIndexByNameQuery(this, indexName, blocking = false)
+    this
+  }
+
+  /**
+    * @group extended
+    */
+  def persistIndex(indexName: String, fileName: String): this.type = {
+    simbaContext.indexManager.persistIndex(this.simbaContext, indexName, fileName)
+    this
+  }
+
+  /**
+    * @group extended
+    */
+  def loadIndex(indexName: String, fileName: String): this.type = {
+    simbaContext.indexManager.loadIndex(this.simbaContext, indexName, fileName)
+    this
+  }
+
 
   @inline private def withPlan(logicalPlan: => LogicalPlan): DataFrame = {
     new DataFrame(simbaContext, logicalPlan)

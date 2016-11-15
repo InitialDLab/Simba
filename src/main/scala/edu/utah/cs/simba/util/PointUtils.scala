@@ -20,6 +20,7 @@ import edu.utah.cs.simba.spatial.{Point => PointType}
 import org.apache.spark.sql.Column
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.{Attribute, BindReferences}
+import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.execution.SparkPlan
 
 /**
@@ -40,6 +41,16 @@ object PointUtils {
                  isPoint: Boolean): PointType = {
     if (isPoint) {
       BindReferences.bindReference(columns.head, plan.output).eval(row).asInstanceOf[PointType]
+    } else {
+      PointType(columns.toArray.map(BindReferences.bindReference(_, plan.output).eval(row)
+        .asInstanceOf[Number].doubleValue()))
+    }
+  }
+  def getFromRow(row: InternalRow, columns: List[Attribute], plan: LogicalPlan,
+                 isPoint: Boolean): PointType = {
+    if (isPoint) {
+      BindReferences.bindReference(columns.head, plan.output).eval(row)
+        .asInstanceOf[PointType]
     } else {
       PointType(columns.toArray.map(BindReferences.bindReference(_, plan.output).eval(row)
         .asInstanceOf[Number].doubleValue()))

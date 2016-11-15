@@ -21,10 +21,12 @@ import java.util.Properties
 import java.util.concurrent.atomic.AtomicReference
 
 import edu.utah.cs.simba.execution.SimbaPlanner
+import edu.utah.cs.simba.index.IndexType
 import org.apache.spark.SparkContext
 import org.apache.spark.api.java.JavaSparkContext
+import org.apache.spark.sql.catalyst.expressions.Attribute
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
-import org.apache.spark.sql.{DataFrame => SQLDataFrame, SQLContext, execution => sparkexecution}
+import org.apache.spark.sql.{SQLContext, DataFrame => SQLDataFrame, execution => sparkexecution}
 
 import scala.collection.JavaConverters._
 import scala.collection.immutable
@@ -78,6 +80,43 @@ class SimbaContext private[simba](@transient val sc: SparkContext,
   override def newSession(): SimbaContext = {
     new SimbaContext(sc = sc, indexManager = indexManager)
   }
+
+  def hasIndex(tableName: String, indexName: String): Boolean = {
+    import SimbaImplicits._
+    indexManager.lookupIndexedData(table(tableName), indexName).nonEmpty
+  }
+
+  def indexTable(tableName: String, indexType: IndexType,
+                 indexName: String, column: List[String]): Unit = {
+    import SimbaImplicits._
+    val table = _simbaContext.table(tableName)
+    assert(table != null, "Table not found")
+    val attrs = table.queryExecution.analyzed.output
+    val columnKeys = column.map(attr => {
+      var ans: Attribute = null
+      for (i <- attrs.indices)
+        if (attrs(i).name.equals(attr)) ans = attrs(i)
+      assert(ans != null, "Attribute not found")
+      ans
+    })
+    indexManager.createIndexQuery(_simbaContext.table(tableName), indexType,
+      indexName, columnKeys, Some(tableName))
+  }
+
+  def showIndex(tableName: String): Unit = indexManager.showQuery(this, tableName)
+
+  def persistIndex(indexName: String, fileName: String): Unit =
+    indexManager.persistIndex(this, indexName, fileName)
+
+  def loadIndex(indexName: String, fileName: String): Unit =
+    indexManager.loadIndex(this, indexName, fileName)
+
+  def dropIndexTableByName(tableName: String, indexName: String): Unit = {
+    import SimbaImplicits._
+    indexManager.dropIndexByNameQuery(table(tableName), indexName)
+  }
+
+  def clearIndex(): Unit = indexManager.clearIndex()
 
   object SimbaImplicits extends Serializable {
     protected[simba] def _simbaContext: SimbaContext = self
