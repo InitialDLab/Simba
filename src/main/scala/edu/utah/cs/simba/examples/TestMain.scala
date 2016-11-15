@@ -17,6 +17,7 @@
 package edu.utah.cs.simba.examples
 
 import edu.utah.cs.simba.SimbaContext
+import edu.utah.cs.simba.index.RTreeType
 import org.apache.spark.{SparkConf, SparkContext}
 
 import scala.collection.mutable.ListBuffer
@@ -46,8 +47,18 @@ object TestMain {
     val leftDF = sc.parallelize(leftData).toDF
     val rightDF = sc.parallelize(rightData).toDF
 
-    leftDF.range(Array("x", "y"), Array(4.0, 5.0), Array(111.0, 222.0)).show(100)
+    leftDF.registerTempTable("point1")
 
+    simbaContext.sql("SELECT * FROM point1 WHERE x < 10").collect().foreach(println)
+
+    simbaContext.indexTable("point1", RTreeType, "rt", List("x", "y"))
+
+    val df = simbaContext.sql("SELECT * FROM point1 WHERE x < 10")
+    println(df.queryExecution)
+    df.collect().foreach(println)
+
+//    leftDF.range(Array("x", "y"), Array(4.0, 5.0), Array(111.0, 222.0)).show(100)
+//
 //    leftDF.knnJoin(rightDF, Array("x", "y"), Array("x", "y"), 3).show(100)
 
     sc.stop()
