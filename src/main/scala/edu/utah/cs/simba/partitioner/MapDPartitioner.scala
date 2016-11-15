@@ -28,7 +28,7 @@ import org.apache.spark.util.MutablePair
   * Determined Key-Mapping Partitioner
   */
 object MapDPartition {
-  def sortBasedShuffleOn: Boolean = SparkEnv.get.conf.get("spark.shuffle.manager") != "hash"
+  def sortBasedShuffleOn: Boolean = SparkEnv.get.conf.get("spark.shuffle.manager", "sort") != "hash"
 
   def apply[T](origin: RDD[(Int, (T, InternalRow))],
                num_partitions: Int): RDD[(Int, (T, InternalRow))] = {

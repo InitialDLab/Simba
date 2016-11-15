@@ -17,10 +17,8 @@
 package edu.utah.cs.simba.index
 
 import edu.utah.cs.simba.partitioner.RangePartition
-import org.apache.spark.sql._
 import org.apache.spark.sql.catalyst.analysis.MultiInstanceRelation
 import org.apache.spark.sql.catalyst.expressions.{Attribute, BindReferences}
-import org.apache.spark.sql.catalyst.plans.logical.Statistics
 import org.apache.spark.sql.execution.SparkPlan
 import org.apache.spark.sql.types.NumericType
 import org.apache.spark.storage.StorageLevel

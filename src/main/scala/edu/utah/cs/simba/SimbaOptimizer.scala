@@ -18,7 +18,7 @@ package edu.utah.cs.simba
 
 import edu.utah.cs.simba.plans.SpatialJoin
 import org.apache.spark.sql.catalyst.expressions.{And, Expression, PredicateHelper}
-import org.apache.spark.sql.catalyst.plans.logical.{Filter, Join, LogicalPlan}
+import org.apache.spark.sql.catalyst.plans.logical.{Filter, LogicalPlan}
 import org.apache.spark.sql.catalyst.rules.{Rule, RuleExecutor}
 
 /**

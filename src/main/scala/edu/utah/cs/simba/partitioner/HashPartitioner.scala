@@ -28,7 +28,7 @@ import org.apache.spark.util.MutablePair
   * Linear Hash Partitioner with Java hashcode
   */
 object HashPartition {
-  def sortBasedShuffleOn: Boolean = SparkEnv.get.conf.get("spark.shuffle.manager") != "hash"
+  def sortBasedShuffleOn: Boolean = SparkEnv.get.conf.get("spark.shuffle.manager", "sort") != "hash"
 
   def apply(origin: RDD[(Any, InternalRow)], num_partitions: Int): RDD[(Any, InternalRow)] = {
     val rdd = if (sortBasedShuffleOn) {

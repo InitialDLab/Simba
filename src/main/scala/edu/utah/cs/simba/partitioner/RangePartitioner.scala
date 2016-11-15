@@ -37,7 +37,7 @@ import scala.util.hashing._
   * Range Partitioner (slightly hacked from the version from Spark Core)
   */
 object RangePartition {
-  def sortBasedShuffleOn: Boolean = SparkEnv.get.conf.get("spark.shuffle.manager") != "hash"
+  def sortBasedShuffleOn: Boolean = SparkEnv.get.conf.get("spark.shuffle.manager", "sort") != "hash"
 
   def apply[K : Ordering: ClassTag, T](origin: RDD[(K, (T, InternalRow))], num_partitions: Int)
   : (RDD[(K, (T, InternalRow))], Array[K]) = {
@@ -214,7 +214,6 @@ class RangePartitioner[K : Ordering : ClassTag, V](@transient partitions: Int,
 }
 
 private[simba] object RangePartitioner {
-
   /**
     * Sketches the input RDD via reservoir sampling on each partition.
     *

@@ -23,12 +23,12 @@ import java.util.concurrent.atomic.AtomicReference
 import edu.utah.cs.simba.execution.SimbaPlanner
 import org.apache.spark.SparkContext
 import org.apache.spark.api.java.JavaSparkContext
-import org.apache.spark.sql.{SQLContext, execution => sparkexecution}
-import org.apache.spark.sql.catalyst.optimizer.{DefaultOptimizer, Optimizer}
-import org.apache.spark.sql.execution.CacheManager
+import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
+import org.apache.spark.sql.{DataFrame => SQLDataFrame, SQLContext, execution => sparkexecution}
 
 import scala.collection.JavaConverters._
 import scala.collection.immutable
+import scala.language.implicitConversions
 
 /**
   * Created by dongx on 11/11/16.
@@ -58,6 +58,9 @@ class SimbaContext private[simba](@transient val sc: SparkContext,
     else conf.setConfString(key, value)
   }
 
+  override def executePlan(plan: LogicalPlan) =
+    new execution.QueryExecution(this, plan)
+
   override def getConf(key: String): String = {
     if (key.startsWith("simba.")) simbaConf.getConfString(key)
     else conf.getConfString(key)
@@ -74,6 +77,12 @@ class SimbaContext private[simba](@transient val sc: SparkContext,
 
   override def newSession(): SimbaContext = {
     new SimbaContext(sc = sc, indexManager = indexManager)
+  }
+
+  object SimbaImplicits extends Serializable {
+    protected[simba] def _simbaContext: SimbaContext = self
+
+    implicit def dfToSimbaDF(df: SQLDataFrame): DataFrame = DataFrame(self, df.queryExecution.logical)
   }
 }
 

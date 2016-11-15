@@ -29,7 +29,7 @@ import org.apache.spark.util.MutablePair
   * Voronoi Partitioner which assigns points to its nearest pivot
   */
 object VoronoiPartition {
-  def sortBasedShuffledOn: Boolean = SparkEnv.get.conf.get("spark.shuffle.manager") != "hash"
+  def sortBasedShuffledOn: Boolean = SparkEnv.get.conf.get("spark.shuffle.manager", "sort") != "hash"
 
   def apply(origin: RDD[(Int, (Point, InternalRow))], pivot_to_group: Array[Int], num_group: Int)
   : RDD[(Int, (Point, InternalRow))] = {

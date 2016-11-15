@@ -30,7 +30,7 @@ import scala.reflect.ClassTag
   * Range Partitoner with Determined Range Bounds
   */
 object RangeDPartition {
-  def sortBasedShuffleOn: Boolean = SparkEnv.get.conf.get("spark.shuffle.manager") != "hash"
+  def sortBasedShuffleOn: Boolean = SparkEnv.get.conf.get("spark.shuffle.manager", "sort") != "hash"
 
   def apply[K: Ordering: ClassTag, T](origin: RDD[(K, (T, InternalRow))],
                                       range_bounds: Array[K]): RDD[(K, (T, InternalRow))] = {

@@ -16,7 +16,8 @@
 
 package edu.utah.cs.simba.util
 
-import edu.utah.cs.simba.spatial.Point
+import edu.utah.cs.simba.spatial.{Point => PointType}
+import org.apache.spark.sql.Column
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.{Attribute, BindReferences}
 import org.apache.spark.sql.execution.SparkPlan
@@ -24,13 +25,23 @@ import org.apache.spark.sql.execution.SparkPlan
 /**
   * Created by dongx on 11/12/2016.
   */
+
+case class PointFromColumn(cols: Seq[Column])
+
+case class PointFromCoords(coords: Seq[Double])
+
+object Point {
+  def apply(cols: Column*): PointFromColumn = PointFromColumn(cols)
+  def apply(coords: Double*): PointFromCoords = PointFromCoords(coords)
+}
+
 object PointUtils {
   def getFromRow(row: InternalRow, columns: List[Attribute], plan: SparkPlan,
-                 isPoint: Boolean): Point = {
+                 isPoint: Boolean): PointType = {
     if (isPoint) {
-      BindReferences.bindReference(columns.head, plan.output).eval(row).asInstanceOf[Point]
+      BindReferences.bindReference(columns.head, plan.output).eval(row).asInstanceOf[PointType]
     } else {
-      Point(columns.toArray.map(BindReferences.bindReference(_, plan.output).eval(row)
+      PointType(columns.toArray.map(BindReferences.bindReference(_, plan.output).eval(row)
         .asInstanceOf[Number].doubleValue()))
     }
   }

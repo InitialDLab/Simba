@@ -20,7 +20,6 @@ import java.util.concurrent.locks.ReentrantReadWriteLock
 
 import edu.utah.cs.simba.index._
 import org.apache.spark.Logging
-import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.catalyst.expressions.Attribute
 import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, Subquery}
 import org.apache.spark.storage.StorageLevel
@@ -206,7 +205,6 @@ private[simba] class IndexManager extends Logging {
     }
 
   private[simba] def showQuery(simbaContext: SimbaContext, tableName: String): Unit = readLock {
-    val query = simbaContext.table(tableName)
     indexInfos.map(row => {
       if (row.tableName.equals(tableName)) {
         // scalastyle:off println

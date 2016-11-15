@@ -32,7 +32,7 @@ import scala.collection.mutable
   * A Multi-Dimensional Data Partitioner based on Sorted-Tile Recursive Algorithm
   */
 object STRPartition {
-  def sortBasedShuffleOn: Boolean = SparkEnv.get.conf.get("spark.shuffle.manager") != "hash"
+  def sortBasedShuffleOn: Boolean = SparkEnv.get.conf.get("spark.shuffle.manager", "sort") != "hash"
 
   def apply(origin: RDD[(Point, InternalRow)], dimension: Int, est_partition: Int,
             sample_rate: Double, transfer_threshold: Long, max_entries_per_node: Int)
@@ -69,9 +69,9 @@ class STRPartitioner(est_partition: Int,
     val (data_bounds, total_size) = {
       rdd.aggregate[(Bounds, Long)]((null, 0))((bound, data) => {
         val new_bound = if (bound._1 == null) {
-          new Bounds(data._1.coord, data._1.coord)
+          Bounds(data._1.coord, data._1.coord)
         } else {
-          new Bounds(bound._1.min.zip(data._1.coord).map(x => Math.min(x._1, x._2)),
+          Bounds(bound._1.min.zip(data._1.coord).map(x => Math.min(x._1, x._2)),
             bound._1.max.zip(data._1.coord).map(x => Math.max(x._1, x._2)))
         }
         (new_bound, bound._2 + SizeEstimator.estimate(data._1))
@@ -80,7 +80,7 @@ class STRPartitioner(est_partition: Int,
           if (left._1 == null) right._1
           else if (right._1 == null) left._1
           else {
-            new Bounds(left._1.min.zip(right._1.min).map(x => Math.min(x._1, x._2)),
+            Bounds(left._1.min.zip(right._1.min).map(x => Math.min(x._1, x._2)),
               left._1.max.zip(right._1.max).map(x => Math.max(x._1, x._2)))
           }}
         (new_bound, left._2 + right._2)
@@ -143,7 +143,7 @@ class STRPartitioner(est_partition: Int,
             now_min(cur_dim) = grouped(i).head.coord(cur_dim)
             now_max(cur_dim) = grouped(i + 1).head.coord(cur_dim)
           }
-          ans += new MBR(new Point(now_min.clone()), new Point(now_max.clone()))
+          ans += MBR(new Point(now_min.clone()), new Point(now_max.clone()))
         }
         ans.toArray
       }
