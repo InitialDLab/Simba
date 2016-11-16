@@ -18,7 +18,7 @@ package edu.utah.cs.simba.index
 
 import edu.utah.cs.simba.ShapeType
 import edu.utah.cs.simba.partitioner.STRPartition
-import edu.utah.cs.simba.util.PointUtils
+import edu.utah.cs.simba.util.ShapeUtils
 import org.apache.spark.sql.catalyst.analysis.MultiInstanceRelation
 import org.apache.spark.sql.catalyst.expressions.Attribute
 import org.apache.spark.sql.execution.SparkPlan
@@ -52,7 +52,7 @@ private[simba] case class RTreeIndexedRelation(output: Seq[Attribute], child: Sp
   }
   require(checkKeys)
 
-  val dimension = PointUtils.getFromRow(child.execute().first(), column_keys, child, isPoint).coord.length
+  val dimension = ShapeUtils.getPointFromRow(child.execute().first(), column_keys, child, isPoint).coord.length
 
   if (_indexedRDD == null) {
     buildIndex()
@@ -64,7 +64,7 @@ private[simba] case class RTreeIndexedRelation(output: Seq[Attribute], child: Sp
     val sampleRate = simbaContext.simbaConf.sampleRate
     val transferThreshold = simbaContext.simbaConf.transferThreshold
     val dataRDD = child.execute().map(row => {
-      (PointUtils.getFromRow(row, column_keys, child, isPoint), row)
+      (ShapeUtils.getPointFromRow(row, column_keys, child, isPoint), row)
     })
 
     val max_entries_per_node = maxEntriesPerNode

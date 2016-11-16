@@ -19,9 +19,10 @@ package edu.utah.cs.simba.execution.join
 
 import edu.utah.cs.simba.execution.SimbaPlan
 import edu.utah.cs.simba.spatial.Point
+import edu.utah.cs.simba.util.ShapeUtils
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.{Attribute, BindReferences, Expression, JoinedRow, Literal}
+import org.apache.spark.sql.catalyst.expressions.{Attribute, Expression, JoinedRow, Literal}
 import org.apache.spark.sql.catalyst.plans.physical.Partitioning
 import org.apache.spark.sql.execution.SparkPlan
 
@@ -29,11 +30,8 @@ import org.apache.spark.sql.execution.SparkPlan
   * Created by dong on 1/20/16.
   * KNN Join based on Cartesian Product
   */
-case class CKJSpark(left_key: Expression,
-                    right_key: Expression,
-                    l: Literal,
-                    left: SparkPlan,
-                    right: SparkPlan) extends SimbaPlan {
+case class CKJSpark(left_key: Expression, right_key: Expression,
+                    l: Literal, left: SparkPlan, right: SparkPlan) extends SimbaPlan {
   override def outputPartitioning: Partitioning = left.outputPartitioning
 
   override def output: Seq[Attribute] = left.output ++ right.output
@@ -45,12 +43,10 @@ case class CKJSpark(left_key: Expression,
     val right_rdd = right.execute()
 
     left_rdd.map(row =>
-      (BindReferences.bindReference(left_key, left.output).eval(row)
-        .asInstanceOf[Point], row)
+      (ShapeUtils.getShape(left_key, left.output, row).asInstanceOf[Point], row)
     ).cartesian(right_rdd).map {
       case (l: (Point, InternalRow), r: InternalRow) =>
-        val tmp_point = BindReferences.bindReference(right_key, right.output).eval(r)
-          .asInstanceOf[Point]
+        val tmp_point = ShapeUtils.getShape(right_key, right.output, r).asInstanceOf[Point]
         l._2 -> List((tmp_point.minDist(l._1), r))
     }.reduceByKey {
       case (l_list: Seq[(Double, InternalRow)], r_list: Seq[(Double, InternalRow)]) =>

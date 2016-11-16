@@ -16,12 +16,13 @@
 
 package edu.utah.cs.simba.execution
 
-import edu.utah.cs.simba.expression.{And, InKNN, Or, Not}
+import edu.utah.cs.simba.expression._
 import edu.utah.cs.simba.spatial.Point
+import edu.utah.cs.simba.util.ShapeUtils
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.{Attribute, BindReferences, Expression, Literal, SortOrder}
-import org.apache.spark.sql.catalyst.expressions.{And => SQLAnd, Or => SQLOr, Not => SQLNot}
+import org.apache.spark.sql.catalyst.expressions.{Attribute, Expression, Literal, SortOrder}
+import org.apache.spark.sql.catalyst.expressions.{And => SQLAnd, Not => SQLNot, Or => SQLOr}
 import org.apache.spark.sql.catalyst.plans.physical.Partitioning
 import org.apache.spark.sql.execution.SparkPlan
 
@@ -33,10 +34,10 @@ case class Filter(condition: Expression, child: SparkPlan) extends SimbaPlan {
 
   private class DistanceOrdering(point: Expression, target: Point) extends Ordering[InternalRow] {
     override def compare(x: InternalRow, y: InternalRow): Int = {
-      val point_x = BindReferences.bindReference(point, child.output).eval(x).asInstanceOf[Point]
-      val point_y = BindReferences.bindReference(point, child.output).eval(y).asInstanceOf[Point]
-      val dis_x = target.minDist(point_x)
-      val dis_y = target.minDist(point_y)
+      val shape_x = ShapeUtils.getShape(point, child.output, x)
+      val shape_y = ShapeUtils.getShape(point, child.output, y)
+      val dis_x = target.minDist(shape_x)
+      val dis_y = target.minDist(shape_y)
       dis_x.compare(dis_y)
     }
   }

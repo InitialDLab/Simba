@@ -17,13 +17,14 @@
 
 package edu.utah.cs.simba.expression
 
+import edu.utah.cs.simba.{ShapeSerializer, ShapeType}
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.codegen.CodegenFallback
 import org.apache.spark.sql.catalyst.expressions.{Expression, Literal, Predicate}
 import org.apache.spark.sql.types.NumericType
-
-import edu.utah.cs.simba.spatial.{Shape, Circle, Point}
-import edu.utah.cs.simba.util.NumberUtil
+import edu.utah.cs.simba.spatial.{Circle, Point, Shape}
+import edu.utah.cs.simba.util.{NumberUtil, ShapeUtils}
+import org.apache.spark.sql.catalyst.util.GenericArrayData
 
 /**
   * Created by dongx on 11/10/16.
@@ -40,7 +41,7 @@ case class InCircleRange(shape: Expression, target: Expression, radius: Literal)
 
   /** Returns the result of evaluating this expression on a given input Row */
   override def eval(input: InternalRow): Any = {
-    val eval_shape = shape.eval(input).asInstanceOf[Shape]
+    val eval_shape = ShapeUtils.getShape(shape, input)
     val eval_target = target.eval(input).asInstanceOf[Point]
     require(eval_shape.dimensions == eval_target.dimensions)
     val eval_r = NumberUtil.literalToDouble(radius)

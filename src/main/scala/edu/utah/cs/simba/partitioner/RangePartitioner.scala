@@ -20,7 +20,7 @@ package edu.utah.cs.simba.partitioner
 import java.io.{IOException, ObjectInputStream, ObjectOutputStream}
 
 import edu.utah.cs.simba.util.SimbaSerializer
-import edu.utah.cs.simba.util.Utils
+import edu.utah.cs.simba.util.GeneralUtils
 import org.apache.spark.{Partitioner, SparkConf, SparkEnv}
 import org.apache.spark.rdd.{PartitionPruningRDD, RDD, ShuffledRDD}
 import org.apache.spark.serializer.JavaSerializer
@@ -129,7 +129,7 @@ class RangePartitioner[K : Ordering : ClassTag, V](@transient partitions: Int,
 
   def numPartitions: Int = rangeBounds.length + 1
 
-  private var binarySearch: ((Array[K], K) => Int) = Utils.makeBinarySearch[K]
+  private var binarySearch: ((Array[K], K) => Int) = GeneralUtils.makeBinarySearch[K]
 
   def getPartition(key: Any): Int = {
     val k = key.asInstanceOf[K]
@@ -177,7 +177,7 @@ class RangePartitioner[K : Ordering : ClassTag, V](@transient partitions: Int,
   }
 
   @throws(classOf[IOException])
-  private def writeObject(out: ObjectOutputStream): Unit = Utils.tryOrIOException {
+  private def writeObject(out: ObjectOutputStream): Unit = GeneralUtils.tryOrIOException {
     val sfactory = SparkEnv.get.serializer
     sfactory match {
       case js: JavaSerializer => out.defaultWriteObject()
@@ -187,7 +187,7 @@ class RangePartitioner[K : Ordering : ClassTag, V](@transient partitions: Int,
         out.writeObject(binarySearch)
 
         val ser = sfactory.newInstance()
-        Utils.serializeViaNestedStream(out, ser) { stream =>
+        GeneralUtils.serializeViaNestedStream(out, ser) { stream =>
           stream.writeObject(scala.reflect.classTag[Array[K]])
           stream.writeObject(rangeBounds)
         }
@@ -195,7 +195,7 @@ class RangePartitioner[K : Ordering : ClassTag, V](@transient partitions: Int,
   }
 
   @throws(classOf[IOException])
-  private def readObject(in: ObjectInputStream): Unit = Utils.tryOrIOException {
+  private def readObject(in: ObjectInputStream): Unit = GeneralUtils.tryOrIOException {
     val sfactory = SparkEnv.get.serializer
     sfactory match {
       case js: JavaSerializer => in.defaultReadObject()
@@ -205,7 +205,7 @@ class RangePartitioner[K : Ordering : ClassTag, V](@transient partitions: Int,
         binarySearch = in.readObject().asInstanceOf[(Array[K], K) => Int]
 
         val ser = sfactory.newInstance()
-        Utils.deserializeViaNestedStream(in, ser) { ds =>
+        GeneralUtils.deserializeViaNestedStream(in, ser) { ds =>
           implicit val classTag = ds.readObject[ClassTag[Array[K]]]()
           rangeBounds = ds.readObject[Array[K]]()
         }
@@ -226,7 +226,7 @@ private[simba] object RangePartitioner {
     // val classTagK = classTag[K] // to avoid serializing the entire partitioner object
     val sketched = rdd.mapPartitionsWithIndex { (idx, iter) =>
       val seed = byteswap32(idx ^ (shift << 16))
-      val (sample, n) = Utils.reservoirSampleAndCount(
+      val (sample, n) = GeneralUtils.reservoirSampleAndCount(
         iter, sampleSizePerPartition, seed)
       Iterator((idx, n, sample))
     }.collect()

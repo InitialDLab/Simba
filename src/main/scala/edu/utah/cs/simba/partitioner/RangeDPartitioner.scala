@@ -17,7 +17,7 @@
 
 package edu.utah.cs.simba.partitioner
 
-import edu.utah.cs.simba.util.{SimbaSerializer, Utils}
+import edu.utah.cs.simba.util.{SimbaSerializer, GeneralUtils}
 import org.apache.spark.{Partitioner, SparkConf, SparkEnv}
 import org.apache.spark.rdd.{RDD, ShuffledRDD}
 import org.apache.spark.sql.catalyst.InternalRow
@@ -54,7 +54,7 @@ class RangeDPartitioner[K: Ordering: ClassTag](range_bounds: Array[K],
                                                ascending: Boolean) extends Partitioner {
   def numPartitions: Int = range_bounds.length + 1
 
-  private val binarySearch: ((Array[K], K) => Int) = Utils.makeBinarySearch[K]
+  private val binarySearch: ((Array[K], K) => Int) = GeneralUtils.makeBinarySearch[K]
 
   def getPartition(key: Any): Int = {
     val k = key.asInstanceOf[K]

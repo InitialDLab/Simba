@@ -21,7 +21,7 @@ import edu.utah.cs.simba.expression._
 import edu.utah.cs.simba.index.IndexType
 import edu.utah.cs.simba.plans.{DistanceJoin, KNNJoin, SpatialJoin}
 import edu.utah.cs.simba.spatial.Point
-import edu.utah.cs.simba.util.{LiteralUtil, PointFromCoords}
+import edu.utah.cs.simba.util.LiteralUtil
 import org.apache.spark.sql.{DataFrame => SQLDataFrame}
 import org.apache.spark.sql.catalyst.expressions.Attribute
 import org.apache.spark.sql.catalyst.plans.logical.{Filter, LogicalPlan}
@@ -121,12 +121,12 @@ class DataFrame private[simba](
     *   point.circleRange(p, Point(10, 10), 5)
     * }}}
     */
-  def circleRange(key: String, point: PointFromCoords, r: Double): DataFrame = withPlan {
+  def circleRange(key: String, point: Array[Double], r: Double): DataFrame = withPlan {
     val attrs = getAttributes(Array(key))
     assert(attrs.head != null, "column not found")
 
     Filter(InCircleRange(attrs.head,
-      LiteralUtil(new Point(point.coords.toArray)),
+      LiteralUtil(new Point(point)),
       LiteralUtil(r)), logicalPlan)
   }
 

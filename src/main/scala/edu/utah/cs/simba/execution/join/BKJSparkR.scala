@@ -21,9 +21,10 @@ import edu.utah.cs.simba.execution.SimbaPlan
 import edu.utah.cs.simba.index.RTree
 import edu.utah.cs.simba.partitioner.MapDPartition
 import edu.utah.cs.simba.spatial.Point
+import edu.utah.cs.simba.util.ShapeUtils
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.{Attribute, BindReferences, Expression, JoinedRow, Literal}
+import org.apache.spark.sql.catalyst.expressions.{Attribute, Expression, JoinedRow, Literal}
 import org.apache.spark.sql.execution.SparkPlan
 
 import scala.collection.mutable
@@ -71,13 +72,11 @@ case class BKJSparkR(left_key: Expression, right_key: Expression, l: Literal,
       while (iter.hasNext) {
         val data = iter.next()
         if (data._2._1 == 0) {
-          val tmp = BindReferences.bindReference(left_key, left.output).eval(data._2._2).
-            asInstanceOf[Point]
-          left_data += ((tmp, data._2._2))
+          val tmp_point = ShapeUtils.getShape(left_key, left.output, data._2._2).asInstanceOf[Point]
+          left_data += ((tmp_point, data._2._2))
         } else {
-          val tmp = BindReferences.bindReference(right_key, right.output).eval(data._2._2).
-            asInstanceOf[Point]
-          right_data += ((tmp, data._2._2))
+          val tmp_point = ShapeUtils.getShape(right_key, right.output, data._2._2).asInstanceOf[Point]
+          right_data += ((tmp_point, data._2._2))
         }
       }
 

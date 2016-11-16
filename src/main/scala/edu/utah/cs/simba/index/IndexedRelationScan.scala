@@ -4,7 +4,7 @@ package edu.utah.cs.simba.index
 import edu.utah.cs.simba.execution.SimbaPlan
 import edu.utah.cs.simba.expression.{InCircleRange, InKNN}
 import edu.utah.cs.simba.spatial.{Dist, MBR, Point, Shape}
-import edu.utah.cs.simba.util.{NumberUtil, PointUtils}
+import edu.utah.cs.simba.util.{NumberUtil, ShapeUtils}
 import org.apache.spark.rdd.{PartitionPruningRDD, RDD}
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.{Attribute, Expression, Literal, PredicateHelper, UnsafeProjection}
@@ -28,8 +28,8 @@ private[simba] case class IndexedRelationScan(attributes: Seq[Attribute],
   class DisOrdering(origin: Point, column_keys: List[Attribute], isPoint: Boolean)
     extends Ordering[InternalRow] {
     def compare(a: InternalRow, b: InternalRow): Int = {
-      val a_point = PointUtils.getFromRow(a, column_keys, relation, isPoint)
-      val b_point = PointUtils.getFromRow(b, column_keys, relation, isPoint)
+      val a_point = ShapeUtils.getPointFromRow(a, column_keys, relation, isPoint)
+      val b_point = ShapeUtils.getPointFromRow(b, column_keys, relation, isPoint)
       origin.minDist(a_point).compare(origin.minDist(b_point))
     }
   }
@@ -37,7 +37,7 @@ private[simba] case class IndexedRelationScan(attributes: Seq[Attribute],
   // Tool function: Distance between row and point
   def evalDist(row: InternalRow, origin: Point, column_keys: List[Attribute],
                isPoint: Boolean): Double = {
-    origin.minDist(PointUtils.getFromRow(row, column_keys, relation, isPoint))
+    origin.minDist(ShapeUtils.getPointFromRow(row, column_keys, relation, isPoint))
   }
 
   override protected def doExecute(): RDD[InternalRow] = {
@@ -174,7 +174,7 @@ private[simba] case class IndexedRelationScan(attributes: Seq[Attribute],
                       val res = index.range(queryMBR, s_level_limit, s_threshold)
                       if (res.isEmpty) { // full scan
                         packed.data.filter(row => queryMBR.intersects(
-                          PointUtils.getFromRow(row, column_keys, relation, rtree.isPoint)
+                          ShapeUtils.getPointFromRow(row, column_keys, relation, rtree.isPoint)
                         ))
                       } else res.get.map(x => packed.data(x._2))
                     } else index.range(queryMBR).map(x => packed.data(x._2))
@@ -191,7 +191,7 @@ private[simba] case class IndexedRelationScan(attributes: Seq[Attribute],
               else tmp_rdd
             } else {
               val final_res = knn_res.filter {row =>
-                val tmp_point = PointUtils.getFromRow(row, column_keys, relation,
+                val tmp_point = ShapeUtils.getPointFromRow(row, column_keys, relation,
                   rtree.isPoint)
                 val contain = cir_ranges.forall(x => tmp_point.minDist(x._1) <= x._2)
                 contain && queryMBR.contains(tmp_point)

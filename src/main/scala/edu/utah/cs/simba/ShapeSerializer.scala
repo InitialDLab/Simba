@@ -38,18 +38,21 @@ object ShapeSerializer {
   kryo.register(classOf[Circle], new KryoShapeSerializer)
   kryo.register(classOf[LineSegment], new KryoShapeSerializer)
   kryo.addDefaultSerializer(classOf[Shape], new KryoShapeSerializer)
+  kryo.setReferences(false)
 
   def deserialize(data: Array[Byte]): Shape = {
     val in = new ByteArrayInputStream(data)
     val input = new Input(in)
-    kryo.readObject(input, classOf[Shape])
+    val res = kryo.readObject(input, classOf[Shape])
+    input.close()
+    res
   }
 
   def serialize(o: Shape): Array[Byte] = {
     val out = new ByteArrayOutputStream()
     val output = new Output(out)
     kryo.writeObject(output, o)
-    output.flush()
+    output.close()
     out.toByteArray
   }
 }

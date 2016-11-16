@@ -18,10 +18,10 @@
 package edu.utah.cs.simba.execution.join
 
 import edu.utah.cs.simba.spatial.Point
-import edu.utah.cs.simba.util.NumberUtil
+import edu.utah.cs.simba.util.{NumberUtil, ShapeUtils}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.{Attribute, BindReferences, Expression, JoinedRow, Literal}
+import org.apache.spark.sql.catalyst.expressions.{Attribute, Expression, JoinedRow, Literal}
 import org.apache.spark.sql.catalyst.plans.physical.Partitioning
 import org.apache.spark.sql.execution.SparkPlan
 
@@ -41,10 +41,8 @@ case class CDJSpark(left_key: Expression, right_key: Expression,
     left.execute().cartesian(right.execute()).mapPartitions { iter =>
       val joinedRow = new JoinedRow
       iter.filter { row =>
-        val point1 = BindReferences.bindReference(left_key, left.output).eval(row._1).
-          asInstanceOf[Point]
-        val point2 = BindReferences.bindReference(right_key, right.output).eval(row._2).
-          asInstanceOf[Point]
+        val point1 = ShapeUtils.getShape(left_key, left.output, row._1).asInstanceOf[Point]
+        val point2 = ShapeUtils.getShape(right_key, right.output, row._2).asInstanceOf[Point]
         point1.minDist(point2) <= r
       }.map(row => joinedRow(row._1, row._2))
     }

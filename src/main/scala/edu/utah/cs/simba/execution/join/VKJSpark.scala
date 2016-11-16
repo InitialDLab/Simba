@@ -20,10 +20,10 @@ package edu.utah.cs.simba.execution.join
 import edu.utah.cs.simba.execution.SimbaPlan
 import edu.utah.cs.simba.partitioner.{MapDPartition, VoronoiPartition}
 import edu.utah.cs.simba.spatial.Point
-import edu.utah.cs.simba.util.BoundedPriorityQueue
+import edu.utah.cs.simba.util.{BoundedPriorityQueue, ShapeUtils}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.{Attribute, BindReferences, Expression, JoinedRow, Literal}
+import org.apache.spark.sql.catalyst.expressions.{Attribute, Expression, JoinedRow, Literal}
 import org.apache.spark.sql.execution.SparkPlan
 
 import scala.collection.mutable
@@ -232,13 +232,11 @@ case class VKJSpark(left_key: Expression, right_key: Expression, l: Literal,
 
   override def doExecute(): RDD[InternalRow] = {
     val left_rdd = left.execute().map(row =>
-      (BindReferences.bindReference(left_key, left.output).eval(row)
-        .asInstanceOf[Point], row)
+      (ShapeUtils.getShape(left_key, left.output, row).asInstanceOf[Point], row)
     )
 
     val right_rdd = right.execute().map(row =>
-      (BindReferences.bindReference(right_key, right.output).eval(row)
-        .asInstanceOf[Point], row)
+      (ShapeUtils.getShape(right_key, right.output, row).asInstanceOf[Point], row)
     )
 
     val pivots = generatePivots(left_rdd.map(_._1).union(right_rdd.map(_._1)), num_of_pivots)

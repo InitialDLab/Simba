@@ -31,7 +31,7 @@ import scala.util.control.NonFatal
   * Created by dongx on 11/11/16.
   * Sampling and searching utils
   */
-private[simba] object Utils extends Logging {
+private[simba] object GeneralUtils extends Logging {
   def makeBinarySearch[K : Ordering : ClassTag] : (Array[K], K) => Int = {
     // For primitive keys, we can use the natural ordering. Otherwise, use the Ordering comparator.
     classTag[K] match {

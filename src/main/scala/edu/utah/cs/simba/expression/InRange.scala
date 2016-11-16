@@ -17,10 +17,13 @@
 
 package edu.utah.cs.simba.expression
 
+import edu.utah.cs.simba.{ShapeSerializer, ShapeType}
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.{Expression, Literal, Predicate}
 import org.apache.spark.sql.catalyst.expressions.codegen.CodegenFallback
-import edu.utah.cs.simba.spatial.{Shape, MBR, Point}
+import edu.utah.cs.simba.spatial.{MBR, Point, Shape}
+import edu.utah.cs.simba.util.ShapeUtils
+import org.apache.spark.sql.catalyst.util.GenericArrayData
 
 /**
   * Created by dongx on 11/10/16.
@@ -30,7 +33,7 @@ case class InRange(shape: Expression, range_low: Expression, range_high: Express
   override def nullable: Boolean = false
 
   override def eval(input: InternalRow): Any = {
-    val eval_shape = shape.eval(input).asInstanceOf[Shape]
+    val eval_shape = ShapeUtils.getShape(shape, input)
     val eval_low = range_low.asInstanceOf[Literal].value.asInstanceOf[Point]
     val eval_high = range_high.asInstanceOf[Literal].value.asInstanceOf[Point]
     require(eval_shape.dimensions == eval_low.dimensions && eval_shape.dimensions == eval_high.dimensions)
