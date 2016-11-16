@@ -189,8 +189,8 @@ class DataFrame private[simba](
   /**
     * @group extended
     */
-  def index(indexType: IndexType, indexName: String, column: List[Attribute]): this.type = {
-    simbaContext.indexManager.createIndexQuery(this, indexType, indexName, column)
+  def index(indexType: IndexType, indexName: String, column: Array[String]): this.type = {
+    simbaContext.indexManager.createIndexQuery(this, indexType, indexName, getAttributes(column).toList)
     this
   }
 

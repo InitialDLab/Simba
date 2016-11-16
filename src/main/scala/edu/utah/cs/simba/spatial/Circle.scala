@@ -17,10 +17,14 @@
 
 package edu.utah.cs.simba.spatial
 
+import edu.utah.cs.simba.ShapeType
+import org.apache.spark.sql.types.SQLUserDefinedType
+
 
 /**
   * Created by dong on 3/16/16.
   */
+@SQLUserDefinedType(udt = classOf[ShapeType])
 case class Circle(center: Point, radius: Double) extends Shape {
   override val dimensions: Int = center.dimensions
 

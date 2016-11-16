@@ -16,8 +16,7 @@
 
 package edu.utah.cs.simba.util
 
-import edu.utah.cs.simba.expression.{And, Or}
-import org.apache.spark.sql.catalyst.expressions.Expression
+import org.apache.spark.sql.catalyst.expressions.{Expression, And, Or}
 
 /**
   * Created by gefei on 2016/11/15.

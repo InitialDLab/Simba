@@ -18,10 +18,13 @@
 package edu.utah.cs.simba.spatial
 
 import com.vividsolutions.jts.geom.{Geometry, Polygon => JTSPolygon}
+import edu.utah.cs.simba.ShapeType
+import org.apache.spark.sql.types.SQLUserDefinedType
 
 /**
   * Created by dong on 3/16/16.
   */
+@SQLUserDefinedType(udt = classOf[ShapeType])
 abstract class Shape extends Serializable {
   def minDist(other: Shape): Double
 

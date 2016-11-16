@@ -49,13 +49,14 @@ object TestMain {
 
     leftDF.registerTempTable("point1")
 
-    simbaContext.sql("SELECT * FROM point1 WHERE x < 10").collect().foreach(println)
+    //simbaContext.sql("SELECT * FROM point1 WHERE x < 10").collect().foreach(println)
 
-    simbaContext.indexTable("point1", RTreeType, "rt", List("x", "y"))
+//    simbaContext.indexTable("point1", RTreeType, "rt", List("x", "y"))
+    leftDF.index(RTreeType, "rt", Array("x", "y"))
 
-    val df = simbaContext.sql("SELECT * FROM point1 WHERE x < 10")
+    val df = leftDF.knn(Array("x", "y"), Array(10.0, 10), 3)
     println(df.queryExecution)
-    df.collect().foreach(println)
+    df.show()
 
 //    leftDF.range(Array("x", "y"), Array(4.0, 5.0), Array(111.0, 222.0)).show(100)
 //

@@ -17,11 +17,15 @@
 
 package edu.utah.cs.simba.spatial
 
+import edu.utah.cs.simba.ShapeType
+import org.apache.spark.sql.types.SQLUserDefinedType
+
 /**
   * Created by dongx on 5/31/16.
   * This is a simple implementation for Line Segment.
   * Note: Currently, we only support 2D line segments.
   */
+@SQLUserDefinedType(udt = classOf[ShapeType])
 case class LineSegment(start: Point, end: Point) extends Shape {
   require(start.dimensions == 2 && end.dimensions == 2)
 

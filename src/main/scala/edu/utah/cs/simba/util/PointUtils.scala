@@ -31,11 +31,6 @@ case class PointFromColumn(cols: Seq[Column])
 
 case class PointFromCoords(coords: Seq[Double])
 
-object Point {
-  def apply(cols: Column*): PointFromColumn = PointFromColumn(cols)
-  def apply(coords: Double*): PointFromCoords = PointFromCoords(coords)
-}
-
 object PointUtils {
   def getFromRow(row: InternalRow, columns: List[Attribute], plan: SparkPlan,
                  isPoint: Boolean): PointType = {

@@ -17,11 +17,15 @@
 
 package edu.utah.cs.simba.spatial
 
+import edu.utah.cs.simba.ShapeType
+import org.apache.spark.sql.types.SQLUserDefinedType
+
 /**
  * Created by dong on 1/15/16.
  * Multi-Dimensional Point
  */
-final case class Point(coord: Array[Double]) extends Shape {
+@SQLUserDefinedType(udt = classOf[ShapeType])
+case class Point(coord: Array[Double]) extends Shape {
   override val dimensions: Int = coord.length
 
   def this() = this(Array())

@@ -23,30 +23,30 @@ import edu.utah.cs.simba.index.{IndexedRelation, IndexedRelationScan}
 import edu.utah.cs.simba.plans._
 import edu.utah.cs.simba.util.PredicateUtil
 import org.apache.spark.Logging
-import org.apache.spark.sql.Strategy
-import org.apache.spark.sql.catalyst.expressions.{Expression, Literal, PredicateHelper}
+import org.apache.spark.sql.{Strategy, catalyst}
+import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeSet, Expression, Literal, NamedExpression, PredicateHelper}
 import org.apache.spark.sql.catalyst.planning.PhysicalOperation
 import org.apache.spark.sql.catalyst.plans.logical
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
-import org.apache.spark.sql.execution.{SparkPlan, SparkPlanner}
+import org.apache.spark.sql.execution.{Project, SparkPlan, SparkPlanner}
 
 /**
   * Created by dongx on 11/13/2016.
   */
 class SimbaPlanner(val simbaContext: SimbaContext) extends SparkPlanner(simbaContext) {
   override def strategies: Seq[Strategy] =
-    super.strategies ++ (
-      SpatialJoinExtractor ::
-        IndexRelationScans ::
-        SimbaFilter :: Nil)
+    (SpatialJoinExtractor ::
+      IndexRelationScans ::
+      SimbaFilter :: Nil) ++ super.strategies
 
-  object IndexRelationScans extends Strategy with PredicateHelper{
+  object IndexRelationScans extends Strategy with PredicateHelper {
     import org.apache.spark.sql.catalyst.expressions._
     lazy val indexInfos = simbaContext.indexManager.getIndexInfo
 
     def lookupIndexInfo(attributes: Seq[Attribute]): IndexInfo =
-      indexInfos.find(item => attributes.count(item.attributes.contains)
-        == attributes.length).orNull
+      indexInfos
+        .find(item => attributes.count(now => item.attributes.exists(x => x.semanticEquals(now))) == attributes.length)
+        .orNull
 
     def mapIndexedExpression(expression: Expression): Expression = {
       val tmp_exp = expression match {
@@ -115,7 +115,7 @@ class SimbaPlanner(val simbaContext: SimbaContext) extends SparkPlanner(simbaCon
           if (predicatesCanBeIndexed.toString // TODO ugly hack
             .compareTo(Seq(filters.reduceLeftOption(And).getOrElse(true)).toString) == 0) Seq[Expression]()
           else filters
-        pruneFilterProject(
+        pruneFilterProjectionForIndex(
           projectList,
           parentFilter,
           identity[Seq[Expression]],
@@ -155,7 +155,7 @@ class SimbaPlanner(val simbaContext: SimbaContext) extends SparkPlanner(simbaCon
     }
   }
 
-  object SpatialJoinExtractor extends Strategy with PredicateHelper{
+  object SpatialJoinExtractor extends Strategy with PredicateHelper {
     def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
       case ExtractSpatialJoinKeys(leftKey, rightKey, k, KNNJoin, left, right) =>
         simbaContext.simbaConf.knnJoin match {
@@ -198,6 +198,24 @@ class SimbaPlanner(val simbaContext: SimbaContext) extends SparkPlanner(simbaCon
       case logical.Filter(condition, child) =>
         Filter(condition, planLater(child)) :: Nil
       case _ => Nil
+    }
+  }
+
+  def pruneFilterProjectionForIndex(projectList: Seq[NamedExpression], filterPredicates: Seq[Expression],
+                                    prunePushedDownFilters: Seq[Expression] => Seq[Expression],
+                                    scanBuilder: Seq[Attribute] => SparkPlan): SparkPlan = {
+    val projectSet = AttributeSet(projectList.flatMap(_.references))
+    val filterSet = AttributeSet(filterPredicates.flatMap(_.references))
+    val filterCondition: Option[Expression] =
+      prunePushedDownFilters(filterPredicates).reduceLeftOption(catalyst.expressions.And)
+
+    if (AttributeSet(projectList.map(_.toAttribute)) == projectSet &&
+      filterSet.subsetOf(projectSet)) {
+      val scan = scanBuilder(projectList.asInstanceOf[Seq[Attribute]])
+      filterCondition.map(Filter(_, scan)).getOrElse(scan)
+    } else {
+      val scan = scanBuilder((projectSet ++ filterSet).toSeq)
+      Project(projectList, filterCondition.map(Filter(_, scan)).getOrElse(scan))
     }
   }
 }

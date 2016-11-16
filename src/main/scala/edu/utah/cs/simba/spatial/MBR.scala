@@ -17,10 +17,14 @@
 
 package edu.utah.cs.simba.spatial
 
+import edu.utah.cs.simba.ShapeType
+import org.apache.spark.sql.types.SQLUserDefinedType
+
 /**
  * Created by dong on 1/15/16.
  * Multi-Dimensional Minimum Bounding Box
  */
+@SQLUserDefinedType(udt = classOf[ShapeType])
 case class MBR(low: Point, high: Point) extends Shape {
   require(low.dimensions == high.dimensions)
   require(low <= high)

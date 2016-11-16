@@ -87,7 +87,7 @@ class SimbaContext private[simba](@transient val sc: SparkContext,
   }
 
   def indexTable(tableName: String, indexType: IndexType,
-                 indexName: String, column: List[String]): Unit = {
+                 indexName: String, column: Array[String]): Unit = {
     import SimbaImplicits._
     val table = _simbaContext.table(tableName)
     assert(table != null, "Table not found")
@@ -98,7 +98,7 @@ class SimbaContext private[simba](@transient val sc: SparkContext,
         if (attrs(i).name.equals(attr)) ans = attrs(i)
       assert(ans != null, "Attribute not found")
       ans
-    })
+    }).toList
     indexManager.createIndexQuery(_simbaContext.table(tableName), indexType,
       indexName, columnKeys, Some(tableName))
   }

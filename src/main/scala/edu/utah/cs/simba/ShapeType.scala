@@ -17,21 +17,31 @@
 
 package edu.utah.cs.simba
 
-import org.apache.spark.sql.types.DataType
-
+import org.apache.spark.sql.types._
 import edu.utah.cs.simba.spatial.Shape
+import org.apache.spark.sql.catalyst.util.{GenericArrayData, ArrayData}
 
 /**
   * Created by dongx on 11/10/16.
   */
-class ShapeType private() extends DataType {
-  private[simba] type InternalType = Shape
+private[simba] class ShapeType extends UserDefinedType[Shape] {
+  override def sqlType: DataType = ArrayType(ByteType, containsNull = false)
 
-  override def defaultSize: Int = 16
+  override def serialize(s: Any): Any = {
+    s match {
+      case o: Shape =>
+        new GenericArrayData(ShapeSerializer.serialize(o))
+    }
+  }
 
-  override def asNullable: DataType = this
+  override def userClass: Class[Shape] = classOf[Shape]
 
-  override def simpleString: String = "Shape"
+  override def deserialize(datum: Any): Shape = {
+    datum match {
+      case values: ArrayData =>
+        ShapeSerializer.deserialize(values.toByteArray)
+    }
+  }
 }
 
 case object ShapeType extends ShapeType

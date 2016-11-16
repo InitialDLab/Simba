@@ -5,7 +5,6 @@ import edu.utah.cs.simba.execution.SimbaPlan
 import edu.utah.cs.simba.expression.{InCircleRange, InKNN}
 import edu.utah.cs.simba.spatial.{Dist, MBR, Point, Shape}
 import edu.utah.cs.simba.util.{NumberUtil, PointUtils}
-import edu.utah.cs.simba.{SimbaConf, SimbaContext}
 import org.apache.spark.rdd.{PartitionPruningRDD, RDD}
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.{Attribute, Expression, Literal, PredicateHelper, UnsafeProjection}
@@ -17,7 +16,7 @@ import org.apache.spark.sql.execution.SparkPlan
 private[simba] case class IndexedRelationScan(attributes: Seq[Attribute],
                                               predicates: Seq[Expression],
                                               relation: IndexedRelation)
-  extends SimbaPlan with PredicateHelper{
+  extends SimbaPlan with PredicateHelper {
 
   private val selectivity_enabled = simbaContext.simbaConf.indexSelectivityEnable
   private val s_level_limit = simbaContext.simbaConf.indexSelectivityLevel
@@ -135,7 +134,7 @@ private[simba] case class IndexedRelationScan(attributes: Seq[Attribute],
                 // first prune, get k partitions, but partitions may not be final partitions
                 val global_part1 = rtree.global_rtree.kNN(query_point, k, keepSame = false).map(_._2).toSet
                 val tmp_ans = knnGlobalPrune(global_part1) // to get a safe and tighter bound
-              val theta = evalDist(tmp_ans.last, query_point, column_keys, rtree.isPoint)
+                val theta = evalDist(tmp_ans.last, query_point, column_keys, rtree.isPoint)
 
                 // second prune, with the safe bound theta, to get the final global result
                 val global_part2 = rtree.global_rtree.circleRange(query_point, theta).

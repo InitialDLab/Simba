@@ -19,13 +19,16 @@ package edu.utah.cs.simba.spatial
 
 import com.vividsolutions.jts.geom.{Polygon => JTSPolygon}
 import com.vividsolutions.jts.geom.{Coordinate, Envelope, GeometryFactory}
-import com.vividsolutions.jts.io.{WKBWriter, WKBReader, WKTWriter}
+import com.vividsolutions.jts.io.{WKBReader, WKBWriter, WKTWriter}
+import edu.utah.cs.simba.ShapeType
+import org.apache.spark.sql.types.SQLUserDefinedType
 
 /**
   * Created by Dong Xie on 3/16/2016.
   * Light wraper of JTS Polygon
   * Note: Only support up to 2 dimension
   */
+@SQLUserDefinedType(udt = classOf[ShapeType])
 case class Polygon(content: JTSPolygon) extends Shape {
   override val dimensions = 2
 
