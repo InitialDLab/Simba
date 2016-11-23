@@ -21,7 +21,7 @@ export MAVEN_OPTS="-Xmx2g -XX:MaxPermSize=512M -XX:ReservedCodeCacheSize=512m"
 - Build Simba project
 ```
 cd /path/to/simba/engine/
-./make-distribution.sh --skip-java-test --tgz --mvn mvn -Phadoop-2.6 -Pyarn -Dhadoop.verison=2.6.2 -DskipTests
+./make-distribution.sh --skip-java-test --tgz --mvn mvn -Phadoop-2.6 -Pyarn -Dhadoop.version=2.6.4 -DskipTests
 ```
 * The output distribution of Simba is in the directory `/path/to/simba/dist/`.
 
