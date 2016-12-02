@@ -88,7 +88,10 @@ class STRPartitioner(est_partition: Int,
     }
 
     val seed = System.currentTimeMillis()
-    val sampled = if (total_size * sample_rate <= transfer_threshold) {
+    // TODO a better sample strategy is needed
+    val sampled =  if (total_size * sample_rate <= 0.05 * transfer_threshold) {
+      rdd.mapPartitions(part => part.map(_._1)).collect()
+    } else if (total_size * sample_rate <= transfer_threshold) {
       rdd.sample(withReplacement = false, sample_rate, seed).map(_._1).collect()
     } else {
       rdd.sample(withReplacement = false, transfer_threshold.toDouble / total_size, seed)
@@ -104,9 +107,9 @@ class STRPartitioner(est_partition: Int,
 
     def recursiveGroupPoint(entries: Array[Point], now_min: Array[Double],
                             now_max: Array[Double], cur_dim: Int, until_dim: Int): Array[MBR] = {
-      val len = entries.length.toDouble
+      val len = entries.length
       val grouped = entries.sortWith(_.coord(cur_dim) < _.coord(cur_dim))
-        .grouped(Math.ceil(len / dim(cur_dim)).toInt).toArray
+        .grouped(Math.ceil(len * 1.0 / dim(cur_dim)).toInt).toArray
       var ans = mutable.ArrayBuffer[MBR]()
       if (cur_dim < until_dim) {
         for (i <- grouped.indices) {
