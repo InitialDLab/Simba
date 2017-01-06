@@ -23,9 +23,9 @@ import org.apache.spark.{SparkConf, SparkContext}
 import scala.collection.mutable.ListBuffer
 
 /**
-  * Created by dongx on 11/14/2016.
-  */
-object TestMain {
+ *  A few examples for simba project
+ */
+object SimbaExample {
   case class PointData(x: Double, y: Double, z: Double, other: String)
 
   def main(args: Array[String]): Unit = {
@@ -48,19 +48,23 @@ object TestMain {
     val rightDF = sc.parallelize(rightData).toDF
 
     leftDF.registerTempTable("point1")
+    rightDF.registerTempTable("point2")
 
-    //simbaContext.sql("SELECT * FROM point1 WHERE x < 10").collect().foreach(println)
-
-//    simbaContext.indexTable("point1", RTreeType, "rt", List("x", "y"))
+    // Simba RTree index create
+    println("--------------------------\n Creating index \n--------------------------")
     leftDF.index(RTreeType, "rt", Array("x", "y"))
 
-    val df = leftDF.knn(Array("x", "y"), Array(10.0, 10), 3)
-    println(df.queryExecution)
-    df.show()
+    // Simba single table query
+    println("--------------------------\n Indexed knn query\n--------------------------")
+    leftDF.knn(Array("x", "y"), Array(10.0, 10), 3).show()
+    println("--------------------------\n Indexed range query\n--------------------------")
+    leftDF.range(Array("x", "y"), Array(4.0, 5.0), Array(111.0, 222.0)).show(10)
 
-//    leftDF.range(Array("x", "y"), Array(4.0, 5.0), Array(111.0, 222.0)).show(100)
-//
-//    leftDF.knnJoin(rightDF, Array("x", "y"), Array("x", "y"), 3).show(100)
+    // Simba join operator
+    println("--------------------------\n knn join operation\n--------------------------")
+    leftDF.knnJoin(rightDF, Array("x", "y"), Array("x", "y"), 3).show(10)
+    println("--------------------------\n distance join operation\n--------------------------")
+    leftDF.distanceJoin(rightDF, Array("x", "y"), Array("x", "y"), 1.42).show(10)
 
     sc.stop()
   }
