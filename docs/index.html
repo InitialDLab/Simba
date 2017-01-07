@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+  <meta charset="UTF-8">
+  <title>Simba: Spatial In-Memory Big data Analytics</title>
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="renderer" content="webkit">
+  <meta http-equiv="Cache-Control" content="no-siteapp"/>
+  <link rel="alternate icon" type="image/png" href="image/favicon.png">
+  <link rel="stylesheet" href="css/amazeui.min.css"/>
+  <link rel="stylesheet" href="css/index.css"/>
+</head>
+<body>
+<a href="https://github.com/InitialDLab/Simba"><img style="position: absolute; top: 0; right: 0; border: 0; z-index:99999" src="https://camo.githubusercontent.com/e7bbb0521b397edbd5fe43e7f760759336b5e05f/68747470733a2f2f73332e616d617a6f6e6177732e636f6d2f6769746875622f726962626f6e732f666f726b6d655f72696768745f677265656e5f3030373230302e706e67" alt="Fork me on GitHub" data-canonical-src="https://s3.amazonaws.com/github/ribbons/forkme_right_green_007200.png"></a>
+<header class="am-topbar am-topbar-inverse am-topbar-fixed-top">
+  <div class="am-container">
+    <h1 class="am-topbar-brand">
+      <a href="index.html">Simba</a>
+    </h1>
+
+    <button class="am-topbar-btn am-topbar-toggle am-btn am-btn-sm am-btn-secondary am-show-sm-only"
+            data-am-collapse="{target: '#collapse-head'}"><span class="am-sr-only">Navigation</span> <span
+        class="am-icon-bars"></span></button>
+
+    <div class="am-collapse am-topbar-collapse" id="collapse-head">
+      <ul class="am-nav am-nav-pills am-topbar-nav">
+        <li><a href="">Home</a></li>
+        <li><a href="#publication">Publications</a></li>
+        <!-- <li class="am-dropdown" data-am-dropdown>
+       <a class="am-dropdown-toggle" data-am-dropdown-toggle href="javascript:;">
+         Documentation <span class="am-icon-caret-down"></span>
+       </a>
+       <ul class="am-dropdown-content">
+         <li><a href="#">Latest Release (Simba 1.0)</a></li>
+         <li><a href="#">Other Resources</a></li>
+       </ul>
+     </li> -->
+        <li><a href="#team">Team</a></li>
+        <!--<li><a href="example.html">Examples</a></li>
+        <li><a href="#">WebInterface</a></li>
+        <li><a href="#faq">FAQ</a></li>!-->
+      </ul>
+    </div>
+  </div>
+</header>
+
+<div class="get">
+  <div class="am-g">
+    <div class="am-u-lg-9 am-u-sm-centered">
+      <div class="get-title">
+        <h1 class="get-sub-title"><font color="#0e90d2">S</font>patial <font color="#0e90d2">I</font>n-<font color="#0e90d2">M</font>emory <font color="#0e90d2">B</font>ig data <font color="#0e90d2">A</font>nalytics</h1>
+      </div>
+      <div class="index-intro">
+        <p>
+          Simba is a distributed in-memory spatial analytics engine based on <a href="http://spark.apache.org/">Apache Spark</a>.
+          It extends the Spark SQL engine across the system stack to support <b>rich spatial queries and analytics</b> through both <b>SQL</b> and
+          <b>DataFrame</b> query interfaces. Besides, Simba introduces <b>native indexing support over RDDs</b> in order to develop efficient spatial operators.
+          It also extends Spark SQL's query optimizer with <b>spatial-aware and cost-based optimizations</b> to make the best use of
+          existing indexes and statistics.
+       </p>
+       <a class="am-btn am-btn-primary" href="https://github.com/InitialDLab/Simba">Download</a>
+     </div>
+     </div>
+    </div>
+  </div>
+
+<div class="detail">
+  <div class="am-g am-container">
+    <div class="am-u-lg-12 am-u-sm-centered">
+      <h2 class="detail-h2">Core Features</h2>
+
+      <div class="am-g">
+        <div class="am-u-lg-3 am-u-md-6 am-u-sm-12 detail-mb">
+
+          <h3 class="detail-h3">
+            <i class="am-icon-cogs am-icon-sm"></i>
+            SQL &amp; DataFrame API
+          </h3>
+
+          <p class="detail-p">
+            Simba extends the SQL and DatFrame query interfaces of Spark SQL,
+            providing a natural way to express complex spatial analysis queries.
+          </p>
+        </div>
+        <div class="am-u-lg-3 am-u-md-6 am-u-sm-12 detail-mb">
+          <h3 class="detail-h3">
+            <i class="am-icon-table am-icon-sm"></i>
+             Index over RDDs
+          </h3>
+
+          <p class="detail-p">
+            Simba supports building native (spatial) indexes over RDDs inside the kernel to achieve superior
+            query performance over large data sets.
+          </p>
+        </div>
+        <div class="am-u-lg-3 am-u-md-6 am-u-sm-12 detail-mb">
+          <h3 class="detail-h3">
+            <i class="am-icon-tasks am-icon-sm"></i>
+            Efficient Algorithms
+          </h3>
+
+          <p class="detail-p">
+            Simba implements efficient algorithms for different spatial operators, which are
+            tailored to its indexing support and underlying Spark engine.
+          </p>
+        </div>
+        <div class="am-u-lg-3 am-u-md-6 am-u-sm-12 detail-mb">
+          <h3 class="detail-h3">
+            <i class="am-icon-send-o am-icon-sm"></i>
+            Query Optimizations
+          </h3>
+
+          <p class="detail-p">
+            Simba introduces spatial and index-aware optimizations to both logical and physical optimizers of Spark SQL,
+            and utilizes a CBO module to select good query plans.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<a name="publication"></a>
+<hr data-am-widget="divider" style="" class="am-divider am-divider-default" />
+
+<!--<div class="news am-u-lg-8 am-u-md-offset-2">!-->
+<!--  <div class="am-panel am-panel-success" style="background:#d9edf7">!-->
+<!--    <div class="am-panel-bd">News: Simba 1.2 has been released for the latest Spark 2.0</div>!-->
+<!--</div>!-->
+<!--</div>!-->
+<div class="publication am-u-lg-9 am-u-sm-centered">
+  <h1><a name="publication">Publications</a></h1>
+  <table class="am-table am-table-bordered am-table-striped am-table-compact">
+  <thead>
+  <tr>
+    <th>Venue</th>
+    <th>Publication</th>
+    <th>Link</th>
+  </tr>
+  </thead>
+  <tbody>
+  <tr>
+    <td><a href="http://sigmod2016.org/">SIGMOD 2016</a></td>
+    <td><span class="text-bold">Simba: Efficient In-Memory Spatial Analytics</span><br/>
+        Dong Xie, Feifei Li, Bin Yao, Gefei Li, Liang Zhou, Minyi Guo
+    </td>
+    <td><a href="paper/simba-sigmod.pdf">pdf</a></td>
+  </tr>
+  <tr>
+    <td><a href="http://sigspatial2016.sigspatial.org">SIGSPATIAL 2016</a></td>
+    <td><span class="text-bold">Simba: Spatial In-Memory Big Data Analysis (Demo Paper)</span><br/>
+        Dong Xie, Feifei Li, Bin Yao, Gefei Li, Zhongpu Chen, Liang Zhou, Minyi Guo
+    </td>
+    <td><a href="paper/simba-demo.pdf">pdf</a></td>
+  </tr>
+  </tbody>
+</table>
+</div>
+<hr data-am-widget="divider" style="" class="am-divider am-divider-default am-no-layout">
+<div class="team am-u-lg-9 am-u-sm-centered">
+      <h1><a name="team">Team</a></h1>
+      <div class="am-g am-container">
+    <div class="am-u-lg-4 am-u-md-6 am-u-sm-12">
+      <img src="image/school.png" alt="" data-am-scrollspy="{animation:'slide-left', repeat: false}">
+      <hr class="am-article-divider am-show-sm-only hope-hr">
+    </div>
+    <div class="am-u-lg-8 am-u-md-6 am-u-sm-12">
+      <ul>
+        <li><a href="http://www.cs.utah.edu/~dongx/">Dong Xie</a>: dongx [at] cs [dot] utah [dot] edu</li>
+        <li>Gefei Li</li>
+        <li>Liang Zhou</li>
+		<li>Zhongpu Chen</li>
+        <li><a href="http://www.cs.utah.edu/~lifeifei/">Feifei Li</li>
+        <li><a href="http://www.cs.sjtu.edu.cn/~yaobin/">Bin Yao</a></li>
+		<li>Minyi Guo</li>
+      </ul>
+    </div>
+  </div>
+</div>
+<!--
+<hr data-am-widget="divider" style="" class="am-divider am-divider-default am-no-layout">
+<div class="faq am-u-lg-9 am-u-sm-centered">
+  <h1><a name="faq">Simba FAQ</a></h1>
+  <h2>How does Simba relate to Spark SQL?</h2>
+    <p class="text-small">Simba builds on Spark SQL and is optimized specially for large scale spatial
+    queries and analytics over multi-dimensional data sets.</p>
+  <h2>How does Simba relate to Spark SQL?</h2>
+    <p class="text-small">Simba builds on Spark SQL and is optimized specially for large scale spatial
+      queries and analytics over multi-dimensional data sets.</p>
+  <h2>How does Simba relate to Spark SQL?</h2>
+      <p class="text-small">Simba builds on Spark SQL and is optimized specially for large scale spatial
+        queries and analytics over multi-dimensional data sets.</p>
+</div>
+!-->
+<footer class="footer am-u-lg-12">
+  <p>© 2016 <a href="http://www.utah.edu/" target="_blank">The University Of Utah</a> and <a
+      href="http://www.utah.edu/" target="_blank"> Shanghai Jiao Tong University </a>. Powered by the AmazeUI</p>
+</footer>
+
+<!--[if lt IE 9]>
+<script src="http://libs.baidu.com/jquery/1.11.1/jquery.min.js"></script>
+<script src="http://cdn.staticfile.org/modernizr/2.8.3/modernizr.js"></script>
+<script src="/js/amazeui.ie8polyfill.min.js"></script>
+<![endif]-->
+
+<!--[if (gte IE 9)|!(IE)]><!-->
+<script src="js/jquery-2.2.3.min.js"></script>
+<!--<![endif]-->
+<script src="js/amazeui.min.js"></script>
+</body>
+</html>

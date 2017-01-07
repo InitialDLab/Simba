@@ -1,0 +1,114 @@
+.html{
+  font-family: Helvetica,Arial,sans-serif;
+}
+
+.get {
+  background: #eee;
+  color: #333;
+  text-align: left;
+  padding-top: 30px;
+  padding-bottom: 60px;
+  padding-left: 100px;
+  padding-right: 100px;
+}
+
+.get-title {
+  background: url(../image/logo.png);
+  background-repeat: no-repeat;
+  background-position: left, top;
+  font-size: 400%;
+  padding-bottom: 20px;
+  padding-top: 60px;
+  display: inline-block;
+}
+
+.get-sub-title {
+  font-size: 20pt;
+  padding-left: 290px;
+  color: #888;
+}
+
+.index-intro {
+  font-size: 15pt;
+  padding-left: 40px;
+}
+
+.get-btn {
+  background: #fff;
+}
+
+.detail {
+  background: #fff;
+}
+
+.detail-h2 {
+  text-align: center;
+  font-size: 180%;
+  margin: 30px 0;
+}
+
+.detail-h3 {
+  color: #1f8dd6;
+}
+
+.detail-p {
+  color: #7f8c8d;
+}
+
+.detail-mb {
+  margin-bottom: 30px;
+}
+
+.publication {
+  padding-left: 120px;
+  padding-right: 100px;
+  padding-bottom: 30px;
+}
+.team {
+  padding-left: 120px;
+  padding-right: 100px;
+  padding-bottom: 30px;
+}
+
+.faq {
+  padding-left: 120px;
+  padding-right: 100px;
+  padding-bottom: 30px;
+
+}
+
+.news {
+  padding-left: 120px;
+  padding-right: 100px;
+  padding-top: 20px;
+  font-size: 10pt;
+  color: #3a87ad;
+}
+
+.example {
+  padding-left: 120px;
+  padding-right: 100px;
+  padding-top: 40px;
+}
+
+.footer p {
+  color: #7f8c8d;
+  margin: 0;
+  padding: 15px 0;
+  text-align: center;
+  background: #2d3e50;
+}
+
+.text-bold {
+  font-weight: bold;
+}
+
+.text-bule {
+  color: #317eac;
+}
+.text-big {
+  font-size: 200%;
+}
+.text-small {
+  font-size: 90%;
+}
