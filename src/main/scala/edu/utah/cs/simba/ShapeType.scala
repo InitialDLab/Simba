@@ -17,9 +17,10 @@
 
 package edu.utah.cs.simba
 
+import com.vividsolutions.jts.geom.{Polygon => JTSPolygon}
 import org.apache.spark.sql.types._
-import edu.utah.cs.simba.spatial.Shape
-import org.apache.spark.sql.catalyst.util.{GenericArrayData, ArrayData}
+import edu.utah.cs.simba.spatial.{Polygon, Shape}
+import org.apache.spark.sql.catalyst.util.{ArrayData, GenericArrayData}
 
 /**
   * Created by dongx on 11/10/16.
@@ -31,6 +32,9 @@ private[simba] class ShapeType extends UserDefinedType[Shape] {
     s match {
       case o: Shape =>
         new GenericArrayData(ShapeSerializer.serialize(o))
+      case g: JTSPolygon => // An ugly hack here
+        val pol = Polygon(g)
+        new GenericArrayData(ShapeSerializer.serialize(pol))
     }
   }
 

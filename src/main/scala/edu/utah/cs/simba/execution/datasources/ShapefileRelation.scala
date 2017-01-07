@@ -16,16 +16,13 @@
 
 package edu.utah.cs.simba.execution.datasources
 
-import com.vividsolutions.jts.geom.{GeometryFactory, Point, Polygon}
+import com.vividsolutions.jts.geom.{GeometryFactory, Point => JTSPoint, Polygon => JTSPolygon}
 import edu.utah.cs.simba.ShapeType
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{Row, SQLContext}
 import org.apache.spark.sql.sources.{BaseRelation, Filter, PrunedFilteredScan}
 import org.apache.spark.sql.types.{StructField, StructType}
 
-/**
-  * Created by gefei on 16-7-31.
-  */
 class ShapefileRelation(path: String)(@transient val sqlContext: SQLContext)
   extends BaseRelation with PrunedFilteredScan {
 
@@ -39,8 +36,8 @@ class ShapefileRelation(path: String)(@transient val sqlContext: SQLContext)
     val shapes = ShapeFile.Parser(path)(gf)
     val shapefileRdd = sqlContext.sparkContext
       .parallelize(shapes).map(_.g match {
-      case p: Polygon => edu.utah.cs.simba.spatial.Polygon(p)
-      case p: Point => edu.utah.cs.simba.spatial.Point(p)
+      case p: JTSPolygon => edu.utah.cs.simba.spatial.Polygon(p)
+      case p: JTSPoint => edu.utah.cs.simba.spatial.Point(p)
       //      case _ => ???
     })
 
