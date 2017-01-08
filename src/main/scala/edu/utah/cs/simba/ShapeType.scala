@@ -32,9 +32,6 @@ private[simba] class ShapeType extends UserDefinedType[Shape] {
     s match {
       case o: Shape =>
         new GenericArrayData(ShapeSerializer.serialize(o))
-      case g: JTSPolygon => // An ugly hack here
-        val pol = Polygon(g)
-        new GenericArrayData(ShapeSerializer.serialize(pol))
     }
   }
 
