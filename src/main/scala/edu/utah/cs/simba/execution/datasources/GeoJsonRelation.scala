@@ -38,9 +38,9 @@ class GeoJsonRelation(path: String)(@transient val sqlContext: SQLContext)
     StructType(StructField("shape", ShapeType, true) :: Nil)
   }
 
-  case class GeoJSon(`type`: String, features: List[Feature])
-  case class Feature(`type`: String, properties: Option[Map[String, String]], geometry: Geometry)
-  case class Geometry(`type`: String, coordinates: JsValue) {
+  private case class GeoJSon(`type`: String, features: List[Feature])
+  private case class Feature(`type`: String, properties: Option[Map[String, String]], geometry: Geometry)
+  private case class Geometry(`type`: String, coordinates: JsValue) {
     private def extractPoints(p: List[JsValue]) = {
       p.map {
         case (JsArray(ListBuffer(JsNumber(x), JsNumber(y)))) =>
