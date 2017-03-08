@@ -25,6 +25,7 @@ import org.apache.spark.sql.simba.util.ShapeUtils
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.{Attribute, Expression, JoinedRow, Literal}
+import org.apache.spark.sql.catalyst.plans.physical.{Partitioning, UnknownPartitioning}
 import org.apache.spark.sql.execution.SparkPlan
 
 import scala.collection.mutable
@@ -43,6 +44,8 @@ case class RKJSpark(left_key: Expression, right_key: Expression, l: Literal,
   final val theta_boost = simbaSessionState.simbaConf.thetaBoost
   final val max_entries_per_node = simbaSessionState.simbaConf.maxEntriesPerNode
   final val k = l.value.asInstanceOf[Number].intValue()
+
+  override def outputPartitioning: Partitioning = UnknownPartitioning(num_partitions)
 
   override protected def doExecute(): RDD[InternalRow] = {
     val left_rdd = left.execute().map(row =>

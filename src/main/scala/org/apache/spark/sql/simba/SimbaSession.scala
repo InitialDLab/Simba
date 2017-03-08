@@ -22,7 +22,7 @@ import java.util.concurrent.atomic.AtomicReference
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.internal.Logging
 import org.apache.spark.scheduler.{SparkListener, SparkListenerApplicationEnd}
-import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.{Encoder, Row, SparkSession, DataFrame => SQLDataFrame, Dataset => SQLDataset}
 import org.apache.spark.sql.catalyst.expressions.Attribute
 import org.apache.spark.sql.execution.ui.SQLListener
 import org.apache.spark.sql.internal.SessionState
@@ -76,6 +76,16 @@ class SimbaSession private[simba] (@transient override val sparkContext: SparkCo
   }
 
   def clearIndex(): Unit = sessionState.indexManager.clearIndex()
+
+  object simbaImplicits extends Serializable {
+    protected[simba] def _simbaContext: SparkSession = self
+
+    implicit def datasetToSimbaDataSet[T : Encoder](ds: SQLDataset[T]): Dataset[T] =
+      Dataset(self, ds.queryExecution.logical)
+
+    implicit def dataframeToSimbaDataFrame(df: SQLDataFrame): DataFrame =
+      Dataset.ofRows(self, df.queryExecution.logical)
+  }
 }
 
 object SimbaSession {
@@ -133,7 +143,7 @@ object SimbaSession {
       // Get the session from current thread's active session.
       var session = activeThreadSession.get()
       if ((session ne null) && !session.sparkContext.isStopped) {
-        options.foreach { case (k, v) => session.sessionState.conf.setConfString(k, v) }
+        options.foreach { case (k, v) => session.sessionState.setConf(k, v) }
         if (options.nonEmpty) {
           logWarning("Using an existing SimbaSession; some configuration may not take effect.")
         }
@@ -145,7 +155,7 @@ object SimbaSession {
         // If the current thread does not have an active session, get it from the global session.
         session = defaultSession.get()
         if ((session ne null) && !session.sparkContext.isStopped) {
-          options.foreach { case (k, v) => session.sessionState.conf.setConfString(k, v) }
+          options.foreach { case (k, v) => session.sessionState.setConf(k, v) }
           if (options.nonEmpty) {
             logWarning("Using an existing SimbaSession; some configuration may not take effect.")
           }
@@ -171,7 +181,7 @@ object SimbaSession {
           sc
         }
         session = new SimbaSession(sparkContext)
-        options.foreach { case (k, v) => session.sessionState.conf.setConfString(k, v) }
+        options.foreach { case (k, v) => session.sessionState.setConf(k, v) }
         defaultSession.set(session)
 
         // Register a successfully instantiated context to the singleton. This should be at the

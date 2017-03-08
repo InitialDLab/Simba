@@ -19,8 +19,8 @@ package org.apache.spark.sql.simba
 import java.util.concurrent.locks.ReentrantReadWriteLock
 
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.simba.index._
+import org.apache.spark.sql.{Dataset => SQLDataset}
 import org.apache.spark.sql.catalyst.expressions.Attribute
 import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, SubqueryAlias}
 import org.apache.spark.storage.StorageLevel
@@ -70,7 +70,7 @@ private[simba] class IndexManager extends Logging {
     indexedData.isEmpty
   }
 
-  private[simba] def lookupIndexedData(query: DataFrame): Option[IndexedData] = readLock {
+  private[simba] def lookupIndexedData(query: SQLDataset[_]): Option[IndexedData] = readLock {
     val tmp_res = indexedData.find(cd => query.queryExecution.analyzed.sameResult(cd.plan))
     if (tmp_res.nonEmpty) return tmp_res
     else {
@@ -98,7 +98,7 @@ private[simba] class IndexManager extends Logging {
     }
   }
 
-  private[simba] def lookupIndexedData(query: DataFrame, indexName: String): Option[IndexedData] =
+  private[simba] def lookupIndexedData(query: SQLDataset[_], indexName: String): Option[IndexedData] =
     readLock {
       lookupIndexedData(query.queryExecution.analyzed, indexName)
     }
@@ -176,7 +176,7 @@ private[simba] class IndexManager extends Logging {
   }
 
 
-  private[simba] def setStorageLevel(query: DataFrame, indexName: String, newLevel: StorageLevel): Unit = writeLock {
+  private[simba] def setStorageLevel(query: SQLDataset[_], indexName: String, newLevel: StorageLevel): Unit = writeLock {
     val dataIndex = indexedData.indexWhere {
       cd => query.queryExecution.analyzed.sameResult(cd.plan) && cd.name.equals(indexName)
     }
@@ -186,7 +186,7 @@ private[simba] class IndexManager extends Logging {
       preData.indexType, preData.location, newLevel)
   }
 
-  private[simba] def createIndexQuery(query: DataFrame, indexType: IndexType, indexName: String,
+  private[simba] def createIndexQuery(query: SQLDataset[_], indexType: IndexType, indexName: String,
                                     column: List[Attribute], tableName: Option[String] = None,
                                     storageLevel: StorageLevel = MEMORY_AND_DISK): Unit =
     writeLock {
@@ -224,7 +224,7 @@ private[simba] class IndexManager extends Logging {
     })
   }
 
-  private[simba] def dropIndexQuery(query: DataFrame, blocking: Boolean = true): Unit = writeLock {
+  private[simba] def dropIndexQuery(query: Dataset[_], blocking: Boolean = true): Unit = writeLock {
     val planToIndex = query.queryExecution.analyzed
     var hasFound = false
     var found = true
@@ -239,7 +239,7 @@ private[simba] class IndexManager extends Logging {
     indexedData
   }
 
-  private[simba] def dropIndexByNameQuery(query: DataFrame,
+  private[simba] def dropIndexByNameQuery(query: SQLDataset[_],
                                         indexName: String,
                                         blocking: Boolean = true): Unit = writeLock {
     val planToIndex = query.queryExecution.analyzed
@@ -252,7 +252,7 @@ private[simba] class IndexManager extends Logging {
     indexInfos.remove(dataIndex)
   }
 
-  private[simba] def dropIndexByColumnQuery(query: DataFrame,
+  private[simba] def dropIndexByColumnQuery(query: SQLDataset[_],
                                           column: List[Attribute],
                                           blocking: Boolean = true) : Unit = writeLock {
     val planToIndex = query.queryExecution.analyzed
@@ -270,7 +270,7 @@ private[simba] class IndexManager extends Logging {
     indexInfos.remove(dataIndex)
   }
 
-  private[simba] def tryDropIndexQuery(query: DataFrame,
+  private[simba] def tryDropIndexQuery(query: SQLDataset[_],
                                      blocking: Boolean = true): Boolean = writeLock {
     val planToIndex = query.queryExecution.analyzed
     var found = true
@@ -288,7 +288,7 @@ private[simba] class IndexManager extends Logging {
     hasFound
   }
 
-  private[simba] def tryDropIndexByNameQuery(query: DataFrame,
+  private[simba] def tryDropIndexByNameQuery(query: SQLDataset[_],
                                            indexName: String,
                                            blocking: Boolean = true): Boolean = writeLock {
     val planToCache = query.queryExecution.analyzed
