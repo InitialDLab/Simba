@@ -21,9 +21,8 @@ import org.apache.spark.sql.simba.{ShapeSerializer, ShapeType}
 import org.apache.spark.sql.simba.expression.PointWrapper
 import org.apache.spark.sql.simba.spatial.{Point, Shape}
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.{Attribute, BindReferences, Expression}
+import org.apache.spark.sql.catalyst.expressions.{Attribute, BindReferences, Expression, UnsafeArrayData}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
-import org.apache.spark.sql.catalyst.util.GenericArrayData
 import org.apache.spark.sql.execution.SparkPlan
 
 /**
@@ -34,7 +33,7 @@ object ShapeUtils {
                       isPoint: Boolean): Point = {
     if (isPoint) {
       ShapeSerializer.deserialize(BindReferences.bindReference(columns.head, plan.output)
-        .eval(row).asInstanceOf[GenericArrayData].toByteArray).asInstanceOf[Point]
+        .eval(row).asInstanceOf[UnsafeArrayData].toByteArray).asInstanceOf[Point]
     } else {
       Point(columns.toArray.map(BindReferences.bindReference(_, plan.output).eval(row)
         .asInstanceOf[Number].doubleValue()))
@@ -44,7 +43,7 @@ object ShapeUtils {
                       isPoint: Boolean): Point = {
     if (isPoint) {
       ShapeSerializer.deserialize(BindReferences.bindReference(columns.head, plan.output)
-        .eval(row).asInstanceOf[GenericArrayData].toByteArray).asInstanceOf[Point]
+        .eval(row).asInstanceOf[UnsafeArrayData].toByteArray).asInstanceOf[Point]
     } else {
       Point(columns.toArray.map(BindReferences.bindReference(_, plan.output).eval(row)
         .asInstanceOf[Number].doubleValue()))
@@ -53,7 +52,7 @@ object ShapeUtils {
 
   def getShape(expression: Expression, input: InternalRow): Shape = {
     if (!expression.isInstanceOf[PointWrapper] && expression.dataType.isInstanceOf[ShapeType]) {
-      ShapeSerializer.deserialize(expression.eval(input).asInstanceOf[GenericArrayData].toByteArray)
+      ShapeSerializer.deserialize(expression.eval(input).asInstanceOf[UnsafeArrayData].toByteArray)
     } else if (expression.isInstanceOf[PointWrapper]) {
       expression.eval(input).asInstanceOf[Shape]
     } else throw new UnsupportedOperationException("Query shape should be of ShapeType")
@@ -62,7 +61,7 @@ object ShapeUtils {
   def getShape(expression: Expression, schema: Seq[Attribute], input: InternalRow): Shape = {
     if (!expression.isInstanceOf[PointWrapper] && expression.dataType.isInstanceOf[ShapeType]) {
       ShapeSerializer.deserialize(BindReferences.bindReference(expression, schema)
-        .eval(input).asInstanceOf[GenericArrayData].toByteArray)
+        .eval(input).asInstanceOf[UnsafeArrayData].toByteArray)
     } else if (expression.isInstanceOf[PointWrapper]) {
       BindReferences.bindReference(expression, schema).eval(input).asInstanceOf[Shape]
     } else throw new UnsupportedOperationException("Query shape should be of ShapeType")
