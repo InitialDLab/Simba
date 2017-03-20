@@ -1,4 +1,6 @@
 name := "simba"
+organization := "InitialDLab"
+
 
 version := "1.0"
 
