@@ -1,6 +1,6 @@
 Simba: Spatial In-Memory Big data Analytics
 ===========================================
-**Simba is now shipped as a standalone package outside Spark. Current version works with Spark 1.6.x. If you find any issues, please make a ticket in the issue tracking system.**
+**Simba is now shipped as a standalone package outside Spark. Current version works with Spark 2.1.x. If you find any issues, please make a ticket in the issue tracking system.**
 
 Simba is a distributed in-memory spatial analytics engine based on Apache Spark. It extends the Spark SQL engine across the system stack to support rich spatial queries and analytics through both SQL and the DataFrame API. Besides, Simba introduces native indexing support over RDDs in order to develop efficient spatial operators. It also extends Spark SQL's query optimizer with spatial-aware and cost-based optimizations to make the best use of existing indexes and statistics.
 
@@ -33,7 +33,7 @@ Developer Notes
 
 Branch Information
 ------------------
-`standalone` branches are opened for maintaining Simba standalone package, which aims at building Simba packages standing outside Spark SQL core. Currently, `master` branch and `develop` branch are built on top of Spark 1.6.x. 
+`standalone` branches are opened for maintaining Simba standalone package, which aims at building Simba packages standing outside Spark SQL core. Currently, `master` branch and `develop` branch are built on top of Spark 2.1.x. 
 
 The `master` branch provides the latest stable version, while the `develop` branch is the main development branch where new features will be merged before ready to release. For legacy reasons, we also keep branches which archives old versions of Simba, which is developed based on former Spark versions, in the branches named `simba-spark-x.x`. Note that we will only integrate latest features into `master` and `develop` branches. Please make sure you checkout the correct branch before start using it.
 
