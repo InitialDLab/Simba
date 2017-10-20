@@ -30,6 +30,7 @@ import org.apache.spark.sql.internal.StaticSQLConf._
 import org.apache.spark.sql.simba.index.IndexType
 import org.apache.spark.util.Utils
 
+import scala.language.implicitConversions
 import scala.reflect.ClassTag
 import scala.util.control.NonFatal
 
