@@ -29,7 +29,6 @@ Developer Notes
 1. Fork this repo (or create your own branch if you are a member of Simba's main development team) to start your development, **DO NOT** push your draft version to the master branch
 2. You can build your own application in `org.apache.spark.examples` package for testing or debugging.
 3. If you want to merge your feature branch to the main develop branch, please create a pull request from your local branch to develop branch (**not the master branch**).
-4. Use IDE to debug this project. If you use IntelliJ IDEA, [INSTALL](./INSTALL.md) file contains a way to import the whole project to IntelliJ IDEA
 
 Branch Information
 ------------------
