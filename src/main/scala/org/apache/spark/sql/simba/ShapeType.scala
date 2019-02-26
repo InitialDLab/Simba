@@ -1,0 +1,44 @@
+/*
+ * Copyright 2017 by Simba Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+
+package org.apache.spark.sql.simba
+
+import org.apache.spark.sql.types._
+import org.apache.spark.sql.simba.spatial.Shape
+import org.apache.spark.sql.catalyst.util.{GenericArrayData, ArrayData}
+
+/**
+  * Created by dongx on 11/10/16.
+  */
+private[simba] class ShapeType extends UserDefinedType[Shape] {
+  override def sqlType: DataType = ArrayType(ByteType, containsNull = false)
+
+  override def serialize(s: Shape): Any = {
+    new GenericArrayData(ShapeSerializer.serialize(s))
+  }
+
+  override def userClass: Class[Shape] = classOf[Shape]
+
+  override def deserialize(datum: Any): Shape = {
+    datum match {
+      case values: ArrayData =>
+        ShapeSerializer.deserialize(values.toByteArray)
+    }
+  }
+}
+
+case object ShapeType extends ShapeType
