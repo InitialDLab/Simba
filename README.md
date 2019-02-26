@@ -8,7 +8,8 @@ Simba is open sourced under Apache License 2.0. Currently, it is developed based
 
 Features
 --------------
-+ Expressive **SQL and DataFrame query interface** fully *compatible with original Spark SQL operators*. (SQL mode is currently not supported in the standalone version.)
++ Expressive **SQL and DataFrame query interface** fully *compatible with original Spark SQL operators*.  
+  ***SQL mode is currently not supported in the standalone version.***
 + Native distributed **indexing** support over RDDs.
 + Efficient **spatial operators**: *high-throughput* & *low-latency*.
     - Box range query: `IN RANGE`
